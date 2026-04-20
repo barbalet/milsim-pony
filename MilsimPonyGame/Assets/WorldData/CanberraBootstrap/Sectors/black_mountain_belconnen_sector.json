@@ -1,0 +1,116 @@
+{
+  "id": "black_mountain_belconnen_sector",
+  "displayName": "Black Mountain And Belconnen",
+  "bounds": {
+    "min": [-270.0, 0.0, -280.0],
+    "max": [70.0, 92.0, -40.0]
+  },
+  "streamingPadding": 190.0,
+  "terrainPatches": [
+    {
+      "name": "BlackMountainMass",
+      "position": [-98.0, 18.0, -118.0],
+      "size": [126.0, 128.0],
+      "cornerHeights": [34.0, 30.0, 22.0, 28.0],
+      "subdivisions": 18,
+      "color": [0.33, 0.40, 0.29, 1.0],
+      "yawDegrees": 0.0
+    },
+    {
+      "name": "BelconnenBasin",
+      "position": [-136.0, 3.0, -188.0],
+      "size": [244.0, 156.0],
+      "cornerHeights": [6.0, 4.0, 3.0, 5.0],
+      "subdivisions": 18,
+      "color": [0.35, 0.42, 0.30, 1.0],
+      "yawDegrees": -6.0
+    },
+    {
+      "name": "BruceRidge",
+      "position": [-36.0, 8.0, -166.0],
+      "size": [112.0, 126.0],
+      "cornerHeights": [14.0, 18.0, 10.0, 12.0],
+      "subdivisions": 16,
+      "color": [0.34, 0.41, 0.30, 1.0],
+      "yawDegrees": 0.0
+    }
+  ],
+  "roadStrips": [
+    {
+      "name": "BelconnenWay",
+      "position": [-86.0, 0.95, -134.0],
+      "size": [12.0, 184.0],
+      "roadColor": [0.20, 0.20, 0.22, 1.0],
+      "shoulderColor": [0.39, 0.42, 0.36, 1.0],
+      "lineColor": [0.90, 0.84, 0.50, 1.0],
+      "shoulderWidth": 1.0,
+      "centerLineWidth": 0.20,
+      "crownHeight": 0.04,
+      "yawDegrees": 84.0
+    },
+    {
+      "name": "TuggeranongParkway",
+      "position": [-118.0, 0.88, -128.0],
+      "size": [11.0, 204.0],
+      "roadColor": [0.19, 0.19, 0.21, 1.0],
+      "shoulderColor": [0.38, 0.41, 0.35, 1.0],
+      "lineColor": [0.88, 0.83, 0.48, 1.0],
+      "shoulderWidth": 0.9,
+      "centerLineWidth": 0.18,
+      "crownHeight": 0.04,
+      "yawDegrees": 0.0
+    }
+  ],
+  "grayboxBlocks": [
+    {
+      "name": "TelstraTowerCore",
+      "position": [-96.0, 44.0, -108.0],
+      "halfExtents": [1.5, 34.0, 1.5],
+      "color": [0.73, 0.75, 0.79, 1.0],
+      "yawDegrees": 0.0
+    },
+    {
+      "name": "TelstraTowerDeck",
+      "position": [-96.0, 72.0, -108.0],
+      "halfExtents": [6.0, 2.8, 6.0],
+      "color": [0.68, 0.71, 0.75, 1.0],
+      "yawDegrees": 0.0
+    },
+    {
+      "name": "BelconnenTownCentreA",
+      "position": [-148.0, 16.0, -194.0],
+      "halfExtents": [22.0, 16.0, 14.0],
+      "color": [0.45, 0.48, 0.52, 1.0],
+      "yawDegrees": 0.0
+    },
+    {
+      "name": "BelconnenTownCentreB",
+      "position": [-108.0, 11.0, -180.0],
+      "halfExtents": [15.0, 11.0, 11.0],
+      "color": [0.44, 0.47, 0.50, 1.0],
+      "yawDegrees": 0.0
+    },
+    {
+      "name": "BelconnenTower",
+      "position": [-132.0, 22.0, -176.0],
+      "halfExtents": [7.0, 22.0, 7.0],
+      "color": [0.52, 0.55, 0.59, 1.0],
+      "yawDegrees": 0.0
+    },
+    {
+      "name": "BruceCampusCluster",
+      "position": [-46.0, 8.0, -164.0],
+      "halfExtents": [18.0, 8.0, 18.0],
+      "color": [0.43, 0.46, 0.49, 1.0],
+      "yawDegrees": 0.0
+    },
+    {
+      "name": "AISBand",
+      "position": [-18.0, 4.5, -146.0],
+      "halfExtents": [10.0, 4.5, 8.0],
+      "color": [0.42, 0.45, 0.48, 1.0],
+      "yawDegrees": 0.0
+    }
+  ],
+  "collisionVolumes": []
+}

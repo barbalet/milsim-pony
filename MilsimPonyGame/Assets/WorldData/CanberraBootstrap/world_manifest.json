@@ -1,11 +1,11 @@
 {
   "worldName": "Canberra Bootstrap",
-  "sceneFile": "Scenes/parliament_bootstrap_scene.json",
+  "sceneFile": "Scenes/canberra_basin_preview_scene.json",
   "coordinateSystemFile": "CoordinateSystems/parliament_local_grid.json",
   "sectorFiles": [
-    "Sectors/parliament_precinct_sector.json",
-    "Sectors/state_circle_approach_sector.json",
-    "Sectors/parliamentary_triangle_edge_sector.json",
-    "Sectors/deakin_escape_corridor_sector.json"
+    "Sectors/east_basin_overlook_sector.json",
+    "Sectors/central_lake_basin_sector.json",
+    "Sectors/woden_valley_sector.json",
+    "Sectors/black_mountain_belconnen_sector.json"
   ]
 }

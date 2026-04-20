@@ -628,7 +628,7 @@ private final class ScenePackageBuilder {
             "Axes: x \(coordinateSystem.axisX) / z \(coordinateSystem.axisZ)",
             "Spawn: \(sceneConfiguration.spawn.label ?? "District start")",
             "Sectors: \(loadedSectors.map(\.displayName).joined(separator: ", "))",
-            "District: \(terrainCount) terrain / \(roadCount) roads / \(collisionCount) blockers",
+            "World: \(terrainCount) terrain / \(roadCount) roads / \(collisionCount) blockers",
             "Route: \(sceneConfiguration.route.name) / \(sceneConfiguration.route.checkpoints.count) checkpoints",
             "Threats: \(detectionConfiguration.observers.count) observers / \(guidanceConfiguration.coverPoints.count) cover / \(guidanceConfiguration.signposts.count) signs",
             String(
@@ -723,7 +723,11 @@ private final class ScenePackageBuilder {
                 modelMatrix: simd_float4x4.translation(configuration.positionVector),
                 worldCenter: configuration.positionVector,
                 boundingRadius: max(Float(configuration.size ?? 16) * (configuration.tileSize ?? 1.2) * 0.75, 8),
-                maxDrawDistance: 140,
+                maxDrawDistance: adaptiveDrawDistance(
+                    defaultValue: 140,
+                    boundingRadius: max(Float(configuration.size ?? 16) * (configuration.tileSize ?? 1.2) * 0.75, 8),
+                    multiplier: 2.6
+                ),
                 minimumViewDot: -1
             )
 
@@ -745,7 +749,11 @@ private final class ScenePackageBuilder {
                 modelMatrix: simd_float4x4.translation(configuration.positionVector) * rotation,
                 worldCenter: configuration.positionVector,
                 boundingRadius: simd_length(configuration.halfExtentsVector),
-                maxDrawDistance: 120,
+                maxDrawDistance: adaptiveDrawDistance(
+                    defaultValue: 120,
+                    boundingRadius: simd_length(configuration.halfExtentsVector),
+                    multiplier: 3.2
+                ),
                 minimumViewDot: -0.65
             )
         }
@@ -769,7 +777,11 @@ private final class ScenePackageBuilder {
             modelMatrix: simd_float4x4.translation(configuration.positionVector) * rotation,
             worldCenter: configuration.positionVector,
             boundingRadius: simd_length(configuration.halfExtentsVector),
-            maxDrawDistance: 130,
+            maxDrawDistance: adaptiveDrawDistance(
+                defaultValue: 130,
+                boundingRadius: simd_length(configuration.halfExtentsVector),
+                multiplier: 3.8
+            ),
             minimumViewDot: -0.55
         )
     }
@@ -796,7 +808,11 @@ private final class ScenePackageBuilder {
             modelMatrix: simd_float4x4.translation(SIMD3<Float>(configuration.positionVector.x, baseY, configuration.positionVector.z)) * rotation,
             worldCenter: SIMD3<Float>(configuration.positionVector.x, baseY, configuration.positionVector.z),
             boundingRadius: max(configuration.halfExtentsVector.x, configuration.halfExtentsVector.z) * 1.2,
-            maxDrawDistance: 110,
+            maxDrawDistance: adaptiveDrawDistance(
+                defaultValue: 110,
+                boundingRadius: max(configuration.halfExtentsVector.x, configuration.halfExtentsVector.z) * 1.2,
+                multiplier: 3.0
+            ),
             minimumViewDot: -0.7
         )
     }
@@ -821,7 +837,11 @@ private final class ScenePackageBuilder {
             modelMatrix: simd_float4x4.translation(configuration.positionVector) * rotation,
             worldCenter: configuration.positionVector,
             boundingRadius: simd_length(SIMD3<Float>(configuration.sizeVector.x * 0.5, 1.8, configuration.sizeVector.y * 0.5)),
-            maxDrawDistance: 180,
+            maxDrawDistance: adaptiveDrawDistance(
+                defaultValue: 180,
+                boundingRadius: simd_length(SIMD3<Float>(configuration.sizeVector.x * 0.5, 1.8, configuration.sizeVector.y * 0.5)),
+                multiplier: 2.6
+            ),
             minimumViewDot: -1
         )
     }
@@ -849,7 +869,11 @@ private final class ScenePackageBuilder {
             modelMatrix: simd_float4x4.translation(configuration.positionVector) * rotation,
             worldCenter: configuration.positionVector,
             boundingRadius: simd_length(SIMD3<Float>(configuration.sizeVector.x * 0.5, 0.5, configuration.sizeVector.y * 0.5)),
-            maxDrawDistance: 175,
+            maxDrawDistance: adaptiveDrawDistance(
+                defaultValue: 175,
+                boundingRadius: simd_length(SIMD3<Float>(configuration.sizeVector.x * 0.5, 0.5, configuration.sizeVector.y * 0.5)),
+                multiplier: 2.8
+            ),
             minimumViewDot: -1
         )
     }
@@ -895,7 +919,11 @@ private final class ScenePackageBuilder {
             modelMatrix: simd_float4x4.translation(configuration.positionVector) * rotation * normalization,
             worldCenter: worldCenter,
             boundingRadius: simd_length(worldExtent) * 0.5,
-            maxDrawDistance: 90,
+            maxDrawDistance: adaptiveDrawDistance(
+                defaultValue: 90,
+                boundingRadius: simd_length(worldExtent) * 0.5,
+                multiplier: 3.2
+            ),
             minimumViewDot: -0.45
         )
     }
@@ -1139,6 +1167,10 @@ private final class ScenePackageBuilder {
             bytes: vertices,
             length: MemoryLayout<SceneVertex>.stride * vertices.count
         )
+    }
+
+    private func adaptiveDrawDistance(defaultValue: Float, boundingRadius: Float, multiplier: Float) -> Float {
+        max(defaultValue, boundingRadius * multiplier)
     }
 
     private func groundSurface(from configuration: TerrainPatchConfiguration) -> GameGroundSurface {

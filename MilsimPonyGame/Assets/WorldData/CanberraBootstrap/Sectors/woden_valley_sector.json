@@ -1,0 +1,109 @@
+{
+  "id": "woden_valley_sector",
+  "displayName": "Woden Valley",
+  "bounds": {
+    "min": [-170.0, 0.0, 70.0],
+    "max": [170.0, 72.0, 250.0]
+  },
+  "streamingPadding": 170.0,
+  "terrainPatches": [
+    {
+      "name": "WodenValleyFloor",
+      "position": [0.0, 0.0, 160.0],
+      "size": [250.0, 180.0],
+      "cornerHeights": [2.2, 2.2, 1.2, 1.4],
+      "subdivisions": 18,
+      "color": [0.36, 0.43, 0.31, 1.0],
+      "yawDegrees": 0.0
+    },
+    {
+      "name": "WesternRidge",
+      "position": [-92.0, 10.0, 160.0],
+      "size": [120.0, 190.0],
+      "cornerHeights": [18.0, 14.0, 10.0, 12.0],
+      "subdivisions": 16,
+      "color": [0.34, 0.41, 0.29, 1.0],
+      "yawDegrees": 0.0
+    },
+    {
+      "name": "EasternRidge",
+      "position": [94.0, 10.0, 160.0],
+      "size": [120.0, 190.0],
+      "cornerHeights": [14.0, 18.0, 12.0, 10.0],
+      "subdivisions": 16,
+      "color": [0.34, 0.41, 0.29, 1.0],
+      "yawDegrees": 0.0
+    }
+  ],
+  "roadStrips": [
+    {
+      "name": "AdelaideAvenue",
+      "position": [0.0, 0.95, 110.0],
+      "size": [14.0, 190.0],
+      "roadColor": [0.20, 0.20, 0.22, 1.0],
+      "shoulderColor": [0.39, 0.42, 0.36, 1.0],
+      "lineColor": [0.90, 0.85, 0.50, 1.0],
+      "shoulderWidth": 1.2,
+      "centerLineWidth": 0.24,
+      "crownHeight": 0.05,
+      "yawDegrees": 0.0
+    },
+    {
+      "name": "YarraGlen",
+      "position": [46.0, 0.76, 148.0],
+      "size": [10.0, 130.0],
+      "roadColor": [0.19, 0.19, 0.21, 1.0],
+      "shoulderColor": [0.38, 0.41, 0.35, 1.0],
+      "lineColor": [0.88, 0.83, 0.48, 1.0],
+      "shoulderWidth": 0.9,
+      "centerLineWidth": 0.18,
+      "crownHeight": 0.04,
+      "yawDegrees": 6.0
+    }
+  ],
+  "grayboxBlocks": [
+    {
+      "name": "WodenTownCentreA",
+      "position": [4.0, 12.0, 166.0],
+      "halfExtents": [16.0, 12.0, 13.0],
+      "color": [0.45, 0.48, 0.52, 1.0],
+      "yawDegrees": 0.0
+    },
+    {
+      "name": "WodenTownCentreB",
+      "position": [-24.0, 9.0, 184.0],
+      "halfExtents": [12.0, 9.0, 11.0],
+      "color": [0.44, 0.47, 0.50, 1.0],
+      "yawDegrees": 0.0
+    },
+    {
+      "name": "WodenTownCentreC",
+      "position": [28.0, 13.0, 188.0],
+      "halfExtents": [12.0, 13.0, 10.0],
+      "color": [0.46, 0.49, 0.53, 1.0],
+      "yawDegrees": 0.0
+    },
+    {
+      "name": "WodenTower",
+      "position": [8.0, 18.0, 176.0],
+      "halfExtents": [5.0, 18.0, 5.0],
+      "color": [0.50, 0.53, 0.57, 1.0],
+      "yawDegrees": 0.0
+    },
+    {
+      "name": "CurtinRidgeBand",
+      "position": [-56.0, 4.0, 132.0],
+      "halfExtents": [12.0, 4.0, 10.0],
+      "color": [0.42, 0.45, 0.48, 1.0],
+      "yawDegrees": 0.0
+    },
+    {
+      "name": "PhillipOfficeBand",
+      "position": [56.0, 5.0, 164.0],
+      "halfExtents": [16.0, 5.0, 10.0],
+      "color": [0.43, 0.46, 0.49, 1.0],
+      "yawDegrees": 0.0
+    }
+  ],
+  "collisionVolumes": []
+}

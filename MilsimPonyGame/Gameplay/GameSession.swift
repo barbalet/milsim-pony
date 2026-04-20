@@ -138,7 +138,7 @@ final class GameSession: ObservableObject {
     var inputCardSubtitle: String {
         let cycleLabel = overlayTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         return menuPanel == nil
-            ? "\(cycleLabel) traversal, stability hardening, and routed escape controls"
+            ? "\(cycleLabel) traversal, basin survey, and observation controls"
             : "Deploy, pause, retry, and tune persistent field settings"
     }
 
@@ -149,13 +149,13 @@ final class GameSession: ObservableObject {
     func menuTitle(for panel: GameMenuPanel) -> String {
         switch panel {
         case .title:
-            return "Operation Southbound"
+            return sceneReady ? sceneLabel : "Loading Canberra Slice"
         case .paused:
-            return "Mission Paused"
+            return "Demo Paused"
         case .failed:
             return "Compromised"
         case .complete:
-            return "Escape Confirmed"
+            return "Survey Complete"
         case .settings:
             return "Field Settings"
         }
@@ -164,13 +164,13 @@ final class GameSession: ObservableObject {
     func menuSubtitle(for panel: GameMenuPanel) -> String {
         switch panel {
         case .title:
-            return sceneReady ? sceneLabel : "Loading Canberra slice"
+            return sceneReady ? overlayTitle : "Loading Canberra slice"
         case .paused:
             return routeSummary
         case .failed:
             return "Observer pressure forced a checkpoint fallback"
         case .complete:
-            return "The Deakin corridor is clear end to end"
+            return routeSummary
         case .settings:
             return "Persistent controls and overlay tuning"
         }
@@ -206,7 +206,7 @@ final class GameSession: ObservableObject {
     func noteViewActivation() {
         shouldIgnoreNextMouseDelta = true
         statusLine = sceneReady && demoFlowState == .title
-            ? "Mission briefing ready"
+            ? "Demo briefing ready"
             : "Input focus captured"
         print("[Input] MTKView accepted first responder")
         rebuildOverlay()
@@ -217,7 +217,7 @@ final class GameSession: ObservableObject {
         sceneSummary = summary
         sceneDetails = details
         sceneReady = true
-        statusLine = "Mission briefing ready"
+        statusLine = "Demo briefing ready"
         rebuildOverlay()
     }
 
@@ -270,7 +270,7 @@ final class GameSession: ObservableObject {
         isSettingsPresented = false
         demoFlowState = .playing
         resetMissionRuntime()
-        statusLine = "Mission live - push south to the Deakin exit"
+        statusLine = "Demo live - move through the current survey route"
         rebuildOverlay()
     }
 
@@ -282,7 +282,7 @@ final class GameSession: ObservableObject {
         isSettingsPresented = false
         demoFlowState = .playing
         clearGameplayInputState()
-        statusLine = "Mission resumed"
+        statusLine = "Demo resumed"
         rebuildOverlay()
     }
 
@@ -311,7 +311,7 @@ final class GameSession: ObservableObject {
         isSettingsPresented = false
         demoFlowState = .playing
         resetMissionRuntime()
-        statusLine = "Mission restarted from State Circle South Verge"
+        statusLine = "Demo restarted from the authored spawn"
         rebuildOverlay()
     }
 
@@ -323,7 +323,7 @@ final class GameSession: ObservableObject {
         isSettingsPresented = false
         demoFlowState = .title
         resetMissionRuntime()
-        statusLine = "Mission briefing ready"
+        statusLine = "Demo briefing ready"
         rebuildOverlay()
     }
 
@@ -463,7 +463,7 @@ final class GameSession: ObservableObject {
             } else if snapshot.routeComplete && !routeWasComplete {
                 demoFlowState = .complete
                 clearGameplayInputState()
-                statusLine = "Escape corridor reached"
+                statusLine = "Survey route complete"
             } else if Int(snapshot.completedCheckpointCount) > completedCheckpointCount {
                 statusLine = "Checkpoint \(snapshot.completedCheckpointCount) reached"
             }
@@ -483,7 +483,7 @@ final class GameSession: ObservableObject {
         demoFlowState = .title
         isSettingsPresented = false
         refreshSnapshotFromCore()
-        statusLine = "Mission briefing ready"
+        statusLine = "Demo briefing ready"
         rebuildOverlay()
     }
 
@@ -501,7 +501,7 @@ final class GameSession: ObservableObject {
         case .playing:
             demoFlowState = .paused
             clearGameplayInputState()
-            statusLine = "Mission paused"
+            statusLine = "Demo paused"
         case .paused:
             resumeDemo()
         case .title, .failed, .complete:
@@ -621,17 +621,24 @@ final class GameSession: ObservableObject {
     }
 
     private func titlePanelLines() -> [String] {
+        let riskLine: String
+        if evasionSummary == "Evasion: unavailable" {
+            riskLine = "Threats: no live opposition in this preview; focus on Canberra scale, streaming, and sightlines."
+        } else {
+            riskLine = "Threats: active observers can still trigger a checkpoint fallback if the route enters an exposed lane."
+        }
+
         var lines = [
-            "Mission: leave the Parliament precinct and clear the Deakin South Escape route.",
-            "Script: State Circle Cutthrough, Cross Street Junction, Deakin Service Lane, then Extraction Canopy.",
-            "Risk: crossing open observer lanes forces a checkpoint fallback instead of a clean run.",
+            "Objective: survey the current Canberra build and move through the authored review markers.",
+            "Priority: validate Lake Burley Griffin, the Woden-side basin, the Belconnen skyline, and future 4x firing lanes.",
+            riskLine,
             "Release: \(configuration.releaseDisplayName) / \(configuration.bundleIdentifier)",
             "Content: \(configuration.contentSourceSummary)",
             "Deploy: press Space or Return, then use Esc at any time for the pause shell.",
         ]
 
         if sceneReady {
-            lines.append(briefingSummary)
+            lines.append("Route: \(routeSummary)")
             lines.append(briefingDetails.first ?? routeSummary)
             if briefingDetails.count > 1 {
                 lines.append(briefingDetails[1])
@@ -648,8 +655,8 @@ final class GameSession: ObservableObject {
         [
             briefingSummary,
             routeDetails.first ?? "Route: continue south through the current checkpoint leg.",
-            evasionDetails.first ?? "Threats: observer pressure is frozen while paused.",
-            "Resume keeps the current run live. Restart returns to State Circle South Verge.",
+            evasionDetails.first ?? "Threats: preview pressure and world updates are frozen while paused.",
+            "Resume keeps the current survey live. Restart returns to the authored basin spawn.",
         ]
     }
 
@@ -677,10 +684,10 @@ final class GameSession: ObservableObject {
                 snapshot?.routeDistanceMeters ?? 0,
                 snapshot?.restartCount ?? 0
             ),
-            "Outcome: the playable Canberra slice now runs from briefing to extraction without developer prompts.",
+            "Outcome: the current Canberra basin survey route is complete and ready for the next world-data pass.",
             "Release: \(configuration.releaseDisplayName) / \(configuration.contentSourceSummary)",
-            "Script: title shell, live route, fail or retry loop, and extraction summary all resolve in one session.",
-            "New Run restarts the mission immediately. Briefing returns to the title shell.",
+            "Script: title shell, live survey route, optional fail or retry loop, and completion summary all resolve in one session.",
+            "New Run restarts the survey immediately. Briefing returns to the title shell.",
         ]
     }
 
@@ -699,15 +706,15 @@ final class GameSession: ObservableObject {
     private func statusLineForCurrentFlowState() -> String {
         switch demoFlowState {
         case .title:
-            return "Mission briefing ready"
+            return "Demo briefing ready"
         case .playing:
-            return "Mission live - push south to the Deakin exit"
+            return "Demo live - move through the current survey route"
         case .paused:
-            return "Mission paused"
+            return "Demo paused"
         case .failed:
             return "Compromised - choose retry or restart"
         case .complete:
-            return "Escape corridor reached"
+            return "Survey route complete"
         }
     }
 
