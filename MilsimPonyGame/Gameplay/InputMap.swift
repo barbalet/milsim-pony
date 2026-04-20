@@ -41,6 +41,8 @@ enum InputBindings {
         56: .sprint,
         60: .sprint,
         49: .interact,
+        36: .interact,
+        76: .interact,
         15: .restart,
         53: .pause,
     ]
@@ -49,9 +51,9 @@ enum InputBindings {
         "W A S D: grounded movement",
         "Shift: sprint",
         "Mouse move: look",
-        "Space: interact placeholder",
+        "Space / Return: deploy, confirm, or interact placeholder",
         "R: restart or retry from last checkpoint",
-        "Esc: pause placeholder",
+        "Esc: pause or resume the demo shell",
     ]
 
     static func command(for keyCode: UInt16) -> InputCommand? {

@@ -68,6 +68,9 @@ typedef struct GameFrameSnapshot {
     float cameraY;
     float cameraZ;
     float moveSpeed;
+    float walkSpeed;
+    float sprintSpeed;
+    float lookSensitivity;
     float groundHeight;
     float routeDistanceMeters;
     float distanceToNextCheckpointMeters;
@@ -102,6 +105,7 @@ void GameCoreConfigureDetection(
     float suspicionDecayPerSecond,
     float failThreshold
 );
+void GameCoreConfigureTraversal(float walkSpeed, float sprintSpeed, float lookSensitivity);
 void GameCoreSetMoveIntent(float strafeIntent, float forwardIntent);
 void GameCoreSetSprint(bool sprinting);
 void GameCoreAddLookDelta(float deltaX, float deltaY);

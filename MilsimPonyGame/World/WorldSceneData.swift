@@ -19,16 +19,58 @@ struct CoordinateSystemConfiguration: Decodable {
 }
 
 struct SceneConfiguration: Decodable {
+    let cycleLabel: String?
     let sceneName: String
     let spawn: SpawnConfiguration
     let sky: SkyConfiguration
     let sun: SunConfiguration
+    let atmosphere: AtmosphereConfiguration?
+    let player: PlayerConfiguration?
     let route: RouteConfiguration
     let detection: DetectionConfiguration?
     let guidance: GuidanceConfiguration?
     let proceduralElements: [ProceduralElementConfiguration]
     let assetInstances: [AssetInstanceConfiguration]
     let includedSectors: [String]
+}
+
+struct AtmosphereConfiguration: Decodable {
+    let fogColor: [Float]?
+    let fogNear: Float?
+    let fogFar: Float?
+    let hazeStrength: Float?
+
+    init(
+        fogColor: [Float]? = nil,
+        fogNear: Float? = nil,
+        fogFar: Float? = nil,
+        hazeStrength: Float? = nil
+    ) {
+        self.fogColor = fogColor
+        self.fogNear = fogNear
+        self.fogFar = fogFar
+        self.hazeStrength = hazeStrength
+    }
+
+    var fogColorVector: SIMD4<Float> {
+        fogColor?.simdColor(or: SIMD4<Float>(0.66, 0.74, 0.80, 1)) ?? SIMD4<Float>(0.66, 0.74, 0.80, 1)
+    }
+}
+
+struct PlayerConfiguration: Decodable {
+    let walkSpeed: Float?
+    let sprintSpeed: Float?
+    let lookSensitivity: Float?
+
+    init(
+        walkSpeed: Float? = nil,
+        sprintSpeed: Float? = nil,
+        lookSensitivity: Float? = nil
+    ) {
+        self.walkSpeed = walkSpeed
+        self.sprintSpeed = sprintSpeed
+        self.lookSensitivity = lookSensitivity
+    }
 }
 
 struct DetectionConfiguration: Decodable {

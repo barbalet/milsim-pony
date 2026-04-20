@@ -20,9 +20,14 @@ struct SceneEnvironment {
     let sunColor: SIMD3<Float>
     let ambientIntensity: Float
     let diffuseIntensity: Float
+    let fogColor: SIMD4<Float>
+    let fogNear: Float
+    let fogFar: Float
+    let hazeStrength: Float
 }
 
 struct SceneDebugInfo {
+    let cycleLabel: String
     let sceneName: String
     let summary: String
     let details: [String]
@@ -63,6 +68,11 @@ struct SceneEvasionState {
     let details: [String]
 }
 
+struct SceneBriefingState {
+    let summary: String
+    let details: [String]
+}
+
 final class BootstrapScene {
     let drawables: [SceneDrawable]
     let debugInfo: SceneDebugInfo
@@ -73,6 +83,7 @@ final class BootstrapScene {
     private let alwaysLoadedIndices: [Int]
     private let routeInfo: SceneRouteInfo
     private let evasionInfo: SceneEvasionInfo
+    private let traversalTuning: SceneTraversalTuning
 
     init(device: MTLDevice, assetRoot: String, worldDataRoot: String, worldManifestPath: String) {
         let manifestURL = URL(fileURLWithPath: worldManifestPath)
@@ -92,6 +103,7 @@ final class BootstrapScene {
             alwaysLoadedIndices = buildResult.alwaysLoadedIndices
             routeInfo = buildResult.routeInfo
             evasionInfo = buildResult.evasionInfo
+            traversalTuning = buildResult.traversalTuning
         } catch {
             let fallbackResult = FallbackSceneFactory.build(
                 device: device,
@@ -108,6 +120,7 @@ final class BootstrapScene {
             alwaysLoadedIndices = fallbackResult.alwaysLoadedIndices
             routeInfo = fallbackResult.routeInfo
             evasionInfo = fallbackResult.evasionInfo
+            traversalTuning = fallbackResult.traversalTuning
             print("[Scene] Falling back to procedural scene: \(error)")
         }
     }
@@ -140,6 +153,12 @@ final class BootstrapScene {
                 evasionInfo.failThreshold
             )
         }
+
+        GameCoreConfigureTraversal(
+            traversalTuning.walkSpeed,
+            traversalTuning.sprintSpeed,
+            traversalTuning.lookSensitivity
+        )
     }
 
     func visibilityState(for cameraPosition: SIMD3<Float>, forwardVector: SIMD3<Float>) -> SceneVisibilityState {
@@ -272,6 +291,71 @@ final class BootstrapScene {
         )
     }
 
+    func briefingState(for snapshot: GameFrameSnapshot) -> SceneBriefingState {
+        guard !routeInfo.checkpoints.isEmpty else {
+            return SceneBriefingState(summary: "Briefing: unavailable", details: [])
+        }
+
+        if snapshot.routeComplete {
+            return SceneBriefingState(
+                summary: "Briefing: corridor cleared",
+                details: [
+                    "Outcome: the Deakin corridor is readable end to end without developer prompts",
+                    "Reset: press R for a fresh run from the initial spawn",
+                ]
+            )
+        }
+
+        if snapshot.routeFailed {
+            return SceneBriefingState(
+                summary: "Briefing: break contact and reset",
+                details: [
+                    "Recovery: restart from the latest checkpoint and clear suspicion behind cover",
+                    "Priority: re-enter on the nearest signposted line instead of crossing open ground",
+                ]
+            )
+        }
+
+        let nextIndex = min(Int(snapshot.completedCheckpointCount), max(routeInfo.checkpoints.count - 1, 0))
+        let nextCheckpoint = routeInfo.checkpoints[nextIndex]
+        let originLabel = nextIndex == 0
+            ? (debugInfo.spawn.label ?? "State Circle South Verge")
+            : routeInfo.checkpoints[nextIndex - 1].label
+        let cameraPosition = SIMD3<Float>(snapshot.cameraX, snapshot.cameraY, snapshot.cameraZ)
+        let paceLine: String
+
+        if snapshot.suspicionLevel >= max(evasionInfo.failThreshold * 0.55, 0.45) {
+            paceLine = "Pace: break line of sight and let suspicion settle before the next push"
+        } else if snapshot.activeObserverCount > 0 {
+            paceLine = "Pace: walk the exposed lane and sprint only between hard cover"
+        } else if snapshot.distanceToNextCheckpointMeters > 18 {
+            paceLine = "Pace: sprint the open stretch, then reset before the next observer cone"
+        } else {
+            paceLine = "Pace: steady approach into the next checkpoint trigger"
+        }
+
+        var details = [
+            "Leg: \(originLabel) -> \(nextCheckpoint.label)",
+            String(
+                format: "Heading: %@ for %.0fm",
+                cardinalDirection(from: cameraPosition, to: nextCheckpoint.positionVector),
+                max(snapshot.distanceToNextCheckpointMeters, 0)
+            ),
+            paceLine,
+        ]
+
+        if let nearestSignpost = nearestGuidancePoint(from: evasionInfo.signposts, to: cameraPosition) {
+            details.append("Cue: follow \(nearestSignpost.point.label) to stay on the southbound line")
+        } else if let nearestCover = nearestGuidancePoint(from: evasionInfo.coverPoints, to: cameraPosition) {
+            details.append("Cue: \(nearestCover.point.label) is the closest break-contact position")
+        }
+
+        return SceneBriefingState(
+            summary: "Briefing: leg \(nextIndex + 1) / \(routeInfo.checkpoints.count) toward \(nextCheckpoint.label)",
+            details: details
+        )
+    }
+
     private func activeSectorIndices(for cameraPosition: SIMD3<Float>) -> [Int] {
         let active = sectors.enumerated().compactMap { index, sector in
             sector.isActive(for: cameraPosition) ? index : nil
@@ -306,6 +390,15 @@ final class BootstrapScene {
                 lhs.1 < rhs.1
             }
     }
+
+    private func cardinalDirection(from origin: SIMD3<Float>, to destination: SIMD3<Float>) -> String {
+        let delta = destination - origin
+        let angle = atan2f(delta.x, -delta.z)
+        let normalized = angle < 0 ? angle + (.pi * 2) : angle
+        let sector = Int(round(normalized / (.pi / 4))) % 8
+        let directions = ["north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west"]
+        return directions[sector]
+    }
 }
 
 private struct SceneBuildResult {
@@ -317,6 +410,7 @@ private struct SceneBuildResult {
     let alwaysLoadedIndices: [Int]
     let routeInfo: SceneRouteInfo
     let evasionInfo: SceneEvasionInfo
+    let traversalTuning: SceneTraversalTuning
 }
 
 private struct SceneRuntimeWorld {
@@ -326,6 +420,12 @@ private struct SceneRuntimeWorld {
     let routeCheckpoints: [GameRouteCheckpoint]
     let threatObservers: [GameThreatObserver]
     let suspicionDecayPerSecond: Float
+}
+
+private struct SceneTraversalTuning {
+    let walkSpeed: Float
+    let sprintSpeed: Float
+    let lookSensitivity: Float
 }
 
 private struct SceneSectorRuntime {
@@ -384,8 +484,15 @@ private final class ScenePackageBuilder {
             relativePaths: manifest.sectorFiles,
             packageRootURL: packageRootURL
         )
+        let atmosphereConfiguration = sceneConfiguration.atmosphere ?? AtmosphereConfiguration()
         let detectionConfiguration = sceneConfiguration.detection ?? DetectionConfiguration()
         let guidanceConfiguration = sceneConfiguration.guidance ?? GuidanceConfiguration()
+        let playerConfiguration = sceneConfiguration.player ?? PlayerConfiguration()
+        let traversalTuning = SceneTraversalTuning(
+            walkSpeed: max(playerConfiguration.walkSpeed ?? 4.2, 1.0),
+            sprintSpeed: max(playerConfiguration.sprintSpeed ?? 6.8, max(playerConfiguration.walkSpeed ?? 4.2, 1.0) + 0.6),
+            lookSensitivity: max(playerConfiguration.lookSensitivity ?? 0.08, 0.01)
+        )
 
         var sceneDrawables: [SceneDrawable] = []
         var alwaysLoadedIndices: [Int] = []
@@ -524,6 +631,12 @@ private final class ScenePackageBuilder {
             "District: \(terrainCount) terrain / \(roadCount) roads / \(collisionCount) blockers",
             "Route: \(sceneConfiguration.route.name) / \(sceneConfiguration.route.checkpoints.count) checkpoints",
             "Threats: \(detectionConfiguration.observers.count) observers / \(guidanceConfiguration.coverPoints.count) cover / \(guidanceConfiguration.signposts.count) signs",
+            String(
+                format: "Traversal: %.1f walk / %.1f sprint / %.3f look",
+                traversalTuning.walkSpeed,
+                traversalTuning.sprintSpeed,
+                traversalTuning.lookSensitivity
+            ),
             "Data Root: \(URL(fileURLWithPath: worldDataRoot).lastPathComponent)",
         ]
 
@@ -532,6 +645,7 @@ private final class ScenePackageBuilder {
         return SceneBuildResult(
             drawables: sceneDrawables,
             debugInfo: SceneDebugInfo(
+                cycleLabel: sceneConfiguration.cycleLabel ?? "Canberra Bootstrap Slice",
                 sceneName: sceneConfiguration.sceneName,
                 summary: summary,
                 details: detailLines,
@@ -543,7 +657,11 @@ private final class ScenePackageBuilder {
                 sunDirection: sceneConfiguration.sun.directionVector,
                 sunColor: sceneConfiguration.sun.colorVector,
                 ambientIntensity: sceneConfiguration.sun.ambientIntensity,
-                diffuseIntensity: sceneConfiguration.sun.diffuseIntensity
+                diffuseIntensity: sceneConfiguration.sun.diffuseIntensity,
+                fogColor: atmosphereConfiguration.fogColorVector,
+                fogNear: max(atmosphereConfiguration.fogNear ?? 38, 8),
+                fogFar: max(atmosphereConfiguration.fogFar ?? 118, max(atmosphereConfiguration.fogNear ?? 38, 8) + 1),
+                hazeStrength: max(atmosphereConfiguration.hazeStrength ?? 0.16, 0)
             ),
             sectors: sceneSectors,
             runtimeWorld: SceneRuntimeWorld(
@@ -565,7 +683,8 @@ private final class ScenePackageBuilder {
                 observers: detectionConfiguration.observers,
                 coverPoints: guidanceConfiguration.coverPoints,
                 signposts: guidanceConfiguration.signposts
-            )
+            ),
+            traversalTuning: traversalTuning
         )
     }
 
@@ -1143,6 +1262,7 @@ private enum FallbackSceneFactory {
         return SceneBuildResult(
             drawables: drawables,
             debugInfo: SceneDebugInfo(
+                cycleLabel: "Fallback Data Slice",
                 sceneName: "Fallback Data Slice",
                 summary: "Fallback procedural scene",
                 details: [
@@ -1164,7 +1284,11 @@ private enum FallbackSceneFactory {
                 sunDirection: SIMD3<Float>(-0.45, -1.0, -0.25),
                 sunColor: SIMD3<Float>(1.0, 0.93, 0.84),
                 ambientIntensity: 0.34,
-                diffuseIntensity: 0.78
+                diffuseIntensity: 0.78,
+                fogColor: SIMD4<Float>(0.58, 0.68, 0.78, 1),
+                fogNear: 32,
+                fogFar: 108,
+                hazeStrength: 0.14
             ),
             sectors: [],
             runtimeWorld: SceneRuntimeWorld(
@@ -1186,6 +1310,11 @@ private enum FallbackSceneFactory {
                 observers: [],
                 coverPoints: [],
                 signposts: []
+            ),
+            traversalTuning: SceneTraversalTuning(
+                walkSpeed: 4.2,
+                sprintSpeed: 6.8,
+                lookSensitivity: 0.08
             )
         )
     }

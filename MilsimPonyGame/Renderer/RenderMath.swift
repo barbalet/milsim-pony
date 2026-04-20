@@ -10,15 +10,19 @@ struct SceneVertex {
 struct SceneUniforms {
     var viewProjectionMatrix: simd_float4x4
     var modelMatrix: simd_float4x4
-    var lightDirection: SIMD3<Float>
-    var ambientIntensity: Float
-    var sunColor: SIMD3<Float>
-    var diffuseIntensity: Float
+    var lightDirection: SIMD4<Float>
+    var sunColor: SIMD4<Float>
+    var cameraPosition: SIMD4<Float>
+    var fogColor: SIMD4<Float>
+    var lightingParameters: SIMD4<Float>
+    var atmosphereParameters: SIMD4<Float>
 }
 
 struct SkyUniforms {
     var horizonColor: SIMD4<Float>
     var zenithColor: SIMD4<Float>
+    var sunColor: SIMD4<Float>
+    var skyParameters: SIMD4<Float>
 }
 
 enum RenderMath {

@@ -25,6 +25,9 @@ typedef struct GameCoreState {
     float spawnYawDegrees;
     float spawnPitchDegrees;
     float moveSpeed;
+    float walkSpeed;
+    float sprintSpeed;
+    float lookSensitivity;
     float eyeHeight;
     float playerRadius;
     float groundHeight;
@@ -69,6 +72,9 @@ static GameCoreState gameState = {
     .spawnZ = 4.5f,
     .pitchDegrees = -12.0f,
     .spawnPitchDegrees = -12.0f,
+    .walkSpeed = 4.2f,
+    .sprintSpeed = 6.8f,
+    .lookSensitivity = 0.08f,
     .eyeHeight = 1.65f,
     .playerRadius = 0.36f,
     .suspicionDecayPerSecond = 0.28f,
@@ -463,6 +469,9 @@ void GameCoreBootstrap(const char *bootMode) {
     gameState.respawnY = 1.65f;
     gameState.respawnZ = 4.5f;
     gameState.respawnPitchDegrees = -12.0f;
+    gameState.walkSpeed = 4.2f;
+    gameState.sprintSpeed = 6.8f;
+    gameState.lookSensitivity = 0.08f;
     gameState.suspicionDecayPerSecond = 0.28f;
     gameState.failThreshold = 1.0f;
 
@@ -605,9 +614,25 @@ void GameCoreSetSprint(bool sprinting) {
     gameState.sprinting = sprinting;
 }
 
+void GameCoreConfigureTraversal(float walkSpeed, float sprintSpeed, float lookSensitivity) {
+    if (!gameState.bootstrapped) {
+        GameCoreBootstrap("implicit");
+    }
+
+    gameState.walkSpeed = walkSpeed > 0 ? walkSpeed : 4.2f;
+    gameState.sprintSpeed = sprintSpeed >= gameState.walkSpeed ? sprintSpeed : gameState.walkSpeed + 1.8f;
+    gameState.lookSensitivity = lookSensitivity > 0 ? lookSensitivity : 0.08f;
+    printf(
+        "[GameCore] Traversal tuned to %.2f walk / %.2f sprint / %.3f look\n",
+        gameState.walkSpeed,
+        gameState.sprintSpeed,
+        gameState.lookSensitivity
+    );
+}
+
 void GameCoreAddLookDelta(float deltaX, float deltaY) {
-    gameState.yawDegrees += deltaX * 0.08f;
-    gameState.pitchDegrees = GameCoreClamp(gameState.pitchDegrees - (deltaY * 0.08f), -89.0f, 89.0f);
+    gameState.yawDegrees += deltaX * gameState.lookSensitivity;
+    gameState.pitchDegrees = GameCoreClamp(gameState.pitchDegrees - (deltaY * gameState.lookSensitivity), -89.0f, 89.0f);
 }
 
 void GameCoreTick(double deltaTime) {
@@ -627,7 +652,7 @@ void GameCoreTick(double deltaTime) {
     {
         const float startingX = gameState.cameraX;
         const float startingZ = gameState.cameraZ;
-        const float baseMoveSpeed = gameState.sprinting ? 6.8f : 4.2f;
+        const float baseMoveSpeed = gameState.sprinting ? gameState.sprintSpeed : gameState.walkSpeed;
         float moveX = gameState.strafeIntent;
         float moveZ = gameState.forwardIntent;
 
@@ -694,6 +719,9 @@ GameFrameSnapshot GameCoreGetSnapshot(void) {
         .cameraY = gameState.cameraY,
         .cameraZ = gameState.cameraZ,
         .moveSpeed = gameState.moveSpeed,
+        .walkSpeed = gameState.walkSpeed,
+        .sprintSpeed = gameState.sprintSpeed,
+        .lookSensitivity = gameState.lookSensitivity,
         .groundHeight = gameState.groundHeight,
         .routeDistanceMeters = gameState.routeDistanceMeters,
         .distanceToNextCheckpointMeters = gameState.distanceToNextCheckpointMeters,

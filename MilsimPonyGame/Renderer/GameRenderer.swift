@@ -42,12 +42,15 @@ final class GameRenderer: NSObject, MTKViewDelegate {
         skyPipelineDescriptor.vertexFunction = library.makeFunction(name: "skyVertexMain")
         skyPipelineDescriptor.fragmentFunction = library.makeFunction(name: "skyFragmentMain")
         skyPipelineDescriptor.colorAttachments[0].pixelFormat = view.colorPixelFormat
+        skyPipelineDescriptor.depthAttachmentPixelFormat = view.depthStencilPixelFormat
+        skyPipelineDescriptor.rasterSampleCount = view.sampleCount
 
         let pipelineDescriptor = MTLRenderPipelineDescriptor()
         pipelineDescriptor.label = "Bootstrap Scene Pipeline"
         pipelineDescriptor.vertexFunction = library.makeFunction(name: "bootstrapVertexMain")
         pipelineDescriptor.fragmentFunction = library.makeFunction(name: "bootstrapFragmentMain")
         pipelineDescriptor.colorAttachments[0].pixelFormat = view.colorPixelFormat
+        pipelineDescriptor.rasterSampleCount = view.sampleCount
         pipelineDescriptor.colorAttachments[0].isBlendingEnabled = true
         pipelineDescriptor.colorAttachments[0].rgbBlendOperation = .add
         pipelineDescriptor.colorAttachments[0].alphaBlendOperation = .add
@@ -90,6 +93,7 @@ final class GameRenderer: NSObject, MTKViewDelegate {
             summary: scene.debugInfo.summary,
             details: scene.debugInfo.details
         )
+        session.noteOverlayTitle(scene.debugInfo.cycleLabel)
         print("[Renderer] Metal bootstrap ready on \(device.name) with \(scene.debugInfo.summary)")
     }
 
@@ -104,7 +108,9 @@ final class GameRenderer: NSObject, MTKViewDelegate {
         accumulatedFrameTime += deltaTime
         accumulatedFrameCount += 1
 
-        GameCoreTick(deltaTime)
+        if session?.shouldAdvanceSimulation ?? false {
+            GameCoreTick(deltaTime)
+        }
         let snapshot = GameCoreGetSnapshot()
         let cameraPosition = SIMD3<Float>(snapshot.cameraX, snapshot.cameraY, snapshot.cameraZ)
         let forwardVector = RenderMath.forwardVector(yawDegrees: snapshot.yawDegrees, pitchDegrees: snapshot.pitchDegrees)
@@ -114,6 +120,7 @@ final class GameRenderer: NSObject, MTKViewDelegate {
             visibleDrawableCount: visibilityState.drawables.count,
             culledCount: visibilityState.culledCount
         )
+        let briefingState = scene.briefingState(for: snapshot)
         let routeState = scene.routeState(for: snapshot)
         let evasionState = scene.evasionState(for: snapshot)
 
@@ -121,6 +128,10 @@ final class GameRenderer: NSObject, MTKViewDelegate {
             lastOverlayUpdateTime = now
             DispatchQueue.main.async { [weak self] in
                 self?.session?.accept(snapshot: snapshot, drawableSize: view.drawableSize)
+                self?.session?.noteBriefingState(
+                    summary: briefingState.summary,
+                    details: briefingState.details
+                )
                 self?.session?.noteRouteState(
                     summary: routeState.summary,
                     details: routeState.details
@@ -183,7 +194,9 @@ final class GameRenderer: NSObject, MTKViewDelegate {
         encoder.label = "Bootstrap Scene Pass"
         var skyUniforms = SkyUniforms(
             horizonColor: scene.environment.skyHorizonColor,
-            zenithColor: scene.environment.skyZenithColor
+            zenithColor: scene.environment.skyZenithColor,
+            sunColor: SIMD4<Float>(scene.environment.sunColor.x, scene.environment.sunColor.y, scene.environment.sunColor.z, 1),
+            skyParameters: SIMD4<Float>(scene.environment.hazeStrength, 0, 0, 0)
         )
         encoder.setRenderPipelineState(skyPipelineState)
         encoder.setCullMode(.none)
@@ -216,10 +229,17 @@ final class GameRenderer: NSObject, MTKViewDelegate {
             var uniforms = SceneUniforms(
                 viewProjectionMatrix: viewProjectionMatrix,
                 modelMatrix: drawableItem.modelMatrix,
-                lightDirection: lightDirection,
-                ambientIntensity: scene.environment.ambientIntensity,
-                sunColor: scene.environment.sunColor,
-                diffuseIntensity: scene.environment.diffuseIntensity
+                lightDirection: SIMD4<Float>(lightDirection.x, lightDirection.y, lightDirection.z, 0),
+                sunColor: SIMD4<Float>(scene.environment.sunColor.x, scene.environment.sunColor.y, scene.environment.sunColor.z, 1),
+                cameraPosition: SIMD4<Float>(cameraPosition.x, cameraPosition.y, cameraPosition.z, 1),
+                fogColor: scene.environment.fogColor,
+                lightingParameters: SIMD4<Float>(
+                    scene.environment.ambientIntensity,
+                    scene.environment.diffuseIntensity,
+                    scene.environment.fogNear,
+                    scene.environment.fogFar
+                ),
+                atmosphereParameters: SIMD4<Float>(scene.environment.hazeStrength, 0, 0, 0)
             )
 
             encoder.setVertexBuffer(drawableItem.vertexBuffer, offset: 0, index: 0)
