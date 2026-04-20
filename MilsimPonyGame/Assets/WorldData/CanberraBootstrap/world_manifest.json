@@ -5,6 +5,7 @@
   "sectorFiles": [
     "Sectors/parliament_precinct_sector.json",
     "Sectors/state_circle_approach_sector.json",
-    "Sectors/parliamentary_triangle_edge_sector.json"
+    "Sectors/parliamentary_triangle_edge_sector.json",
+    "Sectors/deakin_escape_corridor_sector.json"
   ]
 }

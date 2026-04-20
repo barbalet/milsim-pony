@@ -48,6 +48,13 @@ final class GameRenderer: NSObject, MTKViewDelegate {
         pipelineDescriptor.vertexFunction = library.makeFunction(name: "bootstrapVertexMain")
         pipelineDescriptor.fragmentFunction = library.makeFunction(name: "bootstrapFragmentMain")
         pipelineDescriptor.colorAttachments[0].pixelFormat = view.colorPixelFormat
+        pipelineDescriptor.colorAttachments[0].isBlendingEnabled = true
+        pipelineDescriptor.colorAttachments[0].rgbBlendOperation = .add
+        pipelineDescriptor.colorAttachments[0].alphaBlendOperation = .add
+        pipelineDescriptor.colorAttachments[0].sourceRGBBlendFactor = .sourceAlpha
+        pipelineDescriptor.colorAttachments[0].sourceAlphaBlendFactor = .sourceAlpha
+        pipelineDescriptor.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
+        pipelineDescriptor.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
         pipelineDescriptor.depthAttachmentPixelFormat = view.depthStencilPixelFormat
 
         do {
@@ -100,13 +107,23 @@ final class GameRenderer: NSObject, MTKViewDelegate {
         GameCoreTick(deltaTime)
         let snapshot = GameCoreGetSnapshot()
         let cameraPosition = SIMD3<Float>(snapshot.cameraX, snapshot.cameraY, snapshot.cameraZ)
-        let streamingState = scene.streamingState(for: cameraPosition)
-        let activeDrawables = scene.activeDrawables(for: cameraPosition)
+        let forwardVector = RenderMath.forwardVector(yawDegrees: snapshot.yawDegrees, pitchDegrees: snapshot.pitchDegrees)
+        let visibilityState = scene.visibilityState(for: cameraPosition, forwardVector: forwardVector)
+        let streamingState = scene.streamingState(
+            for: cameraPosition,
+            visibleDrawableCount: visibilityState.drawables.count,
+            culledCount: visibilityState.culledCount
+        )
+        let routeState = scene.routeState(for: snapshot)
 
         if now - lastOverlayUpdateTime > 0.12 {
             lastOverlayUpdateTime = now
             DispatchQueue.main.async { [weak self] in
                 self?.session?.accept(snapshot: snapshot, drawableSize: view.drawableSize)
+                self?.session?.noteRouteState(
+                    summary: routeState.summary,
+                    details: routeState.details
+                )
                 self?.session?.noteStreamingState(
                     summary: streamingState.summary,
                     details: streamingState.details
@@ -125,7 +142,7 @@ final class GameRenderer: NSObject, MTKViewDelegate {
                 self?.session?.noteFrameTiming(
                     milliseconds: averageFrameTime * 1000,
                     framesPerSecond: framesPerSecond,
-                    drawableCount: streamingState.activeDrawableCount
+                    drawableCount: visibilityState.drawables.count
                 )
             }
         }
@@ -179,17 +196,16 @@ final class GameRenderer: NSObject, MTKViewDelegate {
             farZ: 100.0
         )
 
-        let forward = RenderMath.forwardVector(yawDegrees: snapshot.yawDegrees, pitchDegrees: snapshot.pitchDegrees)
         let viewMatrix = simd_float4x4.lookAt(
             eye: cameraPosition,
-            center: cameraPosition + forward,
+            center: cameraPosition + forwardVector,
             up: SIMD3<Float>(0, 1, 0)
         )
 
         let viewProjectionMatrix = projectionMatrix * viewMatrix
         let lightDirection = simd_normalize(scene.environment.sunDirection)
 
-        for drawableItem in activeDrawables {
+        for drawableItem in visibilityState.drawables {
             var uniforms = SceneUniforms(
                 viewProjectionMatrix: viewProjectionMatrix,
                 modelMatrix: drawableItem.modelMatrix,

@@ -23,6 +23,7 @@ struct SceneConfiguration: Decodable {
     let spawn: SpawnConfiguration
     let sky: SkyConfiguration
     let sun: SunConfiguration
+    let route: RouteConfiguration
     let proceduralElements: [ProceduralElementConfiguration]
     let assetInstances: [AssetInstanceConfiguration]
     let includedSectors: [String]
@@ -64,6 +65,38 @@ struct SunConfiguration: Decodable {
 
     var colorVector: SIMD3<Float> {
         color.simd3(or: SIMD3<Float>(1.0, 0.95, 0.86))
+    }
+}
+
+struct RouteConfiguration: Decodable {
+    let name: String
+    let summary: String
+    let checkpoints: [RouteCheckpointConfiguration]
+}
+
+struct RouteCheckpointConfiguration: Decodable {
+    let id: String
+    let label: String
+    let position: [Float]
+    let triggerRadius: Float
+    let yawDegrees: Float?
+    let pitchDegrees: Float?
+    let goal: Bool?
+    let beaconColor: [Float]?
+    let beaconHeight: Float?
+
+    var positionVector: SIMD3<Float> {
+        position.simd3(or: .zero)
+    }
+
+    var beaconColorVector: SIMD4<Float> {
+        beaconColor?.simdColor(or: defaultBeaconColor) ?? defaultBeaconColor
+    }
+
+    var defaultBeaconColor: SIMD4<Float> {
+        (goal ?? false)
+            ? SIMD4<Float>(0.36, 0.86, 0.56, 0.88)
+            : SIMD4<Float>(0.33, 0.72, 0.96, 0.84)
     }
 }
 

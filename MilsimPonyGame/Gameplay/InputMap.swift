@@ -7,6 +7,7 @@ enum InputCommand: String, CaseIterable, Hashable {
     case strafeRight
     case sprint
     case interact
+    case restart
     case pause
 
     var label: String {
@@ -23,6 +24,8 @@ enum InputCommand: String, CaseIterable, Hashable {
             return "Sprint"
         case .interact:
             return "Interact"
+        case .restart:
+            return "Restart Route"
         case .pause:
             return "Pause"
         }
@@ -38,14 +41,16 @@ enum InputBindings {
         56: .sprint,
         60: .sprint,
         49: .interact,
+        15: .restart,
         53: .pause,
     ]
 
     static let launchHints: [String] = [
-        "W A S D: movement intent hooks",
-        "Shift: sprint toggle hook",
-        "Mouse move: look delta hook",
+        "W A S D: grounded movement",
+        "Shift: sprint",
+        "Mouse move: look",
         "Space: interact placeholder",
+        "R: restart from last checkpoint",
         "Esc: pause placeholder",
     ]
 

@@ -100,9 +100,15 @@
   ],
   "collisionVolumes": [
     {
-      "name": "SouthBoundaryWall",
-      "position": [0.0, 1.0, 36.5],
-      "halfExtents": [12.5, 1.0, 0.7],
+      "name": "StateCircleEastKerbBarrier",
+      "position": [12.8, 0.7, 24.0],
+      "halfExtents": [0.6, 0.7, 11.0],
+      "yawDegrees": 0.0
+    },
+    {
+      "name": "StateCircleWestKerbBarrier",
+      "position": [-12.8, 0.7, 24.0],
+      "halfExtents": [0.6, 0.7, 11.0],
       "yawDegrees": 0.0
     }
   ]

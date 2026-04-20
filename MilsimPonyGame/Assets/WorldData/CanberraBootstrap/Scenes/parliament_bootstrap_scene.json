@@ -16,6 +16,56 @@
     "ambientIntensity": 0.36,
     "diffuseIntensity": 0.84
   },
+  "route": {
+    "name": "Deakin South Escape",
+    "summary": "Leave the Parliament precinct and push south through the first suburban corridor.",
+    "checkpoints": [
+      {
+        "id": "state_circle_cutthrough",
+        "label": "State Circle Cutthrough",
+        "position": [0.0, 0.24, 35.5],
+        "triggerRadius": 4.8,
+        "yawDegrees": 0.0,
+        "pitchDegrees": -14.0,
+        "goal": false,
+        "beaconColor": [0.34, 0.74, 0.96, 0.82],
+        "beaconHeight": 4.2
+      },
+      {
+        "id": "cross_street_junction",
+        "label": "Cross Street Junction",
+        "position": [0.0, 0.20, 49.5],
+        "triggerRadius": 5.2,
+        "yawDegrees": 0.0,
+        "pitchDegrees": -14.0,
+        "goal": false,
+        "beaconColor": [0.42, 0.82, 0.96, 0.82],
+        "beaconHeight": 4.8
+      },
+      {
+        "id": "deakin_service_lane",
+        "label": "Deakin Service Lane",
+        "position": [-8.5, 0.22, 63.0],
+        "triggerRadius": 5.4,
+        "yawDegrees": -6.0,
+        "pitchDegrees": -14.0,
+        "goal": false,
+        "beaconColor": [0.92, 0.82, 0.38, 0.84],
+        "beaconHeight": 5.2
+      },
+      {
+        "id": "escape_corridor_exit",
+        "label": "Escape Corridor Exit",
+        "position": [-9.0, 0.24, 79.0],
+        "triggerRadius": 6.2,
+        "yawDegrees": 0.0,
+        "pitchDegrees": -12.0,
+        "goal": true,
+        "beaconColor": [0.36, 0.88, 0.56, 0.88],
+        "beaconHeight": 6.0
+      }
+    ]
+  },
   "proceduralElements": [
     {
       "kind": "box",
@@ -27,8 +77,8 @@
     {
       "kind": "box",
       "name": "FarSouthBoundary",
-      "position": [0.0, 2.2, 38.0],
-      "halfExtents": [22.0, 2.2, 1.2],
+      "position": [0.0, 2.6, 92.0],
+      "halfExtents": [28.0, 2.6, 1.4],
       "color": [0.32, 0.37, 0.31, 1.0]
     }
   ],
@@ -65,6 +115,7 @@
   "includedSectors": [
     "parliament_precinct_sector",
     "state_circle_approach_sector",
-    "parliamentary_triangle_edge_sector"
+    "parliamentary_triangle_edge_sector",
+    "deakin_escape_corridor_sector"
   ]
 }

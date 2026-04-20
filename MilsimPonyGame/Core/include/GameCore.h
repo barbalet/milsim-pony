@@ -37,6 +37,16 @@ typedef struct GameGroundSurface {
     float southWestHeight;
 } GameGroundSurface;
 
+typedef struct GameRouteCheckpoint {
+    float positionX;
+    float positionY;
+    float positionZ;
+    float triggerRadius;
+    float yawDegrees;
+    float pitchDegrees;
+    bool isGoal;
+} GameRouteCheckpoint;
+
 typedef struct GameFrameSnapshot {
     double elapsedSeconds;
     float strafeIntent;
@@ -48,9 +58,15 @@ typedef struct GameFrameSnapshot {
     float cameraZ;
     float moveSpeed;
     float groundHeight;
+    float routeDistanceMeters;
+    float distanceToNextCheckpointMeters;
     int activeSectorCount;
+    int completedCheckpointCount;
+    int totalCheckpointCount;
+    int restartCount;
     bool sprinting;
     bool grounded;
+    bool routeComplete;
 } GameFrameSnapshot;
 
 void GameCoreBootstrap(const char *bootMode);
@@ -63,11 +79,13 @@ void GameCoreConfigureWorld(
     const GameGroundSurface *groundSurfaces,
     int groundSurfaceCount
 );
+void GameCoreConfigureRoute(const GameRouteCheckpoint *checkpoints, int checkpointCount);
 void GameCoreSetMoveIntent(float strafeIntent, float forwardIntent);
 void GameCoreSetSprint(bool sprinting);
 void GameCoreAddLookDelta(float deltaX, float deltaY);
 void GameCoreTick(double deltaTime);
 GameFrameSnapshot GameCoreGetSnapshot(void);
+void GameCoreRestartRoute(void);
 void GameCoreResetDebugState(void);
 
 #ifdef __cplusplus

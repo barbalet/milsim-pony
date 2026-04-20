@@ -7,6 +7,10 @@ struct SceneDrawable {
     let vertexBuffer: MTLBuffer
     let vertexCount: Int
     let modelMatrix: simd_float4x4
+    let worldCenter: SIMD3<Float>
+    let boundingRadius: Float
+    let maxDrawDistance: Float
+    let minimumViewDot: Float
 }
 
 struct SceneEnvironment {
@@ -31,6 +35,22 @@ struct SceneStreamingState {
     let activeDrawableCount: Int
 }
 
+struct SceneVisibilityState {
+    let drawables: [SceneDrawable]
+    let culledCount: Int
+}
+
+struct SceneRouteInfo {
+    let name: String
+    let summary: String
+    let checkpoints: [RouteCheckpointConfiguration]
+}
+
+struct SceneRouteState {
+    let summary: String
+    let details: [String]
+}
+
 final class BootstrapScene {
     let drawables: [SceneDrawable]
     let debugInfo: SceneDebugInfo
@@ -39,6 +59,7 @@ final class BootstrapScene {
     private let sectors: [SceneSectorRuntime]
     private let runtimeWorld: SceneRuntimeWorld
     private let alwaysLoadedIndices: [Int]
+    private let routeInfo: SceneRouteInfo
 
     init(device: MTLDevice, assetRoot: String, worldDataRoot: String, worldManifestPath: String) {
         let manifestURL = URL(fileURLWithPath: worldManifestPath)
@@ -56,6 +77,7 @@ final class BootstrapScene {
             sectors = buildResult.sectors
             runtimeWorld = buildResult.runtimeWorld
             alwaysLoadedIndices = buildResult.alwaysLoadedIndices
+            routeInfo = buildResult.routeInfo
         } catch {
             let fallbackResult = FallbackSceneFactory.build(
                 device: device,
@@ -70,6 +92,7 @@ final class BootstrapScene {
             sectors = fallbackResult.sectors
             runtimeWorld = fallbackResult.runtimeWorld
             alwaysLoadedIndices = fallbackResult.alwaysLoadedIndices
+            routeInfo = fallbackResult.routeInfo
             print("[Scene] Falling back to procedural scene: \(error)")
         }
     }
@@ -89,32 +112,101 @@ final class BootstrapScene {
                 }
             }
         }
+
+        runtimeWorld.routeCheckpoints.withUnsafeBufferPointer { routeCheckpoints in
+            GameCoreConfigureRoute(routeCheckpoints.baseAddress, Int32(routeCheckpoints.count))
+        }
     }
 
-    func activeDrawables(for cameraPosition: SIMD3<Float>) -> [SceneDrawable] {
-        let activeIndices = Set(activeSectorIndices(for: cameraPosition))
-        let streamedIndices = sectors.enumerated().flatMap { index, sector in
-            activeIndices.contains(index) ? Array(sector.drawableRange) : []
+    func visibilityState(for cameraPosition: SIMD3<Float>, forwardVector: SIMD3<Float>) -> SceneVisibilityState {
+        let drawIndices = alwaysLoadedIndices + streamedDrawIndices(for: cameraPosition)
+        var visibleDrawables: [SceneDrawable] = []
+        var culledCount = 0
+
+        for drawIndex in drawIndices {
+            let drawable = drawables[drawIndex]
+            let offset = drawable.worldCenter - cameraPosition
+            let distance = simd_length(offset)
+
+            if distance - drawable.boundingRadius > drawable.maxDrawDistance {
+                culledCount += 1
+                continue
+            }
+
+            if distance > 18, drawable.minimumViewDot > -1, simd_length_squared(offset) > 0.001 {
+                let viewDirection = simd_normalize(offset)
+                if simd_dot(viewDirection, forwardVector) < drawable.minimumViewDot {
+                    culledCount += 1
+                    continue
+                }
+            }
+
+            visibleDrawables.append(drawable)
         }
 
-        let drawIndices = alwaysLoadedIndices + streamedIndices
-        return drawIndices.map { drawables[$0] }
+        return SceneVisibilityState(drawables: visibleDrawables, culledCount: culledCount)
     }
 
-    func streamingState(for cameraPosition: SIMD3<Float>) -> SceneStreamingState {
+    func streamingState(
+        for cameraPosition: SIMD3<Float>,
+        visibleDrawableCount: Int,
+        culledCount: Int
+    ) -> SceneStreamingState {
         let activeIndices = activeSectorIndices(for: cameraPosition)
         let activeSectors = activeIndices.map { sectors[$0] }
         let activeNames = activeSectors.map(\.displayName)
         let currentSector = sectors.first(where: { $0.contains(cameraPosition) })?.displayName ?? "Outside district bounds"
-        let activeDrawableCount = alwaysLoadedIndices.count + activeSectors.reduce(0) { $0 + $1.drawableRange.count }
+        let streamedDrawableCount = activeSectors.reduce(0) { $0 + $1.drawableRange.count }
 
         return SceneStreamingState(
             summary: "Chunks: \(activeSectors.count) active / \(sectors.count) total",
             details: [
                 "Active: \(activeNames.isEmpty ? "Fallback load" : activeNames.joined(separator: ", "))",
                 "Current Sector: \(currentSector)",
+                "Visibility: \(visibleDrawableCount) drawn / \(culledCount) culled",
             ],
-            activeDrawableCount: activeDrawableCount
+            activeDrawableCount: alwaysLoadedIndices.count + streamedDrawableCount
+        )
+    }
+
+    func routeState(for snapshot: GameFrameSnapshot) -> SceneRouteState {
+        guard !routeInfo.checkpoints.isEmpty else {
+            return SceneRouteState(summary: "Route: unavailable", details: [])
+        }
+
+        if snapshot.routeComplete {
+            return SceneRouteState(
+                summary: "Route: \(routeInfo.name) complete",
+                details: [
+                    "Goal: \(routeInfo.checkpoints.last?.label ?? "Escape corridor exit")",
+                    String(
+                        format: "Run: %.1fs / %.0fm / %d restarts",
+                        snapshot.elapsedSeconds,
+                        snapshot.routeDistanceMeters,
+                        snapshot.restartCount
+                    ),
+                ]
+            )
+        }
+
+        let nextIndex = min(Int(snapshot.completedCheckpointCount), max(routeInfo.checkpoints.count - 1, 0))
+        let nextCheckpoint = routeInfo.checkpoints[nextIndex]
+        return SceneRouteState(
+            summary: "Route: \(snapshot.completedCheckpointCount) / \(snapshot.totalCheckpointCount) checkpoints",
+            details: [
+                "Objective: \(routeInfo.summary)",
+                String(
+                    format: "Next: %@ (%.1fm)",
+                    nextCheckpoint.label,
+                    snapshot.distanceToNextCheckpointMeters
+                ),
+                String(
+                    format: "Run: %.1fs / %.0fm / %d restarts",
+                    snapshot.elapsedSeconds,
+                    snapshot.routeDistanceMeters,
+                    snapshot.restartCount
+                ),
+            ]
         )
     }
 
@@ -132,6 +224,13 @@ final class BootstrapScene {
 
         return active
     }
+
+    private func streamedDrawIndices(for cameraPosition: SIMD3<Float>) -> [Int] {
+        let activeIndices = Set(activeSectorIndices(for: cameraPosition))
+        return sectors.enumerated().flatMap { index, sector in
+            activeIndices.contains(index) ? Array(sector.drawableRange) : []
+        }
+    }
 }
 
 private struct SceneBuildResult {
@@ -141,12 +240,14 @@ private struct SceneBuildResult {
     let sectors: [SceneSectorRuntime]
     let runtimeWorld: SceneRuntimeWorld
     let alwaysLoadedIndices: [Int]
+    let routeInfo: SceneRouteInfo
 }
 
 private struct SceneRuntimeWorld {
     let sectorBounds: [GameSectorBounds]
     let collisionVolumes: [GameCollisionVolume]
     let groundSurfaces: [GameGroundSurface]
+    let routeCheckpoints: [GameRouteCheckpoint]
 }
 
 private struct SceneSectorRuntime {
@@ -212,12 +313,14 @@ private final class ScenePackageBuilder {
         var worldSectors: [GameSectorBounds] = []
         var worldCollisionVolumes: [GameCollisionVolume] = []
         var worldGroundSurfaces: [GameGroundSurface] = []
+        var worldRouteCheckpoints: [GameRouteCheckpoint] = []
         var proceduralCount = 0
         var assetCount = 0
         var terrainCount = 0
         var roadCount = 0
         var grayboxCount = 0
         var collisionCount = 0
+        var routeMarkerCount = 0
 
         for element in sceneConfiguration.proceduralElements {
             if let drawable = proceduralDrawable(from: element) {
@@ -232,6 +335,15 @@ private final class ScenePackageBuilder {
                 alwaysLoadedIndices.append(sceneDrawables.count)
                 sceneDrawables.append(drawable)
                 assetCount += 1
+            }
+        }
+
+        for checkpoint in sceneConfiguration.route.checkpoints {
+            worldRouteCheckpoints.append(routeCheckpoint(from: checkpoint))
+            for markerDrawable in routeMarkerDrawables(from: checkpoint) {
+                alwaysLoadedIndices.append(sceneDrawables.count)
+                sceneDrawables.append(markerDrawable)
+                routeMarkerCount += 1
             }
         }
 
@@ -277,6 +389,9 @@ private final class ScenePackageBuilder {
                     sceneDrawables.append(drawable)
                     grayboxCount += 1
                 }
+                if let shadowDrawable = grayboxShadowDrawable(from: block, sectorID: sector.id) {
+                    sceneDrawables.append(shadowDrawable)
+                }
                 if block.collisionEnabled ?? true {
                     worldCollisionVolumes.append(collisionVolume(from: block))
                     collisionCount += 1
@@ -306,10 +421,11 @@ private final class ScenePackageBuilder {
             "Spawn: \(sceneConfiguration.spawn.label ?? "District start")",
             "Sectors: \(loadedSectors.map(\.displayName).joined(separator: ", "))",
             "District: \(terrainCount) terrain / \(roadCount) roads / \(collisionCount) blockers",
+            "Route: \(sceneConfiguration.route.name) / \(sceneConfiguration.route.checkpoints.count) checkpoints",
             "Data Root: \(URL(fileURLWithPath: worldDataRoot).lastPathComponent)",
         ]
 
-        let summary = "\(assetCount) assets, \(terrainCount) terrain, \(roadCount) roads, \(grayboxCount) structures"
+        let summary = "\(assetCount) assets, \(terrainCount) terrain, \(roadCount) roads, \(grayboxCount) structures, \(routeMarkerCount) route markers"
 
         return SceneBuildResult(
             drawables: sceneDrawables,
@@ -331,9 +447,15 @@ private final class ScenePackageBuilder {
             runtimeWorld: SceneRuntimeWorld(
                 sectorBounds: worldSectors,
                 collisionVolumes: worldCollisionVolumes,
-                groundSurfaces: worldGroundSurfaces
+                groundSurfaces: worldGroundSurfaces,
+                routeCheckpoints: worldRouteCheckpoints
             ),
-            alwaysLoadedIndices: alwaysLoadedIndices
+            alwaysLoadedIndices: alwaysLoadedIndices,
+            routeInfo: SceneRouteInfo(
+                name: sceneConfiguration.route.name,
+                summary: sceneConfiguration.route.summary,
+                checkpoints: sceneConfiguration.route.checkpoints
+            )
         )
     }
 
@@ -369,7 +491,11 @@ private final class ScenePackageBuilder {
                 name: configuration.name,
                 vertexBuffer: buffer,
                 vertexCount: vertices.count,
-                modelMatrix: simd_float4x4.translation(configuration.positionVector)
+                modelMatrix: simd_float4x4.translation(configuration.positionVector),
+                worldCenter: configuration.positionVector,
+                boundingRadius: max(Float(configuration.size ?? 16) * (configuration.tileSize ?? 1.2) * 0.75, 8),
+                maxDrawDistance: 140,
+                minimumViewDot: -1
             )
 
         case .box:
@@ -387,7 +513,11 @@ private final class ScenePackageBuilder {
                 name: configuration.name,
                 vertexBuffer: buffer,
                 vertexCount: vertices.count,
-                modelMatrix: simd_float4x4.translation(configuration.positionVector) * rotation
+                modelMatrix: simd_float4x4.translation(configuration.positionVector) * rotation,
+                worldCenter: configuration.positionVector,
+                boundingRadius: simd_length(configuration.halfExtentsVector),
+                maxDrawDistance: 120,
+                minimumViewDot: -0.65
             )
         }
     }
@@ -407,7 +537,38 @@ private final class ScenePackageBuilder {
             name: "\(sectorID):\(configuration.name)",
             vertexBuffer: buffer,
             vertexCount: vertices.count,
-            modelMatrix: simd_float4x4.translation(configuration.positionVector) * rotation
+            modelMatrix: simd_float4x4.translation(configuration.positionVector) * rotation,
+            worldCenter: configuration.positionVector,
+            boundingRadius: simd_length(configuration.halfExtentsVector),
+            maxDrawDistance: 130,
+            minimumViewDot: -0.55
+        )
+    }
+
+    private func grayboxShadowDrawable(from configuration: GrayboxBlockConfiguration, sectorID: String) -> SceneDrawable? {
+        let shadowVertices = GeometryBuilder.makeShadowQuad(
+            halfExtents: SIMD2<Float>(
+                max(configuration.halfExtentsVector.x * 1.08, 0.6),
+                max(configuration.halfExtentsVector.z * 1.08, 0.6)
+            ),
+            color: SIMD4<Float>(0.03, 0.04, 0.05, 0.18)
+        )
+
+        guard let buffer = makeBuffer(from: shadowVertices) else {
+            return nil
+        }
+
+        let baseY = configuration.positionVector.y - configuration.halfExtentsVector.y + 0.03
+        let rotation = simd_float4x4.rotation(y: (configuration.yawDegrees ?? 0) * (.pi / 180.0))
+        return SceneDrawable(
+            name: "\(sectorID):\(configuration.name):Shadow",
+            vertexBuffer: buffer,
+            vertexCount: shadowVertices.count,
+            modelMatrix: simd_float4x4.translation(SIMD3<Float>(configuration.positionVector.x, baseY, configuration.positionVector.z)) * rotation,
+            worldCenter: SIMD3<Float>(configuration.positionVector.x, baseY, configuration.positionVector.z),
+            boundingRadius: max(configuration.halfExtentsVector.x, configuration.halfExtentsVector.z) * 1.2,
+            maxDrawDistance: 110,
+            minimumViewDot: -0.7
         )
     }
 
@@ -428,7 +589,11 @@ private final class ScenePackageBuilder {
             name: "\(sectorID):\(configuration.name)",
             vertexBuffer: buffer,
             vertexCount: vertices.count,
-            modelMatrix: simd_float4x4.translation(configuration.positionVector) * rotation
+            modelMatrix: simd_float4x4.translation(configuration.positionVector) * rotation,
+            worldCenter: configuration.positionVector,
+            boundingRadius: simd_length(SIMD3<Float>(configuration.sizeVector.x * 0.5, 1.8, configuration.sizeVector.y * 0.5)),
+            maxDrawDistance: 180,
+            minimumViewDot: -1
         )
     }
 
@@ -452,7 +617,11 @@ private final class ScenePackageBuilder {
             name: "\(sectorID):\(configuration.name)",
             vertexBuffer: buffer,
             vertexCount: vertices.count,
-            modelMatrix: simd_float4x4.translation(configuration.positionVector) * rotation
+            modelMatrix: simd_float4x4.translation(configuration.positionVector) * rotation,
+            worldCenter: configuration.positionVector,
+            boundingRadius: simd_length(SIMD3<Float>(configuration.sizeVector.x * 0.5, 0.5, configuration.sizeVector.y * 0.5)),
+            maxDrawDistance: 175,
+            minimumViewDot: -1
         )
     }
 
@@ -487,13 +656,88 @@ private final class ScenePackageBuilder {
             )
         )
         let rotation = simd_float4x4.rotation(y: (configuration.yawDegrees ?? 0) * (.pi / 180.0))
+        let worldExtent = loadedAsset.extent * scale
+        let worldCenter = configuration.positionVector + SIMD3<Float>(0, worldExtent.y * 0.5, 0)
 
         return SceneDrawable(
             name: configuration.name,
             vertexBuffer: buffer,
             vertexCount: loadedAsset.vertices.count,
-            modelMatrix: simd_float4x4.translation(configuration.positionVector) * rotation * normalization
+            modelMatrix: simd_float4x4.translation(configuration.positionVector) * rotation * normalization,
+            worldCenter: worldCenter,
+            boundingRadius: simd_length(worldExtent) * 0.5,
+            maxDrawDistance: 90,
+            minimumViewDot: -0.45
         )
+    }
+
+    private func routeMarkerDrawables(from configuration: RouteCheckpointConfiguration) -> [SceneDrawable] {
+        let beaconHeight = configuration.beaconHeight ?? ((configuration.goal ?? false) ? 6.0 : 4.8)
+        let beaconColor = configuration.beaconColorVector
+        let markerPosition = configuration.positionVector
+        var drawables: [SceneDrawable] = []
+
+        let columnVertices = GeometryBuilder.makeBox(
+            halfExtents: SIMD3<Float>(0.28, beaconHeight * 0.5, 0.28),
+            color: beaconColor
+        )
+
+        if let columnBuffer = makeBuffer(from: columnVertices) {
+            drawables.append(
+                SceneDrawable(
+                    name: "RouteBeacon:\(configuration.id)",
+                    vertexBuffer: columnBuffer,
+                    vertexCount: columnVertices.count,
+                    modelMatrix: simd_float4x4.translation(markerPosition + SIMD3<Float>(0, beaconHeight * 0.5, 0)),
+                    worldCenter: markerPosition + SIMD3<Float>(0, beaconHeight * 0.5, 0),
+                    boundingRadius: beaconHeight * 0.6,
+                    maxDrawDistance: configuration.goal ?? false ? 240 : 170,
+                    minimumViewDot: -0.92
+                )
+            )
+        }
+
+        let capVertices = GeometryBuilder.makeBox(
+            halfExtents: SIMD3<Float>((configuration.goal ?? false) ? 2.4 : 1.4, 0.08, 0.08),
+            color: beaconColor
+        )
+
+        if let capBuffer = makeBuffer(from: capVertices) {
+            drawables.append(
+                SceneDrawable(
+                    name: "RouteCap:\(configuration.id)",
+                    vertexBuffer: capBuffer,
+                    vertexCount: capVertices.count,
+                    modelMatrix: simd_float4x4.translation(markerPosition + SIMD3<Float>(0, beaconHeight, 0)),
+                    worldCenter: markerPosition + SIMD3<Float>(0, beaconHeight, 0),
+                    boundingRadius: configuration.goal ?? false ? 2.8 : 1.8,
+                    maxDrawDistance: configuration.goal ?? false ? 240 : 170,
+                    minimumViewDot: -0.92
+                )
+            )
+        }
+
+        let shadowVertices = GeometryBuilder.makeShadowQuad(
+            halfExtents: SIMD2<Float>((configuration.goal ?? false) ? 2.4 : 1.4, (configuration.goal ?? false) ? 2.4 : 1.4),
+            color: SIMD4<Float>(0.03, 0.04, 0.05, configuration.goal ?? false ? 0.24 : 0.18)
+        )
+
+        if let shadowBuffer = makeBuffer(from: shadowVertices) {
+            drawables.append(
+                SceneDrawable(
+                    name: "RouteShadow:\(configuration.id)",
+                    vertexBuffer: shadowBuffer,
+                    vertexCount: shadowVertices.count,
+                    modelMatrix: simd_float4x4.translation(markerPosition + SIMD3<Float>(0, 0.03, 0)),
+                    worldCenter: markerPosition,
+                    boundingRadius: configuration.goal ?? false ? 2.6 : 1.6,
+                    maxDrawDistance: configuration.goal ?? false ? 140 : 100,
+                    minimumViewDot: -0.85
+                )
+            )
+        }
+
+        return drawables
     }
 
     private func makeBuffer(from vertices: [SceneVertex]) -> MTLBuffer? {
@@ -557,6 +801,18 @@ private final class ScenePackageBuilder {
         )
     }
 
+    private func routeCheckpoint(from configuration: RouteCheckpointConfiguration) -> GameRouteCheckpoint {
+        GameRouteCheckpoint(
+            positionX: configuration.positionVector.x,
+            positionY: configuration.positionVector.y + 1.65,
+            positionZ: configuration.positionVector.z,
+            triggerRadius: configuration.triggerRadius,
+            yawDegrees: configuration.yawDegrees ?? 0,
+            pitchDegrees: configuration.pitchDegrees ?? -12,
+            isGoal: configuration.goal ?? false
+        )
+    }
+
     private func loadJSON<T: Decodable>(_ type: T.Type, at url: URL) throws -> T {
         let data = try Data(contentsOf: url)
         return try JSONDecoder().decode(T.self, from: data)
@@ -587,7 +843,11 @@ private enum FallbackSceneFactory {
                     name: "FallbackGround",
                     vertexBuffer: $0,
                     vertexCount: vertices.count,
-                    modelMatrix: .identity()
+                    modelMatrix: .identity(),
+                    worldCenter: .zero,
+                    boundingRadius: 20,
+                    maxDrawDistance: 120,
+                    minimumViewDot: -1
                 )
             ]
         } ?? []
@@ -622,9 +882,15 @@ private enum FallbackSceneFactory {
             runtimeWorld: SceneRuntimeWorld(
                 sectorBounds: [],
                 collisionVolumes: [],
-                groundSurfaces: []
+                groundSurfaces: [],
+                routeCheckpoints: []
             ),
-            alwaysLoadedIndices: Array(drawables.indices)
+            alwaysLoadedIndices: Array(drawables.indices),
+            routeInfo: SceneRouteInfo(
+                name: "Fallback Route",
+                summary: "Route data unavailable",
+                checkpoints: []
+            )
         )
     }
 }
@@ -771,6 +1037,19 @@ private enum GeometryBuilder {
             )
         }
 
+        return vertices
+    }
+
+    static func makeShadowQuad(halfExtents: SIMD2<Float>, color: SIMD4<Float>) -> [SceneVertex] {
+        var vertices: [SceneVertex] = []
+        appendQuad(
+            to: &vertices,
+            p0: SIMD3<Float>(-halfExtents.x, 0, -halfExtents.y),
+            p1: SIMD3<Float>(halfExtents.x, 0, -halfExtents.y),
+            p2: SIMD3<Float>(halfExtents.x, 0, halfExtents.y),
+            p3: SIMD3<Float>(-halfExtents.x, 0, halfExtents.y),
+            color: color
+        )
         return vertices
     }
 
