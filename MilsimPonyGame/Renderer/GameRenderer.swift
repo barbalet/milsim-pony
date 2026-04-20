@@ -115,6 +115,7 @@ final class GameRenderer: NSObject, MTKViewDelegate {
             culledCount: visibilityState.culledCount
         )
         let routeState = scene.routeState(for: snapshot)
+        let evasionState = scene.evasionState(for: snapshot)
 
         if now - lastOverlayUpdateTime > 0.12 {
             lastOverlayUpdateTime = now
@@ -123,6 +124,10 @@ final class GameRenderer: NSObject, MTKViewDelegate {
                 self?.session?.noteRouteState(
                     summary: routeState.summary,
                     details: routeState.details
+                )
+                self?.session?.noteEvasionState(
+                    summary: evasionState.summary,
+                    details: evasionState.details
                 )
                 self?.session?.noteStreamingState(
                     summary: streamingState.summary,
@@ -158,12 +163,14 @@ final class GameRenderer: NSObject, MTKViewDelegate {
         let strafeTint = Double(snapshot.strafeIntent) * 0.015
         let forwardTint = Double(snapshot.forwardIntent) * 0.015
         let pulse = sin(snapshot.elapsedSeconds * 0.85) * 0.015
+        let suspicionTint = Double(min(max(snapshot.suspicionLevel, 0), 1))
+        let failurePulse = snapshot.routeFailed ? (0.08 + (sin(snapshot.elapsedSeconds * 7.5) * 0.04)) : 0
 
         renderPassDescriptor.colorAttachments[0].loadAction = .clear
         renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColor(
-            red: Double(scene.environment.skyHorizonColor.x) + strafeTint,
-            green: Double(scene.environment.skyHorizonColor.y) + forwardTint,
-            blue: Double(scene.environment.skyZenithColor.z) + pulse,
+            red: Double(scene.environment.skyHorizonColor.x) + strafeTint + (suspicionTint * 0.14) + failurePulse,
+            green: Double(scene.environment.skyHorizonColor.y) + forwardTint - (suspicionTint * 0.08),
+            blue: Double(scene.environment.skyZenithColor.z) + pulse - (suspicionTint * 0.06),
             alpha: 1
         )
         renderPassDescriptor.depthAttachment.loadAction = .clear

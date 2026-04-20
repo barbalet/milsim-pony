@@ -66,6 +66,114 @@
       }
     ]
   },
+  "detection": {
+    "suspicionDecayPerSecond": 0.28,
+    "failThreshold": 1.0,
+    "observers": [
+      {
+        "id": "precinct_overwatch",
+        "label": "Precinct Overwatch",
+        "position": [9.8, 1.9, 34.0],
+        "yawDegrees": 270.0,
+        "pitchDegrees": -6.0,
+        "range": 18.0,
+        "fieldOfViewDegrees": 58.0,
+        "suspicionPerSecond": 0.42,
+        "markerColor": [0.88, 0.42, 0.24, 0.94]
+      },
+      {
+        "id": "state_circle_patrol",
+        "label": "State Circle Patrol",
+        "position": [-11.5, 1.9, 55.0],
+        "yawDegrees": 110.0,
+        "pitchDegrees": -4.0,
+        "range": 19.5,
+        "fieldOfViewDegrees": 60.0,
+        "suspicionPerSecond": 0.38,
+        "markerColor": [0.90, 0.50, 0.28, 0.94]
+      },
+      {
+        "id": "deakin_watchpoint",
+        "label": "Deakin Watchpoint",
+        "position": [10.8, 1.9, 73.5],
+        "yawDegrees": 255.0,
+        "pitchDegrees": -3.0,
+        "range": 22.0,
+        "fieldOfViewDegrees": 62.0,
+        "suspicionPerSecond": 0.40,
+        "markerColor": [0.94, 0.58, 0.30, 0.94]
+      }
+    ]
+  },
+  "guidance": {
+    "coverPoints": [
+      {
+        "id": "median_cutthrough_cover",
+        "label": "Median Planter Cover",
+        "kind": "cover",
+        "position": [0.0, 0.22, 29.8],
+        "yawDegrees": 0.0,
+        "color": [0.28, 0.76, 0.58, 0.92],
+        "height": 1.15
+      },
+      {
+        "id": "west_office_shadow",
+        "label": "West Office Barrier",
+        "kind": "cover",
+        "position": [-6.2, 0.22, 34.2],
+        "yawDegrees": 0.0,
+        "color": [0.30, 0.78, 0.54, 0.92],
+        "height": 1.05
+      },
+      {
+        "id": "service_lane_shelter",
+        "label": "Service Lane Cover",
+        "kind": "cover",
+        "position": [-9.0, 0.22, 68.8],
+        "yawDegrees": 0.0,
+        "color": [0.32, 0.80, 0.60, 0.92],
+        "height": 1.20
+      },
+      {
+        "id": "pavilion_corner_cover",
+        "label": "Pavilion Corner",
+        "kind": "cover",
+        "position": [-11.8, 0.22, 78.0],
+        "yawDegrees": 0.0,
+        "color": [0.34, 0.82, 0.62, 0.92],
+        "height": 1.10
+      }
+    ],
+    "signposts": [
+      {
+        "id": "state_circle_signpost",
+        "label": "Push South",
+        "kind": "signpost",
+        "position": [3.8, 0.22, 34.8],
+        "yawDegrees": 180.0,
+        "color": [0.92, 0.82, 0.36, 0.92],
+        "height": 2.30
+      },
+      {
+        "id": "service_lane_signpost",
+        "label": "Take Service Lane",
+        "kind": "signpost",
+        "position": [-4.8, 0.22, 62.8],
+        "yawDegrees": 225.0,
+        "color": [0.94, 0.84, 0.38, 0.92],
+        "height": 2.35
+      },
+      {
+        "id": "escape_exit_signpost",
+        "label": "Escape Exit",
+        "kind": "signpost",
+        "position": [-7.2, 0.24, 79.2],
+        "yawDegrees": 180.0,
+        "color": [0.96, 0.88, 0.40, 0.94],
+        "height": 2.50
+      }
+    ]
+  },
   "proceduralElements": [
     {
       "kind": "box",

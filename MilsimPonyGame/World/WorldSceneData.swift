@@ -24,9 +24,88 @@ struct SceneConfiguration: Decodable {
     let sky: SkyConfiguration
     let sun: SunConfiguration
     let route: RouteConfiguration
+    let detection: DetectionConfiguration?
+    let guidance: GuidanceConfiguration?
     let proceduralElements: [ProceduralElementConfiguration]
     let assetInstances: [AssetInstanceConfiguration]
     let includedSectors: [String]
+}
+
+struct DetectionConfiguration: Decodable {
+    let suspicionDecayPerSecond: Float
+    let failThreshold: Float
+    let observers: [ThreatObserverConfiguration]
+
+    init(
+        suspicionDecayPerSecond: Float = 0.28,
+        failThreshold: Float = 1.0,
+        observers: [ThreatObserverConfiguration] = []
+    ) {
+        self.suspicionDecayPerSecond = suspicionDecayPerSecond
+        self.failThreshold = failThreshold
+        self.observers = observers
+    }
+}
+
+struct ThreatObserverConfiguration: Decodable {
+    let id: String
+    let label: String
+    let position: [Float]
+    let yawDegrees: Float
+    let pitchDegrees: Float?
+    let range: Float
+    let fieldOfViewDegrees: Float
+    let suspicionPerSecond: Float
+    let markerColor: [Float]?
+
+    var positionVector: SIMD3<Float> {
+        position.simd3(or: SIMD3<Float>(0, 1.8, 0))
+    }
+
+    var markerColorVector: SIMD4<Float> {
+        markerColor?.simdColor(or: SIMD4<Float>(0.86, 0.38, 0.22, 0.92)) ?? SIMD4<Float>(0.86, 0.38, 0.22, 0.92)
+    }
+}
+
+struct GuidanceConfiguration: Decodable {
+    let coverPoints: [GuidancePointConfiguration]
+    let signposts: [GuidancePointConfiguration]
+
+    init(
+        coverPoints: [GuidancePointConfiguration] = [],
+        signposts: [GuidancePointConfiguration] = []
+    ) {
+        self.coverPoints = coverPoints
+        self.signposts = signposts
+    }
+}
+
+enum GuidancePointKind: String, Decodable {
+    case cover
+    case signpost
+}
+
+struct GuidancePointConfiguration: Decodable {
+    let id: String
+    let label: String
+    let kind: GuidancePointKind
+    let position: [Float]
+    let yawDegrees: Float?
+    let color: [Float]?
+    let height: Float?
+
+    var positionVector: SIMD3<Float> {
+        position.simd3(or: .zero)
+    }
+
+    var colorVector: SIMD4<Float> {
+        switch kind {
+        case .cover:
+            return color?.simdColor(or: SIMD4<Float>(0.26, 0.74, 0.56, 0.92)) ?? SIMD4<Float>(0.26, 0.74, 0.56, 0.92)
+        case .signpost:
+            return color?.simdColor(or: SIMD4<Float>(0.92, 0.80, 0.36, 0.92)) ?? SIMD4<Float>(0.92, 0.80, 0.36, 0.92)
+        }
+    }
 }
 
 struct SpawnConfiguration: Decodable {

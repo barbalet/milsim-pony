@@ -47,6 +47,17 @@ typedef struct GameRouteCheckpoint {
     bool isGoal;
 } GameRouteCheckpoint;
 
+typedef struct GameThreatObserver {
+    float positionX;
+    float positionY;
+    float positionZ;
+    float yawDegrees;
+    float pitchDegrees;
+    float range;
+    float fieldOfViewDegrees;
+    float suspicionPerSecond;
+} GameThreatObserver;
+
 typedef struct GameFrameSnapshot {
     double elapsedSeconds;
     float strafeIntent;
@@ -60,13 +71,18 @@ typedef struct GameFrameSnapshot {
     float groundHeight;
     float routeDistanceMeters;
     float distanceToNextCheckpointMeters;
+    float suspicionLevel;
     int activeSectorCount;
     int completedCheckpointCount;
     int totalCheckpointCount;
+    int activeObserverCount;
+    int seeingObserverCount;
     int restartCount;
+    int failCount;
     bool sprinting;
     bool grounded;
     bool routeComplete;
+    bool routeFailed;
 } GameFrameSnapshot;
 
 void GameCoreBootstrap(const char *bootMode);
@@ -80,12 +96,19 @@ void GameCoreConfigureWorld(
     int groundSurfaceCount
 );
 void GameCoreConfigureRoute(const GameRouteCheckpoint *checkpoints, int checkpointCount);
+void GameCoreConfigureDetection(
+    const GameThreatObserver *observers,
+    int observerCount,
+    float suspicionDecayPerSecond,
+    float failThreshold
+);
 void GameCoreSetMoveIntent(float strafeIntent, float forwardIntent);
 void GameCoreSetSprint(bool sprinting);
 void GameCoreAddLookDelta(float deltaX, float deltaY);
 void GameCoreTick(double deltaTime);
 GameFrameSnapshot GameCoreGetSnapshot(void);
 void GameCoreRestartRoute(void);
+void GameCoreClearFailure(void);
 void GameCoreResetDebugState(void);
 
 #ifdef __cplusplus

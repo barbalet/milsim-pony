@@ -116,6 +116,27 @@
       "color": [0.50, 0.54, 0.57, 1.0],
       "yawDegrees": 0.0,
       "collisionEnabled": false
+    },
+    {
+      "name": "ServiceLaneBarrierA",
+      "position": [-5.6, 0.72, 62.4],
+      "halfExtents": [0.85, 0.72, 1.55],
+      "color": [0.44, 0.47, 0.50, 1.0],
+      "yawDegrees": 0.0
+    },
+    {
+      "name": "ServiceLaneBarrierB",
+      "position": [-10.8, 0.72, 69.0],
+      "halfExtents": [0.90, 0.72, 1.45],
+      "color": [0.44, 0.47, 0.50, 1.0],
+      "yawDegrees": 0.0
+    },
+    {
+      "name": "EastPlaygroundWall",
+      "position": [7.6, 0.86, 71.2],
+      "halfExtents": [1.35, 0.86, 2.20],
+      "color": [0.45, 0.48, 0.51, 1.0],
+      "yawDegrees": 0.0
     }
   ],
   "collisionVolumes": [

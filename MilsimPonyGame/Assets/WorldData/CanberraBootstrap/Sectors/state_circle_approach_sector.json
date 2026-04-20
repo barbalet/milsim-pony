@@ -96,6 +96,20 @@
       "halfExtents": [1.15, 0.42, 8.8],
       "color": [0.36, 0.41, 0.33, 1.0],
       "yawDegrees": 0.0
+    },
+    {
+      "name": "WestConcreteBarrier",
+      "position": [-6.2, 0.55, 34.2],
+      "halfExtents": [1.25, 0.55, 0.72],
+      "color": [0.44, 0.47, 0.50, 1.0],
+      "yawDegrees": 0.0
+    },
+    {
+      "name": "EastShelterMass",
+      "position": [7.8, 0.85, 32.6],
+      "halfExtents": [1.10, 0.85, 1.35],
+      "color": [0.45, 0.48, 0.51, 1.0],
+      "yawDegrees": 0.0
     }
   ],
   "collisionVolumes": [

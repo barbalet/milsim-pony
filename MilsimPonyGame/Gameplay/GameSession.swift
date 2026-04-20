@@ -18,11 +18,14 @@ final class GameSession: ObservableObject {
     private var sceneDetails: [String] = []
     private var routeSummary = "Route: waiting for route state"
     private var routeDetails: [String] = []
+    private var evasionSummary = "Evasion: waiting for detection state"
+    private var evasionDetails: [String] = []
     private var streamingSummary = "Chunks: waiting for stream state"
     private var streamingDetails: [String] = []
     private var frameTimingLine = "Frame: collecting samples"
     private var completedCheckpointCount = 0
     private var routeWasComplete = false
+    private var routeWasFailed = false
 
     init(configuration: LaunchConfiguration) {
         self.configuration = configuration
@@ -96,6 +99,12 @@ final class GameSession: ObservableObject {
         rebuildOverlay()
     }
 
+    func noteEvasionState(summary: String, details: [String]) {
+        evasionSummary = summary
+        evasionDetails = details
+        rebuildOverlay()
+    }
+
     func handleKey(_ keyCode: UInt16, isPressed: Bool) {
         guard let command = InputBindings.command(for: keyCode) else {
             return
@@ -114,10 +123,15 @@ final class GameSession: ObservableObject {
 
         switch command {
         case .restart where isPressed:
+            if latestSnapshot?.routeFailed ?? false {
+                GameCoreClearFailure()
+            }
             GameCoreRestartRoute()
             lastMouseDelta = .zero
             shouldIgnoreNextMouseDelta = true
-            statusLine = "Route restart triggered"
+            statusLine = (latestSnapshot?.routeFailed ?? false)
+                ? "Retry triggered from checkpoint"
+                : "Route restart triggered"
         case .interact where isPressed:
             statusLine = "Interact placeholder triggered"
         case .pause where isPressed:
@@ -153,7 +167,9 @@ final class GameSession: ObservableObject {
     }
 
     func accept(snapshot: GameFrameSnapshot, drawableSize: CGSize) {
-        if snapshot.routeComplete && !routeWasComplete {
+        if snapshot.routeFailed && !routeWasFailed {
+            statusLine = "Detected - restart from checkpoint"
+        } else if snapshot.routeComplete && !routeWasComplete {
             statusLine = "Escape corridor reached"
         } else if Int(snapshot.completedCheckpointCount) > completedCheckpointCount {
             statusLine = "Checkpoint \(snapshot.completedCheckpointCount) reached"
@@ -161,6 +177,7 @@ final class GameSession: ObservableObject {
 
         completedCheckpointCount = Int(snapshot.completedCheckpointCount)
         routeWasComplete = snapshot.routeComplete
+        routeWasFailed = snapshot.routeFailed
         latestSnapshot = snapshot
         viewportSize = drawableSize
         rebuildOverlay()
@@ -172,6 +189,7 @@ final class GameSession: ObservableObject {
         shouldIgnoreNextMouseDelta = true
         completedCheckpointCount = 0
         routeWasComplete = false
+        routeWasFailed = false
         statusLine = "Debug state reset"
         rebuildOverlay()
     }
@@ -201,8 +219,7 @@ final class GameSession: ObservableObject {
             .map(\.label)
             .sorted()
             .joined(separator: ", ")
-
-        overlayLines = [
+        let headerLines = [
             "Mode: \(configuration.bootMode)",
             "Scene: \(sceneLabel)",
             "World: \(configuration.worldName)",
@@ -211,8 +228,10 @@ final class GameSession: ObservableObject {
             "Renderer: \(rendererName)",
             "Scene Summary: \(sceneSummary)",
             routeSummary,
+            evasionSummary,
             streamingSummary,
-        ] + sceneDetails + routeDetails + streamingDetails + [
+        ]
+        let metricLines = [
             "Viewport: \(Int(viewportSize.width)) x \(Int(viewportSize.height))",
             frameTimingLine,
             "Pressed: \(pressed.isEmpty ? "None" : pressed)",
@@ -220,11 +239,14 @@ final class GameSession: ObservableObject {
             String(format: "Move Speed: %.2f m/s", snapshot?.moveSpeed ?? 0),
             String(format: "Ground: %.2f m / %@ / %d active sectors", snapshot?.groundHeight ?? 0, (snapshot?.grounded ?? false) ? "grounded" : "fallback", snapshot?.activeSectorCount ?? 0),
             String(format: "Route Metrics: %.0fm / %d restarts", snapshot?.routeDistanceMeters ?? 0, snapshot?.restartCount ?? 0),
+            String(format: "Threat: %.2f / %d watching / %d in range / %d fails", snapshot?.suspicionLevel ?? 0, snapshot?.seeingObserverCount ?? 0, snapshot?.activeObserverCount ?? 0, snapshot?.failCount ?? 0),
             String(format: "Look: yaw %.1f pitch %.1f", snapshot?.yawDegrees ?? 0, snapshot?.pitchDegrees ?? 0),
             String(format: "Camera: %.2f %.2f %.2f", snapshot?.cameraX ?? 0, snapshot?.cameraY ?? 0, snapshot?.cameraZ ?? 0),
             String(format: "Mouse Delta: %.1f %.1f", lastMouseDelta.width, lastMouseDelta.height),
             String(format: "Uptime: %.2fs", snapshot?.elapsedSeconds ?? 0),
         ]
+
+        overlayLines = headerLines + sceneDetails + routeDetails + evasionDetails + streamingDetails + metricLines
     }
 
     private func shortenedPath(_ path: String) -> String {

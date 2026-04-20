@@ -50,7 +50,7 @@ enum InputBindings {
         "Shift: sprint",
         "Mouse move: look",
         "Space: interact placeholder",
-        "R: restart from last checkpoint",
+        "R: restart or retry from last checkpoint",
         "Esc: pause placeholder",
     ]
 

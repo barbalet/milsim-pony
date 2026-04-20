@@ -8,6 +8,7 @@
 #define GAME_CORE_MAX_COLLISION_VOLUMES 256
 #define GAME_CORE_MAX_GROUND_SURFACES 128
 #define GAME_CORE_MAX_ROUTE_CHECKPOINTS 16
+#define GAME_CORE_MAX_THREAT_OBSERVERS 16
 
 typedef struct GameCoreState {
     double elapsedSeconds;
@@ -29,12 +30,19 @@ typedef struct GameCoreState {
     float groundHeight;
     float routeDistanceMeters;
     float distanceToNextCheckpointMeters;
+    float suspicionLevel;
+    float suspicionDecayPerSecond;
+    float failThreshold;
     int activeSectorCount;
     int completedCheckpointCount;
+    int activeObserverCount;
+    int seeingObserverCount;
     int restartCount;
+    int failCount;
     bool sprinting;
     bool grounded;
     bool routeComplete;
+    bool routeFailed;
     bool bootstrapped;
     char bootMode[64];
     GameSectorBounds sectors[GAME_CORE_MAX_SECTORS];
@@ -45,6 +53,8 @@ typedef struct GameCoreState {
     int groundSurfaceCount;
     GameRouteCheckpoint routeCheckpoints[GAME_CORE_MAX_ROUTE_CHECKPOINTS];
     int routeCheckpointCount;
+    GameThreatObserver threatObservers[GAME_CORE_MAX_THREAT_OBSERVERS];
+    int threatObserverCount;
     float respawnX;
     float respawnY;
     float respawnZ;
@@ -61,6 +71,8 @@ static GameCoreState gameState = {
     .spawnPitchDegrees = -12.0f,
     .eyeHeight = 1.65f,
     .playerRadius = 0.36f,
+    .suspicionDecayPerSecond = 0.28f,
+    .failThreshold = 1.0f,
 };
 
 static float GameCoreClamp(float value, float minimum, float maximum) {
@@ -75,6 +87,10 @@ static float GameCoreClamp(float value, float minimum, float maximum) {
 
 static float GameCoreLerp(float start, float end, float t) {
     return start + ((end - start) * t);
+}
+
+static float GameCoreDegreesToRadians(float degrees) {
+    return degrees * (float)M_PI / 180.0f;
 }
 
 static void GameCoreRotateIntoLocalFrame(float x, float z, float yawDegrees, float *localX, float *localZ) {
@@ -106,15 +122,17 @@ static float GameCoreSampleGroundHeight(float x, float z, float fallbackHeight, 
             continue;
         }
 
-        const float u = surface->halfWidth > 0 ? (localX + surface->halfWidth) / (surface->halfWidth * 2.0f) : 0.5f;
-        const float v = surface->halfDepth > 0 ? (localZ + surface->halfDepth) / (surface->halfDepth * 2.0f) : 0.5f;
-        const float northHeight = GameCoreLerp(surface->northWestHeight, surface->northEastHeight, u);
-        const float southHeight = GameCoreLerp(surface->southWestHeight, surface->southEastHeight, u);
-        const float sampledHeight = GameCoreLerp(northHeight, southHeight, v);
+        {
+            const float u = surface->halfWidth > 0 ? (localX + surface->halfWidth) / (surface->halfWidth * 2.0f) : 0.5f;
+            const float v = surface->halfDepth > 0 ? (localZ + surface->halfDepth) / (surface->halfDepth * 2.0f) : 0.5f;
+            const float northHeight = GameCoreLerp(surface->northWestHeight, surface->northEastHeight, u);
+            const float southHeight = GameCoreLerp(surface->southWestHeight, surface->southEastHeight, u);
+            const float sampledHeight = GameCoreLerp(northHeight, southHeight, v);
 
-        if (!found || sampledHeight > highestHeight) {
-            highestHeight = sampledHeight;
-            found = true;
+            if (!found || sampledHeight > highestHeight) {
+                highestHeight = sampledHeight;
+                found = true;
+            }
         }
     }
 
@@ -196,13 +214,26 @@ static void GameCoreUpdateRespawnAnchorForProgress(void) {
         return;
     }
 
-    const int checkpointIndex = gameState.completedCheckpointCount - 1;
-    const GameRouteCheckpoint *checkpoint = &gameState.routeCheckpoints[checkpointIndex];
-    gameState.respawnX = checkpoint->positionX;
-    gameState.respawnY = checkpoint->positionY;
-    gameState.respawnZ = checkpoint->positionZ;
-    gameState.respawnYawDegrees = checkpoint->yawDegrees;
-    gameState.respawnPitchDegrees = checkpoint->pitchDegrees;
+    {
+        const int checkpointIndex = gameState.completedCheckpointCount - 1;
+        const GameRouteCheckpoint *checkpoint = &gameState.routeCheckpoints[checkpointIndex];
+        gameState.respawnX = checkpoint->positionX;
+        gameState.respawnY = checkpoint->positionY;
+        gameState.respawnZ = checkpoint->positionZ;
+        gameState.respawnYawDegrees = checkpoint->yawDegrees;
+        gameState.respawnPitchDegrees = checkpoint->pitchDegrees;
+    }
+}
+
+static void GameCoreResetDetectionState(bool clearFailCount) {
+    gameState.suspicionLevel = 0;
+    gameState.activeObserverCount = 0;
+    gameState.seeingObserverCount = 0;
+    gameState.routeFailed = false;
+
+    if (clearFailCount) {
+        gameState.failCount = 0;
+    }
 }
 
 static void GameCoreResetRouteProgress(void) {
@@ -240,6 +271,11 @@ static void GameCoreRestartFromRespawnAnchor(void) {
 }
 
 static void GameCoreUpdateRouteProgress(void) {
+    if (gameState.routeFailed) {
+        gameState.distanceToNextCheckpointMeters = 0;
+        return;
+    }
+
     if (gameState.routeComplete) {
         gameState.distanceToNextCheckpointMeters = 0;
         return;
@@ -250,42 +286,169 @@ static void GameCoreUpdateRouteProgress(void) {
         return;
     }
 
-    const int nextCheckpointIndex = gameState.completedCheckpointCount;
-    if (nextCheckpointIndex >= gameState.routeCheckpointCount) {
-        gameState.routeComplete = true;
-        gameState.distanceToNextCheckpointMeters = 0;
-        return;
-    }
-
-    const GameRouteCheckpoint *checkpoint = &gameState.routeCheckpoints[nextCheckpointIndex];
-    const float deltaX = gameState.cameraX - checkpoint->positionX;
-    const float deltaY = gameState.cameraY - checkpoint->positionY;
-    const float deltaZ = gameState.cameraZ - checkpoint->positionZ;
-    const float distance = sqrtf((deltaX * deltaX) + (deltaY * deltaY) + (deltaZ * deltaZ));
-
-    gameState.distanceToNextCheckpointMeters = distance;
-
-    if (distance > checkpoint->triggerRadius) {
-        return;
-    }
-
-    gameState.completedCheckpointCount += 1;
-    if (checkpoint->isGoal || gameState.completedCheckpointCount >= gameState.routeCheckpointCount) {
-        gameState.routeComplete = true;
-        gameState.distanceToNextCheckpointMeters = 0;
-        return;
-    }
-
-    GameCoreUpdateRespawnAnchorForProgress();
-
     {
-        const GameRouteCheckpoint *upcomingCheckpoint = &gameState.routeCheckpoints[gameState.completedCheckpointCount];
-        const float nextDeltaX = gameState.cameraX - upcomingCheckpoint->positionX;
-        const float nextDeltaY = gameState.cameraY - upcomingCheckpoint->positionY;
-        const float nextDeltaZ = gameState.cameraZ - upcomingCheckpoint->positionZ;
-        gameState.distanceToNextCheckpointMeters = sqrtf(
-            (nextDeltaX * nextDeltaX) + (nextDeltaY * nextDeltaY) + (nextDeltaZ * nextDeltaZ)
+        const int nextCheckpointIndex = gameState.completedCheckpointCount;
+        if (nextCheckpointIndex >= gameState.routeCheckpointCount) {
+            gameState.routeComplete = true;
+            gameState.distanceToNextCheckpointMeters = 0;
+            return;
+        }
+
+        const GameRouteCheckpoint *checkpoint = &gameState.routeCheckpoints[nextCheckpointIndex];
+        const float deltaX = gameState.cameraX - checkpoint->positionX;
+        const float deltaY = gameState.cameraY - checkpoint->positionY;
+        const float deltaZ = gameState.cameraZ - checkpoint->positionZ;
+        const float distance = sqrtf((deltaX * deltaX) + (deltaY * deltaY) + (deltaZ * deltaZ));
+
+        gameState.distanceToNextCheckpointMeters = distance;
+
+        if (distance > checkpoint->triggerRadius) {
+            return;
+        }
+
+        gameState.completedCheckpointCount += 1;
+        if (checkpoint->isGoal || gameState.completedCheckpointCount >= gameState.routeCheckpointCount) {
+            gameState.routeComplete = true;
+            gameState.distanceToNextCheckpointMeters = 0;
+            return;
+        }
+
+        GameCoreUpdateRespawnAnchorForProgress();
+
+        {
+            const GameRouteCheckpoint *upcomingCheckpoint = &gameState.routeCheckpoints[gameState.completedCheckpointCount];
+            const float nextDeltaX = gameState.cameraX - upcomingCheckpoint->positionX;
+            const float nextDeltaY = gameState.cameraY - upcomingCheckpoint->positionY;
+            const float nextDeltaZ = gameState.cameraZ - upcomingCheckpoint->positionZ;
+            gameState.distanceToNextCheckpointMeters = sqrtf(
+                (nextDeltaX * nextDeltaX) + (nextDeltaY * nextDeltaY) + (nextDeltaZ * nextDeltaZ)
+            );
+        }
+    }
+}
+
+static bool GameCoreHasLineOfSightToPoint(
+    float startX,
+    float startY,
+    float startZ,
+    float endX,
+    float endY,
+    float endZ
+) {
+    const int sampleCount = 24;
+
+    for (int sample = 1; sample < sampleCount; sample++) {
+        const float t = (float)sample / (float)sampleCount;
+        const float sampleX = startX + ((endX - startX) * t);
+        const float sampleY = startY + ((endY - startY) * t);
+        const float sampleZ = startZ + ((endZ - startZ) * t);
+
+        for (int index = 0; index < gameState.collisionVolumeCount; index++) {
+            const GameCollisionVolume *volume = &gameState.collisionVolumes[index];
+            const float minY = volume->centerY - volume->halfHeight;
+            const float maxY = volume->centerY + volume->halfHeight;
+            float localX = 0;
+            float localZ = 0;
+
+            if (sampleY < minY || sampleY > maxY) {
+                continue;
+            }
+
+            GameCoreRotateIntoLocalFrame(
+                sampleX - volume->centerX,
+                sampleZ - volume->centerZ,
+                volume->yawDegrees,
+                &localX,
+                &localZ
+            );
+
+            if (fabsf(localX) <= volume->halfWidth && fabsf(localZ) <= volume->halfDepth) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+static void GameCoreUpdateDetection(double deltaTime) {
+    float suspicionDelta = 0;
+
+    gameState.activeObserverCount = 0;
+    gameState.seeingObserverCount = 0;
+
+    if (gameState.routeComplete) {
+        gameState.suspicionLevel = GameCoreClamp(
+            gameState.suspicionLevel - (gameState.suspicionDecayPerSecond * (float)deltaTime),
+            0,
+            gameState.failThreshold > 0 ? gameState.failThreshold : 1.0f
         );
+        return;
+    }
+
+    for (int index = 0; index < gameState.threatObserverCount; index++) {
+        const GameThreatObserver *observer = &gameState.threatObservers[index];
+        const float deltaX = gameState.cameraX - observer->positionX;
+        const float deltaY = gameState.cameraY - observer->positionY;
+        const float deltaZ = gameState.cameraZ - observer->positionZ;
+        const float distanceSquared = (deltaX * deltaX) + (deltaY * deltaY) + (deltaZ * deltaZ);
+        const float rangeSquared = observer->range * observer->range;
+
+        if (distanceSquared > rangeSquared) {
+            continue;
+        }
+
+        gameState.activeObserverCount += 1;
+
+        {
+            const float distance = sqrtf(distanceSquared);
+            const float yawRadians = GameCoreDegreesToRadians(observer->yawDegrees);
+            const float pitchRadians = GameCoreDegreesToRadians(observer->pitchDegrees);
+            const float coneThreshold = cosf(GameCoreDegreesToRadians(observer->fieldOfViewDegrees * 0.5f));
+            const float inverseDistance = distance > 0.0001f ? 1.0f / distance : 0.0f;
+            const float toPlayerX = deltaX * inverseDistance;
+            const float toPlayerY = deltaY * inverseDistance;
+            const float toPlayerZ = deltaZ * inverseDistance;
+            const float facingX = sinf(yawRadians) * cosf(pitchRadians);
+            const float facingY = sinf(pitchRadians);
+            const float facingZ = -cosf(yawRadians) * cosf(pitchRadians);
+            const float viewDot = (toPlayerX * facingX) + (toPlayerY * facingY) + (toPlayerZ * facingZ);
+
+            if (viewDot < coneThreshold) {
+                continue;
+            }
+
+            if (!GameCoreHasLineOfSightToPoint(
+                observer->positionX,
+                observer->positionY,
+                observer->positionZ,
+                gameState.cameraX,
+                gameState.cameraY,
+                gameState.cameraZ
+            )) {
+                continue;
+            }
+
+            gameState.seeingObserverCount += 1;
+            suspicionDelta += observer->suspicionPerSecond * (float)deltaTime;
+        }
+    }
+
+    if (gameState.routeFailed) {
+        return;
+    }
+
+    gameState.suspicionLevel = GameCoreClamp(
+        gameState.suspicionLevel + suspicionDelta - (gameState.suspicionDecayPerSecond * (float)deltaTime),
+        0,
+        gameState.failThreshold > 0 ? gameState.failThreshold : 1.0f
+    );
+
+    if (gameState.failThreshold > 0 && gameState.suspicionLevel >= gameState.failThreshold) {
+        gameState.routeFailed = true;
+        gameState.failCount += 1;
+        gameState.moveSpeed = 0;
+        gameState.distanceToNextCheckpointMeters = 0;
     }
 }
 
@@ -300,6 +463,8 @@ void GameCoreBootstrap(const char *bootMode) {
     gameState.respawnY = 1.65f;
     gameState.respawnZ = 4.5f;
     gameState.respawnPitchDegrees = -12.0f;
+    gameState.suspicionDecayPerSecond = 0.28f;
+    gameState.failThreshold = 1.0f;
 
     if (bootMode != NULL) {
         snprintf(gameState.bootMode, sizeof(gameState.bootMode), "%s", bootMode);
@@ -307,6 +472,7 @@ void GameCoreBootstrap(const char *bootMode) {
         snprintf(gameState.bootMode, sizeof(gameState.bootMode), "bootstrap");
     }
 
+    GameCoreResetDetectionState(true);
     GameCoreResetRouteProgress();
     GameCoreResetRuntimeState();
     printf("[GameCore] Bootstrap mode: %s\n", gameState.bootMode);
@@ -322,6 +488,7 @@ void GameCoreConfigureSpawn(float x, float y, float z, float yawDegrees, float p
     gameState.spawnZ = z;
     gameState.spawnYawDegrees = yawDegrees;
     gameState.spawnPitchDegrees = pitchDegrees;
+    GameCoreResetDetectionState(true);
     GameCoreResetRouteProgress();
     GameCoreResetRuntimeState();
     GameCoreUpdateRouteProgress();
@@ -368,6 +535,7 @@ void GameCoreConfigureWorld(
 
     GameCoreRefreshGrounding();
     GameCoreUpdateRouteProgress();
+    GameCoreUpdateDetection(0);
     printf(
         "[GameCore] World configured with %d sectors, %d blockers, %d ground surfaces\n",
         gameState.sectorCount,
@@ -393,9 +561,39 @@ void GameCoreConfigureRoute(const GameRouteCheckpoint *checkpoints, int checkpoi
         );
     }
 
+    GameCoreResetDetectionState(true);
     GameCoreResetRouteProgress();
     GameCoreUpdateRouteProgress();
     printf("[GameCore] Route configured with %d checkpoints\n", gameState.routeCheckpointCount);
+}
+
+void GameCoreConfigureDetection(
+    const GameThreatObserver *observers,
+    int observerCount,
+    float suspicionDecayPerSecond,
+    float failThreshold
+) {
+    if (!gameState.bootstrapped) {
+        GameCoreBootstrap("implicit");
+    }
+
+    gameState.threatObserverCount = observerCount > GAME_CORE_MAX_THREAT_OBSERVERS
+        ? GAME_CORE_MAX_THREAT_OBSERVERS
+        : observerCount;
+    gameState.suspicionDecayPerSecond = suspicionDecayPerSecond > 0 ? suspicionDecayPerSecond : 0.28f;
+    gameState.failThreshold = failThreshold > 0 ? failThreshold : 1.0f;
+
+    if (observers != NULL && gameState.threatObserverCount > 0) {
+        memcpy(
+            gameState.threatObservers,
+            observers,
+            sizeof(GameThreatObserver) * (size_t)gameState.threatObserverCount
+        );
+    }
+
+    GameCoreResetDetectionState(true);
+    GameCoreUpdateDetection(0);
+    printf("[GameCore] Detection configured with %d observers\n", gameState.threatObserverCount);
 }
 
 void GameCoreSetMoveIntent(float strafeIntent, float forwardIntent) {
@@ -419,58 +617,70 @@ void GameCoreTick(double deltaTime) {
 
     gameState.elapsedSeconds += deltaTime;
 
-    const float startingX = gameState.cameraX;
-    const float startingZ = gameState.cameraZ;
-    const float baseMoveSpeed = gameState.sprinting ? 6.8f : 4.2f;
-    float moveX = gameState.strafeIntent;
-    float moveZ = gameState.forwardIntent;
-
-    const float magnitude = sqrtf((moveX * moveX) + (moveZ * moveZ));
-    if (magnitude > 1.0f) {
-        moveX /= magnitude;
-        moveZ /= magnitude;
+    if (gameState.routeFailed) {
+        gameState.moveSpeed = 0;
+        GameCoreRefreshGrounding();
+        GameCoreUpdateDetection(deltaTime);
+        return;
     }
-
-    const float yawRadians = gameState.yawDegrees * (float)M_PI / 180.0f;
-    const float rightX = cosf(yawRadians);
-    const float rightZ = sinf(yawRadians);
-    const float forwardX = sinf(yawRadians);
-    const float forwardZ = -cosf(yawRadians);
-    const float worldMoveX = (rightX * moveX) + (forwardX * moveZ);
-    const float worldMoveZ = (rightZ * moveX) + (forwardZ * moveZ);
-    const float stepDistance = baseMoveSpeed * (float)deltaTime;
-
-    gameState.moveSpeed = baseMoveSpeed * magnitude;
-
-    if (magnitude > 0.0f) {
-        float nextX = gameState.cameraX + (worldMoveX * stepDistance);
-        float nextZ = gameState.cameraZ;
-        float candidateGroundHeight = GameCoreSampleGroundHeight(nextX, nextZ, gameState.groundHeight, NULL);
-
-        if (!GameCoreWouldCollide(nextX, nextZ, candidateGroundHeight)) {
-            gameState.cameraX = nextX;
-            gameState.groundHeight = candidateGroundHeight;
-        }
-
-        nextX = gameState.cameraX;
-        nextZ = gameState.cameraZ + (worldMoveZ * stepDistance);
-        candidateGroundHeight = GameCoreSampleGroundHeight(nextX, nextZ, gameState.groundHeight, NULL);
-
-        if (!GameCoreWouldCollide(nextX, nextZ, candidateGroundHeight)) {
-            gameState.cameraZ = nextZ;
-            gameState.groundHeight = candidateGroundHeight;
-        }
-    }
-
-    GameCoreRefreshGrounding();
 
     {
-        const float deltaX = gameState.cameraX - startingX;
-        const float deltaZ = gameState.cameraZ - startingZ;
-        gameState.routeDistanceMeters += sqrtf((deltaX * deltaX) + (deltaZ * deltaZ));
+        const float startingX = gameState.cameraX;
+        const float startingZ = gameState.cameraZ;
+        const float baseMoveSpeed = gameState.sprinting ? 6.8f : 4.2f;
+        float moveX = gameState.strafeIntent;
+        float moveZ = gameState.forwardIntent;
+
+        const float magnitude = sqrtf((moveX * moveX) + (moveZ * moveZ));
+        if (magnitude > 1.0f) {
+            moveX /= magnitude;
+            moveZ /= magnitude;
+        }
+
+        {
+            const float yawRadians = gameState.yawDegrees * (float)M_PI / 180.0f;
+            const float rightX = cosf(yawRadians);
+            const float rightZ = sinf(yawRadians);
+            const float forwardX = sinf(yawRadians);
+            const float forwardZ = -cosf(yawRadians);
+            const float worldMoveX = (rightX * moveX) + (forwardX * moveZ);
+            const float worldMoveZ = (rightZ * moveX) + (forwardZ * moveZ);
+            const float stepDistance = baseMoveSpeed * (float)deltaTime;
+
+            gameState.moveSpeed = baseMoveSpeed * magnitude;
+
+            if (magnitude > 0.0f) {
+                float nextX = gameState.cameraX + (worldMoveX * stepDistance);
+                float nextZ = gameState.cameraZ;
+                float candidateGroundHeight = GameCoreSampleGroundHeight(nextX, nextZ, gameState.groundHeight, NULL);
+
+                if (!GameCoreWouldCollide(nextX, nextZ, candidateGroundHeight)) {
+                    gameState.cameraX = nextX;
+                    gameState.groundHeight = candidateGroundHeight;
+                }
+
+                nextX = gameState.cameraX;
+                nextZ = gameState.cameraZ + (worldMoveZ * stepDistance);
+                candidateGroundHeight = GameCoreSampleGroundHeight(nextX, nextZ, gameState.groundHeight, NULL);
+
+                if (!GameCoreWouldCollide(nextX, nextZ, candidateGroundHeight)) {
+                    gameState.cameraZ = nextZ;
+                    gameState.groundHeight = candidateGroundHeight;
+                }
+            }
+        }
+
+        GameCoreRefreshGrounding();
+
+        {
+            const float deltaX = gameState.cameraX - startingX;
+            const float deltaZ = gameState.cameraZ - startingZ;
+            gameState.routeDistanceMeters += sqrtf((deltaX * deltaX) + (deltaZ * deltaZ));
+        }
     }
 
     GameCoreUpdateRouteProgress();
+    GameCoreUpdateDetection(deltaTime);
 }
 
 GameFrameSnapshot GameCoreGetSnapshot(void) {
@@ -487,13 +697,18 @@ GameFrameSnapshot GameCoreGetSnapshot(void) {
         .groundHeight = gameState.groundHeight,
         .routeDistanceMeters = gameState.routeDistanceMeters,
         .distanceToNextCheckpointMeters = gameState.distanceToNextCheckpointMeters,
+        .suspicionLevel = gameState.suspicionLevel,
         .activeSectorCount = gameState.activeSectorCount,
         .completedCheckpointCount = gameState.completedCheckpointCount,
         .totalCheckpointCount = gameState.routeCheckpointCount,
+        .activeObserverCount = gameState.activeObserverCount,
+        .seeingObserverCount = gameState.seeingObserverCount,
         .restartCount = gameState.restartCount,
+        .failCount = gameState.failCount,
         .sprinting = gameState.sprinting,
         .grounded = gameState.grounded,
         .routeComplete = gameState.routeComplete,
+        .routeFailed = gameState.routeFailed,
     };
 
     return snapshot;
@@ -506,17 +721,35 @@ void GameCoreRestartRoute(void) {
     }
 
     if (gameState.routeComplete) {
+        GameCoreResetDetectionState(true);
         GameCoreResetRouteProgress();
         GameCoreResetRuntimeState();
         GameCoreUpdateRouteProgress();
+        GameCoreUpdateDetection(0);
         printf("[GameCore] Route restart from initial spawn\n");
         return;
+    }
+
+    if (gameState.routeFailed) {
+        GameCoreResetDetectionState(false);
     }
 
     gameState.restartCount += 1;
     GameCoreRestartFromRespawnAnchor();
     GameCoreUpdateRouteProgress();
+    GameCoreUpdateDetection(0);
     printf("[GameCore] Route restart to %.2f %.2f %.2f\n", gameState.respawnX, gameState.respawnY, gameState.respawnZ);
+}
+
+void GameCoreClearFailure(void) {
+    if (!gameState.bootstrapped) {
+        GameCoreBootstrap("implicit");
+        return;
+    }
+
+    GameCoreResetDetectionState(false);
+    GameCoreUpdateDetection(0);
+    printf("[GameCore] Failure state cleared\n");
 }
 
 void GameCoreResetDebugState(void) {
@@ -525,8 +758,10 @@ void GameCoreResetDebugState(void) {
         return;
     }
 
+    GameCoreResetDetectionState(true);
     GameCoreResetRouteProgress();
     GameCoreResetRuntimeState();
     GameCoreUpdateRouteProgress();
+    GameCoreUpdateDetection(0);
     printf("[GameCore] Debug state reset\n");
 }
