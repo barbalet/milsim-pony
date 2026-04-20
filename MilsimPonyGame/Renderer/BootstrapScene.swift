@@ -9,93 +9,305 @@ struct SceneDrawable {
     let modelMatrix: simd_float4x4
 }
 
+struct SceneDebugInfo {
+    let sceneName: String
+    let summary: String
+    let details: [String]
+    let spawn: SpawnConfiguration
+}
+
 final class BootstrapScene {
     let drawables: [SceneDrawable]
-    let summary: String
+    let debugInfo: SceneDebugInfo
 
-    init(device: MTLDevice, assetRoot: String) {
+    init(device: MTLDevice, assetRoot: String, worldDataRoot: String, worldManifestPath: String) {
+        let manifestURL = URL(fileURLWithPath: worldManifestPath)
+
+        do {
+            let buildResult = try ScenePackageBuilder(
+                device: device,
+                assetRoot: assetRoot,
+                worldDataRoot: worldDataRoot
+            ).buildScene(from: manifestURL)
+
+            drawables = buildResult.drawables
+            debugInfo = buildResult.debugInfo
+        } catch {
+            let fallbackResult = FallbackSceneFactory.build(
+                device: device,
+                worldDataRoot: worldDataRoot,
+                worldManifestPath: worldManifestPath,
+                errorDescription: error.localizedDescription
+            )
+
+            drawables = fallbackResult.drawables
+            debugInfo = fallbackResult.debugInfo
+            print("[Scene] Falling back to procedural scene: \(error)")
+        }
+    }
+}
+
+private struct SceneBuildResult {
+    let drawables: [SceneDrawable]
+    let debugInfo: SceneDebugInfo
+}
+
+private final class ScenePackageBuilder {
+    private let device: MTLDevice
+    private let assetRoot: String
+    private let worldDataRoot: String
+    private var assetCache: [String: LoadedAsset] = [:]
+
+    init(device: MTLDevice, assetRoot: String, worldDataRoot: String) {
+        self.device = device
+        self.assetRoot = assetRoot
+        self.worldDataRoot = worldDataRoot
+    }
+
+    func buildScene(from manifestURL: URL) throws -> SceneBuildResult {
+        let manifest = try loadJSON(WorldManifest.self, at: manifestURL)
+        let packageRootURL = manifestURL.deletingLastPathComponent()
+        let coordinateSystem = try loadJSON(
+            CoordinateSystemConfiguration.self,
+            at: packageRootURL.appendingPathComponent(manifest.coordinateSystemFile)
+        )
+        let sceneConfiguration = try loadJSON(
+            SceneConfiguration.self,
+            at: packageRootURL.appendingPathComponent(manifest.sceneFile)
+        )
+
+        let sectorLookup = try buildSectorLookup(
+            relativePaths: manifest.sectorFiles,
+            packageRootURL: packageRootURL
+        )
+
         var sceneDrawables: [SceneDrawable] = []
-        var loadedAssets: [String] = []
+        var proceduralCount = 0
+        var assetCount = 0
+        var grayboxCount = 0
 
-        let groundVertices = GeometryBuilder.makeCheckerboard(size: 16, tileSize: 1.2)
-        if let buffer = device.makeBuffer(bytes: groundVertices, length: MemoryLayout<SceneVertex>.stride * groundVertices.count) {
-            sceneDrawables.append(
+        for element in sceneConfiguration.proceduralElements {
+            if let drawable = proceduralDrawable(from: element) {
+                sceneDrawables.append(drawable)
+                proceduralCount += 1
+            }
+        }
+
+        let includedSectorIDs = sceneConfiguration.includedSectors.isEmpty
+            ? Array(sectorLookup.keys).sorted()
+            : sceneConfiguration.includedSectors
+
+        let loadedSectors = includedSectorIDs.compactMap { sectorLookup[$0] }
+        for sector in loadedSectors {
+            for block in sector.grayboxBlocks {
+                if let drawable = grayboxDrawable(from: block, sectorID: sector.id) {
+                    sceneDrawables.append(drawable)
+                    grayboxCount += 1
+                }
+            }
+        }
+
+        for assetInstance in sceneConfiguration.assetInstances {
+            if let drawable = assetDrawable(from: assetInstance) {
+                sceneDrawables.append(drawable)
+                assetCount += 1
+            }
+        }
+
+        let detailLines = [
+            "Grid: \(coordinateSystem.name)",
+            "Axes: x \(coordinateSystem.axisX) / z \(coordinateSystem.axisZ)",
+            "Sectors: \(loadedSectors.map(\.displayName).joined(separator: ", "))",
+            "Data Root: \(URL(fileURLWithPath: worldDataRoot).lastPathComponent)",
+        ]
+
+        let summary = "\(assetCount) assets, \(grayboxCount) graybox, \(proceduralCount) procedural"
+
+        return SceneBuildResult(
+            drawables: sceneDrawables,
+            debugInfo: SceneDebugInfo(
+                sceneName: sceneConfiguration.sceneName,
+                summary: summary,
+                details: detailLines,
+                spawn: sceneConfiguration.spawn
+            )
+        )
+    }
+
+    private func buildSectorLookup(
+        relativePaths: [String],
+        packageRootURL: URL
+    ) throws -> [String: SectorConfiguration] {
+        var sectors: [String: SectorConfiguration] = [:]
+
+        for relativePath in relativePaths {
+            let sector = try loadJSON(SectorConfiguration.self, at: packageRootURL.appendingPathComponent(relativePath))
+            sectors[sector.id] = sector
+        }
+
+        return sectors
+    }
+
+    private func proceduralDrawable(from configuration: ProceduralElementConfiguration) -> SceneDrawable? {
+        switch configuration.kind {
+        case .checkerboard:
+            let vertices = GeometryBuilder.makeCheckerboard(
+                size: configuration.size ?? 16,
+                tileSize: configuration.tileSize ?? 1.2,
+                colorA: configuration.checkerColorA,
+                colorB: configuration.checkerColorB
+            )
+
+            guard let buffer = makeBuffer(from: vertices) else {
+                return nil
+            }
+
+            return SceneDrawable(
+                name: configuration.name,
+                vertexBuffer: buffer,
+                vertexCount: vertices.count,
+                modelMatrix: simd_float4x4.translation(configuration.positionVector)
+            )
+
+        case .box:
+            let vertices = GeometryBuilder.makeBox(
+                halfExtents: configuration.halfExtentsVector,
+                color: configuration.colorVector
+            )
+
+            guard let buffer = makeBuffer(from: vertices) else {
+                return nil
+            }
+
+            let rotation = simd_float4x4.rotation(y: (configuration.yawDegrees ?? 0) * (.pi / 180.0))
+            return SceneDrawable(
+                name: configuration.name,
+                vertexBuffer: buffer,
+                vertexCount: vertices.count,
+                modelMatrix: simd_float4x4.translation(configuration.positionVector) * rotation
+            )
+        }
+    }
+
+    private func grayboxDrawable(from configuration: GrayboxBlockConfiguration, sectorID: String) -> SceneDrawable? {
+        let vertices = GeometryBuilder.makeBox(
+            halfExtents: configuration.halfExtentsVector,
+            color: configuration.colorVector
+        )
+
+        guard let buffer = makeBuffer(from: vertices) else {
+            return nil
+        }
+
+        let rotation = simd_float4x4.rotation(y: (configuration.yawDegrees ?? 0) * (.pi / 180.0))
+        return SceneDrawable(
+            name: "\(sectorID):\(configuration.name)",
+            vertexBuffer: buffer,
+            vertexCount: vertices.count,
+            modelMatrix: simd_float4x4.translation(configuration.positionVector) * rotation
+        )
+    }
+
+    private func assetDrawable(from configuration: AssetInstanceConfiguration) -> SceneDrawable? {
+        let cacheKey = "\(configuration.category)/\(configuration.name)"
+        let loadedAsset: LoadedAsset
+
+        if let cachedAsset = assetCache[cacheKey] {
+            loadedAsset = cachedAsset
+        } else if let parsedAsset = OBJAssetLoader.loadAsset(
+            named: configuration.name,
+            category: configuration.category,
+            assetRoot: assetRoot
+        ) {
+            assetCache[cacheKey] = parsedAsset
+            loadedAsset = parsedAsset
+        } else {
+            return nil
+        }
+
+        guard let buffer = makeBuffer(from: loadedAsset.vertices) else {
+            return nil
+        }
+
+        let maxExtent = max(loadedAsset.extent.x, max(loadedAsset.extent.y, loadedAsset.extent.z))
+        let scale = max(configuration.targetExtent, 0.001) / max(maxExtent, 0.001)
+        let normalization = simd_float4x4.scale(SIMD3<Float>(repeating: scale)) * simd_float4x4.translation(
+            SIMD3<Float>(
+                -loadedAsset.center.x,
+                -loadedAsset.boundsMin.y,
+                -loadedAsset.center.z
+            )
+        )
+        let rotation = simd_float4x4.rotation(y: (configuration.yawDegrees ?? 0) * (.pi / 180.0))
+
+        return SceneDrawable(
+            name: configuration.name,
+            vertexBuffer: buffer,
+            vertexCount: loadedAsset.vertices.count,
+            modelMatrix: simd_float4x4.translation(configuration.positionVector) * rotation * normalization
+        )
+    }
+
+    private func makeBuffer(from vertices: [SceneVertex]) -> MTLBuffer? {
+        device.makeBuffer(
+            bytes: vertices,
+            length: MemoryLayout<SceneVertex>.stride * vertices.count
+        )
+    }
+
+    private func loadJSON<T: Decodable>(_ type: T.Type, at url: URL) throws -> T {
+        let data = try Data(contentsOf: url)
+        return try JSONDecoder().decode(T.self, from: data)
+    }
+}
+
+private enum FallbackSceneFactory {
+    static func build(
+        device: MTLDevice,
+        worldDataRoot: String,
+        worldManifestPath: String,
+        errorDescription: String
+    ) -> SceneBuildResult {
+        let vertices = GeometryBuilder.makeCheckerboard(
+            size: 18,
+            tileSize: 1.4,
+            colorA: SIMD4<Float>(0.18, 0.22, 0.26, 1),
+            colorB: SIMD4<Float>(0.24, 0.29, 0.34, 1)
+        )
+        let groundBuffer = device.makeBuffer(
+            bytes: vertices,
+            length: MemoryLayout<SceneVertex>.stride * vertices.count
+        )
+
+        let drawables = groundBuffer.map {
+            [
                 SceneDrawable(
-                    name: "Ground",
-                    vertexBuffer: buffer,
-                    vertexCount: groundVertices.count,
+                    name: "FallbackGround",
+                    vertexBuffer: $0,
+                    vertexCount: vertices.count,
                     modelMatrix: .identity()
                 )
-            )
-        }
+            ]
+        } ?? []
 
-        let pedestalVertices = GeometryBuilder.makeBox(
-            halfExtents: SIMD3<Float>(0.55, 0.35, 0.55),
-            color: SIMD4<Float>(0.58, 0.60, 0.66, 1)
-        )
-
-        for (name, position) in [("Left Pedestal", SIMD3<Float>(-1.4, 0.35, 0)), ("Right Pedestal", SIMD3<Float>(1.4, 0.35, 0))] {
-            if let buffer = device.makeBuffer(bytes: pedestalVertices, length: MemoryLayout<SceneVertex>.stride * pedestalVertices.count) {
-                sceneDrawables.append(
-                    SceneDrawable(
-                        name: name,
-                        vertexBuffer: buffer,
-                        vertexCount: pedestalVertices.count,
-                        modelMatrix: .translation(position)
-                    )
-                )
-            }
-        }
-
-        let backdropVertices = GeometryBuilder.makeBox(
-            halfExtents: SIMD3<Float>(7.5, 1.6, 0.25),
-            color: SIMD4<Float>(0.30, 0.37, 0.44, 1)
-        )
-        if let buffer = device.makeBuffer(bytes: backdropVertices, length: MemoryLayout<SceneVertex>.stride * backdropVertices.count) {
-            sceneDrawables.append(
-                SceneDrawable(
-                    name: "Backdrop",
-                    vertexBuffer: buffer,
-                    vertexCount: backdropVertices.count,
-                    modelMatrix: .translation(SIMD3<Float>(0, 1.6, -5.8))
+        return SceneBuildResult(
+            drawables: drawables,
+            debugInfo: SceneDebugInfo(
+                sceneName: "Fallback Data Slice",
+                summary: "Fallback procedural scene",
+                details: [
+                    "Grid: data unavailable",
+                    "Manifest: \(URL(fileURLWithPath: worldManifestPath).lastPathComponent)",
+                    "Data Root: \(URL(fileURLWithPath: worldDataRoot).lastPathComponent)",
+                    "Error: \(errorDescription)",
+                ],
+                spawn: SpawnConfiguration(
+                    position: [0, 1.65, 6],
+                    yawDegrees: 0,
+                    pitchDegrees: -10
                 )
             )
-        }
-
-        for (name, category, position, targetExtent) in [
-            ("Compass_Open", "Props", SIMD3<Float>(-1.4, 0.70, 0), Float(1.1)),
-            ("Knife", "Props", SIMD3<Float>(1.4, 0.70, 0), Float(1.25)),
-        ] {
-            if let asset = OBJAssetLoader.loadAsset(named: name, category: category, assetRoot: assetRoot),
-               let buffer = device.makeBuffer(bytes: asset.vertices, length: MemoryLayout<SceneVertex>.stride * asset.vertices.count)
-            {
-                let maxExtent = max(asset.extent.x, max(asset.extent.y, asset.extent.z))
-                let scale = targetExtent / max(maxExtent, 0.001)
-                let normalization = simd_float4x4.scale(SIMD3<Float>(repeating: scale)) * simd_float4x4.translation(
-                    SIMD3<Float>(
-                        -asset.center.x,
-                        -asset.boundsMin.y,
-                        -asset.center.z
-                    )
-                )
-
-                sceneDrawables.append(
-                    SceneDrawable(
-                        name: name,
-                        vertexBuffer: buffer,
-                        vertexCount: asset.vertices.count,
-                        modelMatrix: simd_float4x4.translation(position) * normalization
-                    )
-                )
-
-                loadedAssets.append(name)
-            }
-        }
-
-        drawables = sceneDrawables
-        summary = loadedAssets.isEmpty
-            ? "Procedural ground and pedestals"
-            : "Procedural ground plus props: \(loadedAssets.joined(separator: ", "))"
+        )
     }
 }
 
@@ -114,7 +326,12 @@ private struct LoadedAsset {
 }
 
 private enum GeometryBuilder {
-    static func makeCheckerboard(size: Int, tileSize: Float) -> [SceneVertex] {
+    static func makeCheckerboard(
+        size: Int,
+        tileSize: Float,
+        colorA: SIMD4<Float>,
+        colorB: SIMD4<Float>
+    ) -> [SceneVertex] {
         var vertices: [SceneVertex] = []
         let half = Float(size) * tileSize * 0.5
 
@@ -125,9 +342,7 @@ private enum GeometryBuilder {
                 let x1 = x0 + tileSize
                 let z1 = z0 + tileSize
                 let isDark = (row + column).isMultiple(of: 2)
-                let color = isDark
-                    ? SIMD4<Float>(0.18, 0.22, 0.26, 1)
-                    : SIMD4<Float>(0.23, 0.28, 0.33, 1)
+                let color = isDark ? colorA : colorB
 
                 appendQuad(
                     to: &vertices,

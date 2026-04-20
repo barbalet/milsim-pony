@@ -64,6 +64,18 @@ extension simd_float4x4 {
         )
     }
 
+    static func rotation(y radians: Float) -> simd_float4x4 {
+        let cosine = cosf(radians)
+        let sine = sinf(radians)
+
+        return simd_float4x4(
+            SIMD4<Float>(cosine, 0, -sine, 0),
+            SIMD4<Float>(0, 1, 0, 0),
+            SIMD4<Float>(sine, 0, cosine, 0),
+            SIMD4<Float>(0, 0, 0, 1)
+        )
+    }
+
     static func perspective(fieldOfViewY: Float, aspectRatio: Float, nearZ: Float, farZ: Float) -> simd_float4x4 {
         let yScale = 1 / tanf(fieldOfViewY * 0.5)
         let xScale = yScale / aspectRatio

@@ -1,0 +1,38 @@
+{
+  "id": "state_circle_approach_sector",
+  "displayName": "State Circle Approach",
+  "bounds": {
+    "min": [-18.0, 0.0, 8.0],
+    "max": [18.0, 8.0, 28.0]
+  },
+  "grayboxBlocks": [
+    {
+      "name": "ApproachRoad",
+      "position": [0.0, 0.12, 15.5],
+      "halfExtents": [7.0, 0.12, 6.0],
+      "color": [0.24, 0.26, 0.29, 1.0],
+      "yawDegrees": 0.0
+    },
+    {
+      "name": "MedianBlock",
+      "position": [0.0, 0.35, 15.5],
+      "halfExtents": [1.0, 0.35, 5.2],
+      "color": [0.34, 0.39, 0.32, 1.0],
+      "yawDegrees": 0.0
+    },
+    {
+      "name": "EastSuburbMass",
+      "position": [11.0, 1.4, 17.0],
+      "halfExtents": [4.2, 1.4, 6.0],
+      "color": [0.41, 0.43, 0.48, 1.0],
+      "yawDegrees": 0.0
+    },
+    {
+      "name": "WestSuburbMass",
+      "position": [-11.0, 1.4, 17.0],
+      "halfExtents": [4.2, 1.4, 6.0],
+      "color": [0.41, 0.43, 0.48, 1.0],
+      "yawDegrees": 0.0
+    }
+  ]
+}

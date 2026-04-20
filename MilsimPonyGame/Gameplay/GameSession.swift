@@ -12,7 +12,10 @@ final class GameSession: ObservableObject {
     private var latestSnapshot: GameFrameSnapshot?
     private var viewportSize: CGSize = .zero
     private var rendererName = "Waiting for Metal"
+    private var sceneLabel = WorldBootstrap.sceneLabel
     private var sceneSummary = "Preparing scene"
+    private var sceneDetails: [String] = []
+    private var frameTimingLine = "Frame: collecting samples"
 
     init(configuration: LaunchConfiguration) {
         self.configuration = configuration
@@ -27,6 +30,14 @@ final class GameSession: ObservableObject {
 
     var assetRootPath: String {
         configuration.assetRoot
+    }
+
+    var worldDataRootPath: String {
+        configuration.worldDataRoot
+    }
+
+    var worldManifestPath: String {
+        configuration.worldManifestPath
     }
 
     func noteRendererReady(deviceName: String) {
@@ -47,9 +58,21 @@ final class GameSession: ObservableObject {
         rebuildOverlay()
     }
 
-    func noteSceneReady(summary: String) {
+    func noteSceneReady(label: String, summary: String, details: [String]) {
+        sceneLabel = label
         sceneSummary = summary
-        statusLine = "Scene ready"
+        sceneDetails = details
+        statusLine = "Scene data loaded"
+        rebuildOverlay()
+    }
+
+    func noteFrameTiming(milliseconds: Double, framesPerSecond: Double, drawableCount: Int) {
+        frameTimingLine = String(
+            format: "Frame: %.2f ms / %.1f fps / %d drawables",
+            milliseconds,
+            framesPerSecond,
+            drawableCount
+        )
         rebuildOverlay()
     }
 
@@ -138,12 +161,15 @@ final class GameSession: ObservableObject {
 
         overlayLines = [
             "Mode: \(configuration.bootMode)",
-            "Scene: \(WorldBootstrap.sceneLabel)",
+            "Scene: \(sceneLabel)",
             "World: \(configuration.worldName)",
-            "Assets: \(configuration.assetRoot)",
+            "Assets: \(shortenedPath(configuration.assetRoot))",
+            "Manifest: \(shortenedPath(configuration.worldManifestPath))",
             "Renderer: \(rendererName)",
-            "Scene Assets: \(sceneSummary)",
+            "Scene Summary: \(sceneSummary)",
+        ] + sceneDetails + [
             "Viewport: \(Int(viewportSize.width)) x \(Int(viewportSize.height))",
+            frameTimingLine,
             "Pressed: \(pressed.isEmpty ? "None" : pressed)",
             String(format: "Intent: strafe %.1f forward %.1f sprint %@", snapshot?.strafeIntent ?? 0, snapshot?.forwardIntent ?? 0, (snapshot?.sprinting ?? false) ? "on" : "off"),
             String(format: "Move Speed: %.2f m/s", snapshot?.moveSpeed ?? 0),
@@ -152,5 +178,14 @@ final class GameSession: ObservableObject {
             String(format: "Mouse Delta: %.1f %.1f", lastMouseDelta.width, lastMouseDelta.height),
             String(format: "Uptime: %.2fs", snapshot?.elapsedSeconds ?? 0),
         ]
+    }
+
+    private func shortenedPath(_ path: String) -> String {
+        let components = URL(fileURLWithPath: path).pathComponents.filter { $0 != "/" }
+        guard components.count > 3 else {
+            return path
+        }
+
+        return components.suffix(3).joined(separator: "/")
     }
 }

@@ -1,0 +1,13 @@
+{
+  "name": "Parliament Local Grid",
+  "anchorName": "New Parliament House forecourt anchor",
+  "axisX": "east meters",
+  "axisY": "up meters",
+  "axisZ": "south meters",
+  "forwardHeadingDegrees": 0.0,
+  "notes": [
+    "Negative Z looks north toward the city axis and the escape corridor.",
+    "All sector bounds and graybox positions are authored in local meters from the forecourt anchor.",
+    "This grid is the temporary Canberra blockout frame until terrain and road data arrive."
+  ]
+}

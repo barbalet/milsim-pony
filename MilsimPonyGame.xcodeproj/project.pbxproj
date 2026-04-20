@@ -20,6 +20,7 @@
 		AA000000000000000000000B /* RenderMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000011 /* RenderMath.swift */; };
 		AA000000000000000000000C /* BootstrapScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000012 /* BootstrapScene.swift */; };
 		AA000000000000000000000D /* Assets in Resources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000014 /* Assets */; };
+		AA000000000000000000000E /* WorldSceneData.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000015 /* WorldSceneData.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -43,6 +44,8 @@
 		BA0000000000000000000012 /* BootstrapScene.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BootstrapScene.swift; sourceTree = "<group>"; };
 		BA0000000000000000000013 /* CYCLE_1_SMOKE_TEST.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CYCLE_1_SMOKE_TEST.md; sourceTree = "<group>"; };
 		BA0000000000000000000014 /* Assets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Assets; sourceTree = "<group>"; };
+		BA0000000000000000000015 /* WorldSceneData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorldSceneData.swift; sourceTree = "<group>"; };
+		BA0000000000000000000016 /* CYCLE_2_SMOKE_TEST.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CYCLE_2_SMOKE_TEST.md; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -122,6 +125,7 @@
 			isa = PBXGroup;
 			children = (
 				BA0000000000000000000008 /* WorldBootstrap.swift */,
+				BA0000000000000000000015 /* WorldSceneData.swift */,
 			);
 			path = World;
 			sourceTree = "<group>";
@@ -142,6 +146,7 @@
 				BA000000000000000000000E /* INPUT_MAP.md */,
 				BA000000000000000000000F /* CYCLE_0_SMOKE_TEST.md */,
 				BA0000000000000000000013 /* CYCLE_1_SMOKE_TEST.md */,
+				BA0000000000000000000016 /* CYCLE_2_SMOKE_TEST.md */,
 			);
 			path = Docs;
 			sourceTree = "<group>";
@@ -242,6 +247,7 @@
 				AA000000000000000000000C /* BootstrapScene.swift in Sources */,
 				AA0000000000000000000007 /* BootstrapShaders.metal in Sources */,
 				AA0000000000000000000008 /* WorldBootstrap.swift in Sources */,
+				AA000000000000000000000E /* WorldSceneData.swift in Sources */,
 				AA0000000000000000000009 /* LaunchConfiguration.swift in Sources */,
 				AA000000000000000000000A /* GameCore.c in Sources */,
 			);

@@ -1,0 +1,67 @@
+{
+  "sceneName": "Parliament House Data Slice",
+  "spawn": {
+    "position": [0.0, 1.65, 8.0],
+    "yawDegrees": 0.0,
+    "pitchDegrees": -10.0
+  },
+  "proceduralElements": [
+    {
+      "kind": "checkerboard",
+      "name": "ForecourtGrid",
+      "position": [0.0, 0.0, 0.0],
+      "size": 28,
+      "tileSize": 1.6,
+      "colorA": [0.18, 0.22, 0.26, 1.0],
+      "colorB": [0.24, 0.29, 0.34, 1.0]
+    },
+    {
+      "kind": "box",
+      "name": "NorthBackdrop",
+      "position": [0.0, 2.0, -16.0],
+      "halfExtents": [18.0, 2.0, 0.35],
+      "color": [0.30, 0.36, 0.43, 1.0]
+    },
+    {
+      "kind": "box",
+      "name": "SouthCanopy",
+      "position": [0.0, 2.9, 15.0],
+      "halfExtents": [9.5, 0.25, 1.25],
+      "color": [0.25, 0.29, 0.33, 1.0]
+    }
+  ],
+  "assetInstances": [
+    {
+      "category": "Props",
+      "name": "Compass_Open",
+      "position": [-2.6, 0.78, 1.2],
+      "targetExtent": 1.10,
+      "yawDegrees": 20.0
+    },
+    {
+      "category": "Props",
+      "name": "Knife",
+      "position": [2.6, 0.78, 1.2],
+      "targetExtent": 1.20,
+      "yawDegrees": -28.0
+    },
+    {
+      "category": "Props",
+      "name": "Backpack",
+      "position": [-6.2, 0.95, -3.8],
+      "targetExtent": 1.35,
+      "yawDegrees": 10.0
+    },
+    {
+      "category": "Props",
+      "name": "FirstAidKit_Hard",
+      "position": [6.3, 0.58, -3.5],
+      "targetExtent": 0.95,
+      "yawDegrees": 0.0
+    }
+  ],
+  "includedSectors": [
+    "parliament_precinct_sector",
+    "state_circle_approach_sector"
+  ]
+}

@@ -13,6 +13,9 @@ final class GameRenderer: NSObject, MTKViewDelegate {
     private weak var session: GameSession?
     private var lastFrameTimestamp: CFTimeInterval?
     private var lastOverlayUpdateTime: CFTimeInterval = 0
+    private var lastPerformanceUpdateTime: CFTimeInterval = 0
+    private var accumulatedFrameTime: Double = 0
+    private var accumulatedFrameCount = 0
 
     init?(view: MTKView, session: GameSession) {
         guard
@@ -26,7 +29,12 @@ final class GameRenderer: NSObject, MTKViewDelegate {
         self.deviceName = device.name
         self.commandQueue = commandQueue
         self.session = session
-        self.scene = BootstrapScene(device: device, assetRoot: session.assetRootPath)
+        self.scene = BootstrapScene(
+            device: device,
+            assetRoot: session.assetRootPath,
+            worldDataRoot: session.worldDataRootPath,
+            worldManifestPath: session.worldManifestPath
+        )
 
         let pipelineDescriptor = MTLRenderPipelineDescriptor()
         pipelineDescriptor.label = "Bootstrap Scene Pipeline"
@@ -53,8 +61,20 @@ final class GameRenderer: NSObject, MTKViewDelegate {
 
         super.init()
 
-        session.noteSceneReady(summary: scene.summary)
-        print("[Renderer] Metal bootstrap ready on \(device.name) with \(scene.summary)")
+        let spawn = scene.debugInfo.spawn.positionVector
+        GameCoreConfigureSpawn(
+            spawn.x,
+            spawn.y,
+            spawn.z,
+            scene.debugInfo.spawn.yawDegrees,
+            scene.debugInfo.spawn.pitchDegrees
+        )
+        session.noteSceneReady(
+            label: scene.debugInfo.sceneName,
+            summary: scene.debugInfo.summary,
+            details: scene.debugInfo.details
+        )
+        print("[Renderer] Metal bootstrap ready on \(device.name) with \(scene.debugInfo.summary)")
     }
 
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
@@ -65,6 +85,8 @@ final class GameRenderer: NSObject, MTKViewDelegate {
         let now = CACurrentMediaTime()
         let deltaTime = lastFrameTimestamp.map { now - $0 } ?? (1.0 / 60.0)
         lastFrameTimestamp = now
+        accumulatedFrameTime += deltaTime
+        accumulatedFrameCount += 1
 
         GameCoreTick(deltaTime)
         let snapshot = GameCoreGetSnapshot()
@@ -73,6 +95,22 @@ final class GameRenderer: NSObject, MTKViewDelegate {
             lastOverlayUpdateTime = now
             DispatchQueue.main.async { [weak self] in
                 self?.session?.accept(snapshot: snapshot, drawableSize: view.drawableSize)
+            }
+        }
+
+        if now - lastPerformanceUpdateTime > 0.45, accumulatedFrameCount > 0 {
+            let averageFrameTime = accumulatedFrameTime / Double(accumulatedFrameCount)
+            let framesPerSecond = averageFrameTime > 0 ? (1 / averageFrameTime) : 0
+            lastPerformanceUpdateTime = now
+            accumulatedFrameTime = 0
+            accumulatedFrameCount = 0
+
+            DispatchQueue.main.async { [weak self] in
+                self?.session?.noteFrameTiming(
+                    milliseconds: averageFrameTime * 1000,
+                    framesPerSecond: framesPerSecond,
+                    drawableCount: self?.scene.drawables.count ?? 0
+                )
             }
         }
 

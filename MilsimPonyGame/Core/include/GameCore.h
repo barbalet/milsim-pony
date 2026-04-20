@@ -21,6 +21,7 @@ typedef struct GameFrameSnapshot {
 } GameFrameSnapshot;
 
 void GameCoreBootstrap(const char *bootMode);
+void GameCoreConfigureSpawn(float x, float y, float z, float yawDegrees, float pitchDegrees);
 void GameCoreSetMoveIntent(float strafeIntent, float forwardIntent);
 void GameCoreSetSprint(bool sprinting);
 void GameCoreAddLookDelta(float deltaX, float deltaY);

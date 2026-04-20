@@ -13,6 +13,11 @@ typedef struct GameCoreState {
     float cameraX;
     float cameraY;
     float cameraZ;
+    float spawnX;
+    float spawnY;
+    float spawnZ;
+    float spawnYawDegrees;
+    float spawnPitchDegrees;
     float moveSpeed;
     bool sprinting;
     bool bootstrapped;
@@ -23,6 +28,9 @@ static GameCoreState gameState = {
     .cameraY = 1.65f,
     .cameraZ = 4.5f,
     .pitchDegrees = -12.0f,
+    .spawnY = 1.65f,
+    .spawnZ = 4.5f,
+    .spawnPitchDegrees = -12.0f,
 };
 
 static float GameCoreClamp(float value, float minimum, float maximum) {
@@ -35,12 +43,25 @@ static float GameCoreClamp(float value, float minimum, float maximum) {
     return value;
 }
 
+static void GameCoreResetRuntimeState(void) {
+    gameState.elapsedSeconds = 0;
+    gameState.strafeIntent = 0;
+    gameState.forwardIntent = 0;
+    gameState.moveSpeed = 0;
+    gameState.sprinting = false;
+    gameState.cameraX = gameState.spawnX;
+    gameState.cameraY = gameState.spawnY;
+    gameState.cameraZ = gameState.spawnZ;
+    gameState.yawDegrees = gameState.spawnYawDegrees;
+    gameState.pitchDegrees = gameState.spawnPitchDegrees;
+}
+
 void GameCoreBootstrap(const char *bootMode) {
     memset(&gameState, 0, sizeof(gameState));
-    gameState.cameraY = 1.65f;
-    gameState.cameraZ = 4.5f;
-    gameState.pitchDegrees = -12.0f;
     gameState.bootstrapped = true;
+    gameState.spawnY = 1.65f;
+    gameState.spawnZ = 4.5f;
+    gameState.spawnPitchDegrees = -12.0f;
 
     if (bootMode != NULL) {
         snprintf(gameState.bootMode, sizeof(gameState.bootMode), "%s", bootMode);
@@ -48,7 +69,22 @@ void GameCoreBootstrap(const char *bootMode) {
         snprintf(gameState.bootMode, sizeof(gameState.bootMode), "bootstrap");
     }
 
+    GameCoreResetRuntimeState();
     printf("[GameCore] Bootstrap mode: %s\n", gameState.bootMode);
+}
+
+void GameCoreConfigureSpawn(float x, float y, float z, float yawDegrees, float pitchDegrees) {
+    if (!gameState.bootstrapped) {
+        GameCoreBootstrap("implicit");
+    }
+
+    gameState.spawnX = x;
+    gameState.spawnY = y;
+    gameState.spawnZ = z;
+    gameState.spawnYawDegrees = yawDegrees;
+    gameState.spawnPitchDegrees = pitchDegrees;
+    GameCoreResetRuntimeState();
+    printf("[GameCore] Spawn configured to %.2f %.2f %.2f (yaw %.1f pitch %.1f)\n", x, y, z, yawDegrees, pitchDegrees);
 }
 
 void GameCoreSetMoveIntent(float strafeIntent, float forwardIntent) {
@@ -113,8 +149,11 @@ GameFrameSnapshot GameCoreGetSnapshot(void) {
 }
 
 void GameCoreResetDebugState(void) {
-    char bootMode[64] = {0};
-    memcpy(bootMode, gameState.bootMode, sizeof(gameState.bootMode));
-    GameCoreBootstrap(bootMode[0] == '\0' ? "bootstrap" : bootMode);
+    if (!gameState.bootstrapped) {
+        GameCoreBootstrap("implicit");
+        return;
+    }
+
+    GameCoreResetRuntimeState();
     printf("[GameCore] Debug state reset\n");
 }

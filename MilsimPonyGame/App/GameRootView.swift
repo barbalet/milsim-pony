@@ -11,7 +11,7 @@ struct GameRootView: View {
 
             VStack(alignment: .leading, spacing: 14) {
                 overlayCard(
-                    title: "Cycle 1 First Frame",
+                    title: "Cycle 2 Data Slice",
                     subtitle: session.statusLine,
                     lines: session.overlayLines
                 )

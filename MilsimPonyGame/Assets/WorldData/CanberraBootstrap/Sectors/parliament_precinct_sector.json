@@ -1,0 +1,38 @@
+{
+  "id": "parliament_precinct_sector",
+  "displayName": "Parliament Precinct",
+  "bounds": {
+    "min": [-24.0, 0.0, -24.0],
+    "max": [24.0, 12.0, 8.0]
+  },
+  "grayboxBlocks": [
+    {
+      "name": "ParliamentPlateau",
+      "position": [0.0, 0.45, -8.0],
+      "halfExtents": [9.5, 0.45, 5.8],
+      "color": [0.54, 0.57, 0.62, 1.0],
+      "yawDegrees": 0.0
+    },
+    {
+      "name": "EastWing",
+      "position": [8.6, 1.55, -8.4],
+      "halfExtents": [3.0, 1.55, 2.9],
+      "color": [0.48, 0.51, 0.56, 1.0],
+      "yawDegrees": 0.0
+    },
+    {
+      "name": "WestWing",
+      "position": [-8.6, 1.55, -8.4],
+      "halfExtents": [3.0, 1.55, 2.9],
+      "color": [0.48, 0.51, 0.56, 1.0],
+      "yawDegrees": 0.0
+    },
+    {
+      "name": "ForecourtSteps",
+      "position": [0.0, 0.22, -0.5],
+      "halfExtents": [6.5, 0.22, 2.2],
+      "color": [0.42, 0.45, 0.50, 1.0],
+      "yawDegrees": 0.0
+    }
+  ]
+}
