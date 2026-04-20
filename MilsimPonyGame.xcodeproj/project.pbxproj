@@ -1,0 +1,347 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		AA0000000000000000000001 /* MilsimPonyGameApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000001 /* MilsimPonyGameApp.swift */; };
+		AA0000000000000000000002 /* GameRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000002 /* GameRootView.swift */; };
+		AA0000000000000000000003 /* GameSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000003 /* GameSession.swift */; };
+		AA0000000000000000000004 /* InputMap.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000004 /* InputMap.swift */; };
+		AA0000000000000000000005 /* GameRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000005 /* GameRenderer.swift */; };
+		AA0000000000000000000006 /* MetalGameView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000006 /* MetalGameView.swift */; };
+		AA0000000000000000000007 /* BootstrapShaders.metal in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000007 /* BootstrapShaders.metal */; };
+		AA0000000000000000000008 /* WorldBootstrap.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000008 /* WorldBootstrap.swift */; };
+		AA0000000000000000000009 /* LaunchConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000009 /* LaunchConfiguration.swift */; };
+		AA000000000000000000000A /* GameCore.c in Sources */ = {isa = PBXBuildFile; fileRef = BA000000000000000000000B /* GameCore.c */; };
+		AA000000000000000000000B /* RenderMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000011 /* RenderMath.swift */; };
+		AA000000000000000000000C /* BootstrapScene.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000012 /* BootstrapScene.swift */; };
+		AA000000000000000000000D /* Assets in Resources */ = {isa = PBXBuildFile; fileRef = BA0000000000000000000014 /* Assets */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		BA0000000000000000000001 /* MilsimPonyGameApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MilsimPonyGameApp.swift; sourceTree = "<group>"; };
+		BA0000000000000000000002 /* GameRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameRootView.swift; sourceTree = "<group>"; };
+		BA0000000000000000000003 /* GameSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameSession.swift; sourceTree = "<group>"; };
+		BA0000000000000000000004 /* InputMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InputMap.swift; sourceTree = "<group>"; };
+		BA0000000000000000000005 /* GameRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GameRenderer.swift; sourceTree = "<group>"; };
+		BA0000000000000000000006 /* MetalGameView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MetalGameView.swift; sourceTree = "<group>"; };
+		BA0000000000000000000007 /* BootstrapShaders.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = BootstrapShaders.metal; sourceTree = "<group>"; };
+		BA0000000000000000000008 /* WorldBootstrap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorldBootstrap.swift; sourceTree = "<group>"; };
+		BA0000000000000000000009 /* LaunchConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchConfiguration.swift; sourceTree = "<group>"; };
+		BA000000000000000000000A /* MilsimPonyGame-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "MilsimPonyGame-Bridging-Header.h"; sourceTree = "<group>"; };
+		BA000000000000000000000B /* GameCore.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = GameCore.c; sourceTree = "<group>"; };
+		BA000000000000000000000C /* GameCore.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = GameCore.h; sourceTree = "<group>"; };
+		BA000000000000000000000D /* ASSET_INVENTORY.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = ASSET_INVENTORY.md; sourceTree = "<group>"; };
+		BA000000000000000000000E /* INPUT_MAP.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = INPUT_MAP.md; sourceTree = "<group>"; };
+		BA000000000000000000000F /* CYCLE_0_SMOKE_TEST.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CYCLE_0_SMOKE_TEST.md; sourceTree = "<group>"; };
+		BA0000000000000000000010 /* MilsimPonyGame.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; path = MilsimPonyGame.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		BA0000000000000000000011 /* RenderMath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RenderMath.swift; sourceTree = "<group>"; };
+		BA0000000000000000000012 /* BootstrapScene.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BootstrapScene.swift; sourceTree = "<group>"; };
+		BA0000000000000000000013 /* CYCLE_1_SMOKE_TEST.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = CYCLE_1_SMOKE_TEST.md; sourceTree = "<group>"; };
+		BA0000000000000000000014 /* Assets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Assets; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		CA0000000000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		DA0000000000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				DA0000000000000000000002 /* MilsimPonyGame */,
+				DA0000000000000000000009 /* Docs */,
+				DA000000000000000000000A /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		DA0000000000000000000002 /* MilsimPonyGame */ = {
+			isa = PBXGroup;
+			children = (
+				DA0000000000000000000003 /* App */,
+				DA0000000000000000000004 /* Renderer */,
+				DA0000000000000000000005 /* Core */,
+				DA0000000000000000000006 /* Gameplay */,
+				DA0000000000000000000007 /* World */,
+				DA0000000000000000000008 /* Support */,
+				BA0000000000000000000014 /* Assets */,
+			);
+			path = MilsimPonyGame;
+			sourceTree = "<group>";
+		};
+		DA0000000000000000000003 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				BA0000000000000000000001 /* MilsimPonyGameApp.swift */,
+				BA0000000000000000000002 /* GameRootView.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		DA0000000000000000000004 /* Renderer */ = {
+			isa = PBXGroup;
+			children = (
+				BA0000000000000000000005 /* GameRenderer.swift */,
+				BA0000000000000000000006 /* MetalGameView.swift */,
+				BA0000000000000000000011 /* RenderMath.swift */,
+				BA0000000000000000000012 /* BootstrapScene.swift */,
+				BA0000000000000000000007 /* BootstrapShaders.metal */,
+			);
+			path = Renderer;
+			sourceTree = "<group>";
+		};
+		DA0000000000000000000005 /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				DA000000000000000000000B /* include */,
+				BA000000000000000000000B /* GameCore.c */,
+			);
+			path = Core;
+			sourceTree = "<group>";
+		};
+		DA0000000000000000000006 /* Gameplay */ = {
+			isa = PBXGroup;
+			children = (
+				BA0000000000000000000003 /* GameSession.swift */,
+				BA0000000000000000000004 /* InputMap.swift */,
+			);
+			path = Gameplay;
+			sourceTree = "<group>";
+		};
+		DA0000000000000000000007 /* World */ = {
+			isa = PBXGroup;
+			children = (
+				BA0000000000000000000008 /* WorldBootstrap.swift */,
+			);
+			path = World;
+			sourceTree = "<group>";
+		};
+		DA0000000000000000000008 /* Support */ = {
+			isa = PBXGroup;
+			children = (
+				BA0000000000000000000009 /* LaunchConfiguration.swift */,
+				BA000000000000000000000A /* MilsimPonyGame-Bridging-Header.h */,
+			);
+			path = Support;
+			sourceTree = "<group>";
+		};
+		DA0000000000000000000009 /* Docs */ = {
+			isa = PBXGroup;
+			children = (
+				BA000000000000000000000D /* ASSET_INVENTORY.md */,
+				BA000000000000000000000E /* INPUT_MAP.md */,
+				BA000000000000000000000F /* CYCLE_0_SMOKE_TEST.md */,
+				BA0000000000000000000013 /* CYCLE_1_SMOKE_TEST.md */,
+			);
+			path = Docs;
+			sourceTree = "<group>";
+		};
+		DA000000000000000000000A /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				BA0000000000000000000010 /* MilsimPonyGame.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		DA000000000000000000000B /* include */ = {
+			isa = PBXGroup;
+			children = (
+				BA000000000000000000000C /* GameCore.h */,
+			);
+			path = include;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		EA0000000000000000000001 /* MilsimPonyGame */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = FA0000000000000000000002 /* Build configuration list for PBXNativeTarget "MilsimPonyGame" */;
+			buildPhases = (
+				CA0000000000000000000002 /* Sources */,
+				CA0000000000000000000001 /* Frameworks */,
+				CA0000000000000000000003 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = MilsimPonyGame;
+			productName = MilsimPonyGame;
+			productReference = BA0000000000000000000010 /* MilsimPonyGame.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		EA0000000000000000000002 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2603;
+				LastUpgradeCheck = 2603;
+				TargetAttributes = {
+					EA0000000000000000000001 = {
+						CreatedOnToolsVersion = 26.3;
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = FA0000000000000000000001 /* Build configuration list for PBXProject "MilsimPonyGame" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = DA0000000000000000000001;
+			productRefGroup = DA000000000000000000000A /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				EA0000000000000000000001 /* MilsimPonyGame */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		CA0000000000000000000003 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA000000000000000000000D /* Assets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		CA0000000000000000000002 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA0000000000000000000001 /* MilsimPonyGameApp.swift in Sources */,
+				AA0000000000000000000002 /* GameRootView.swift in Sources */,
+				AA0000000000000000000003 /* GameSession.swift in Sources */,
+				AA0000000000000000000004 /* InputMap.swift in Sources */,
+				AA0000000000000000000005 /* GameRenderer.swift in Sources */,
+				AA0000000000000000000006 /* MetalGameView.swift in Sources */,
+				AA000000000000000000000B /* RenderMath.swift in Sources */,
+				AA000000000000000000000C /* BootstrapScene.swift in Sources */,
+				AA0000000000000000000007 /* BootstrapShaders.metal in Sources */,
+				AA0000000000000000000008 /* WorldBootstrap.swift in Sources */,
+				AA0000000000000000000009 /* LaunchConfiguration.swift in Sources */,
+				AA000000000000000000000A /* GameCore.c in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		FA0000000000000000000003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_C_LANGUAGE_STANDARD = gnu17;
+				CLANG_ENABLE_MODULES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = "$(SRCROOT)/MilsimPonyGame/Core/include";
+				INFOPLIST_KEY_CFBundleDisplayName = MilsimPonyGame;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.games";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				PRODUCT_BUNDLE_IDENTIFIER = com.milsimpony.game;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OBJC_BRIDGING_HEADER = MilsimPonyGame/Support/MilsimPonyGame-Bridging-Header.h;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		FA0000000000000000000004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_C_LANGUAGE_STANDARD = gnu17;
+				CLANG_ENABLE_MODULES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = "$(SRCROOT)/MilsimPonyGame/Core/include";
+				INFOPLIST_KEY_CFBundleDisplayName = MilsimPonyGame;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.games";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.1.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				PRODUCT_BUNDLE_IDENTIFIER = com.milsimpony.game;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SUPPORTED_PLATFORMS = macosx;
+				SWIFT_OBJC_BRIDGING_HEADER = MilsimPonyGame/Support/MilsimPonyGame-Bridging-Header.h;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		FA0000000000000000000005 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				SDKROOT = macosx;
+			};
+			name = Debug;
+		};
+		FA0000000000000000000006 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				SDKROOT = macosx;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		FA0000000000000000000001 /* Build configuration list for PBXProject "MilsimPonyGame" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FA0000000000000000000005 /* Debug */,
+				FA0000000000000000000006 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		FA0000000000000000000002 /* Build configuration list for PBXNativeTarget "MilsimPonyGame" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FA0000000000000000000003 /* Debug */,
+				FA0000000000000000000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = EA0000000000000000000002 /* Project object */;
+}
