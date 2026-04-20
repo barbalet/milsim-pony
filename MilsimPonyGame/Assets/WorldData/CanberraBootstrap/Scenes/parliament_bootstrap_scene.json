@@ -1,67 +1,70 @@
 {
-  "sceneName": "Parliament House Data Slice",
+  "sceneName": "Parliament House District Graybox",
   "spawn": {
-    "position": [0.0, 1.65, 8.0],
+    "label": "State Circle South Verge",
+    "position": [0.0, 1.65, 27.0],
     "yawDegrees": 0.0,
-    "pitchDegrees": -10.0
+    "pitchDegrees": -16.0
+  },
+  "sky": {
+    "horizonColor": [0.62, 0.74, 0.86, 1.0],
+    "zenithColor": [0.18, 0.30, 0.47, 1.0]
+  },
+  "sun": {
+    "direction": [-0.55, -1.0, -0.32],
+    "color": [1.0, 0.93, 0.84],
+    "ambientIntensity": 0.36,
+    "diffuseIntensity": 0.84
   },
   "proceduralElements": [
     {
-      "kind": "checkerboard",
-      "name": "ForecourtGrid",
-      "position": [0.0, 0.0, 0.0],
-      "size": 28,
-      "tileSize": 1.6,
-      "colorA": [0.18, 0.22, 0.26, 1.0],
-      "colorB": [0.24, 0.29, 0.34, 1.0]
+      "kind": "box",
+      "name": "NorthLandformBackdrop",
+      "position": [0.0, 2.8, -27.5],
+      "halfExtents": [26.0, 2.8, 1.4],
+      "color": [0.31, 0.39, 0.34, 1.0]
     },
     {
       "kind": "box",
-      "name": "NorthBackdrop",
-      "position": [0.0, 2.0, -16.0],
-      "halfExtents": [18.0, 2.0, 0.35],
-      "color": [0.30, 0.36, 0.43, 1.0]
-    },
-    {
-      "kind": "box",
-      "name": "SouthCanopy",
-      "position": [0.0, 2.9, 15.0],
-      "halfExtents": [9.5, 0.25, 1.25],
-      "color": [0.25, 0.29, 0.33, 1.0]
+      "name": "FarSouthBoundary",
+      "position": [0.0, 2.2, 38.0],
+      "halfExtents": [22.0, 2.2, 1.2],
+      "color": [0.32, 0.37, 0.31, 1.0]
     }
   ],
   "assetInstances": [
     {
       "category": "Props",
       "name": "Compass_Open",
-      "position": [-2.6, 0.78, 1.2],
+      "position": [-5.4, 1.18, 2.4],
       "targetExtent": 1.10,
-      "yawDegrees": 20.0
-    },
-    {
-      "category": "Props",
-      "name": "Knife",
-      "position": [2.6, 0.78, 1.2],
-      "targetExtent": 1.20,
-      "yawDegrees": -28.0
-    },
-    {
-      "category": "Props",
-      "name": "Backpack",
-      "position": [-6.2, 0.95, -3.8],
-      "targetExtent": 1.35,
       "yawDegrees": 10.0
     },
     {
       "category": "Props",
+      "name": "Knife",
+      "position": [5.2, 1.16, 2.2],
+      "targetExtent": 1.16,
+      "yawDegrees": -24.0
+    },
+    {
+      "category": "Props",
+      "name": "Backpack",
+      "position": [-9.8, 0.24, 23.6],
+      "targetExtent": 1.25,
+      "yawDegrees": 16.0
+    },
+    {
+      "category": "Props",
       "name": "FirstAidKit_Hard",
-      "position": [6.3, 0.58, -3.5],
+      "position": [10.2, 0.22, 23.4],
       "targetExtent": 0.95,
       "yawDegrees": 0.0
     }
   ],
   "includedSectors": [
     "parliament_precinct_sector",
-    "state_circle_approach_sector"
+    "state_circle_approach_sector",
+    "parliamentary_triangle_edge_sector"
   ]
 }

@@ -9,12 +9,15 @@ final class GameSession: ObservableObject {
     private let configuration: LaunchConfiguration
     private var pressedCommands: Set<InputCommand> = []
     private var lastMouseDelta: CGSize = .zero
+    private var shouldIgnoreNextMouseDelta = true
     private var latestSnapshot: GameFrameSnapshot?
     private var viewportSize: CGSize = .zero
     private var rendererName = "Waiting for Metal"
     private var sceneLabel = WorldBootstrap.sceneLabel
     private var sceneSummary = "Preparing scene"
     private var sceneDetails: [String] = []
+    private var streamingSummary = "Chunks: waiting for stream state"
+    private var streamingDetails: [String] = []
     private var frameTimingLine = "Frame: collecting samples"
 
     init(configuration: LaunchConfiguration) {
@@ -53,6 +56,7 @@ final class GameSession: ObservableObject {
     }
 
     func noteViewActivation() {
+        shouldIgnoreNextMouseDelta = true
         statusLine = "Input focus captured"
         print("[Input] MTKView accepted first responder")
         rebuildOverlay()
@@ -73,6 +77,12 @@ final class GameSession: ObservableObject {
             framesPerSecond,
             drawableCount
         )
+        rebuildOverlay()
+    }
+
+    func noteStreamingState(summary: String, details: [String]) {
+        streamingSummary = summary
+        streamingDetails = details
         rebuildOverlay()
     }
 
@@ -111,6 +121,13 @@ final class GameSession: ObservableObject {
             return
         }
 
+        if shouldIgnoreNextMouseDelta {
+            shouldIgnoreNextMouseDelta = false
+            lastMouseDelta = .zero
+            rebuildOverlay()
+            return
+        }
+
         lastMouseDelta = CGSize(width: x, height: y)
         GameCoreAddLookDelta(Float(x), Float(y))
     }
@@ -129,6 +146,7 @@ final class GameSession: ObservableObject {
     func resetDebugState() {
         GameCoreResetDebugState()
         lastMouseDelta = .zero
+        shouldIgnoreNextMouseDelta = true
         statusLine = "Debug state reset"
         rebuildOverlay()
     }
@@ -167,12 +185,14 @@ final class GameSession: ObservableObject {
             "Manifest: \(shortenedPath(configuration.worldManifestPath))",
             "Renderer: \(rendererName)",
             "Scene Summary: \(sceneSummary)",
-        ] + sceneDetails + [
+            streamingSummary,
+        ] + sceneDetails + streamingDetails + [
             "Viewport: \(Int(viewportSize.width)) x \(Int(viewportSize.height))",
             frameTimingLine,
             "Pressed: \(pressed.isEmpty ? "None" : pressed)",
             String(format: "Intent: strafe %.1f forward %.1f sprint %@", snapshot?.strafeIntent ?? 0, snapshot?.forwardIntent ?? 0, (snapshot?.sprinting ?? false) ? "on" : "off"),
             String(format: "Move Speed: %.2f m/s", snapshot?.moveSpeed ?? 0),
+            String(format: "Ground: %.2f m / %@ / %d active sectors", snapshot?.groundHeight ?? 0, (snapshot?.grounded ?? false) ? "grounded" : "fallback", snapshot?.activeSectorCount ?? 0),
             String(format: "Look: yaw %.1f pitch %.1f", snapshot?.yawDegrees ?? 0, snapshot?.pitchDegrees ?? 0),
             String(format: "Camera: %.2f %.2f %.2f", snapshot?.cameraX ?? 0, snapshot?.cameraY ?? 0, snapshot?.cameraZ ?? 0),
             String(format: "Mouse Delta: %.1f %.1f", lastMouseDelta.width, lastMouseDelta.height),

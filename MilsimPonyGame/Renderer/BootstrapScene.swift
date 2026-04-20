@@ -9,6 +9,15 @@ struct SceneDrawable {
     let modelMatrix: simd_float4x4
 }
 
+struct SceneEnvironment {
+    let skyHorizonColor: SIMD4<Float>
+    let skyZenithColor: SIMD4<Float>
+    let sunDirection: SIMD3<Float>
+    let sunColor: SIMD3<Float>
+    let ambientIntensity: Float
+    let diffuseIntensity: Float
+}
+
 struct SceneDebugInfo {
     let sceneName: String
     let summary: String
@@ -16,9 +25,20 @@ struct SceneDebugInfo {
     let spawn: SpawnConfiguration
 }
 
+struct SceneStreamingState {
+    let summary: String
+    let details: [String]
+    let activeDrawableCount: Int
+}
+
 final class BootstrapScene {
     let drawables: [SceneDrawable]
     let debugInfo: SceneDebugInfo
+    let environment: SceneEnvironment
+
+    private let sectors: [SceneSectorRuntime]
+    private let runtimeWorld: SceneRuntimeWorld
+    private let alwaysLoadedIndices: [Int]
 
     init(device: MTLDevice, assetRoot: String, worldDataRoot: String, worldManifestPath: String) {
         let manifestURL = URL(fileURLWithPath: worldManifestPath)
@@ -32,6 +52,10 @@ final class BootstrapScene {
 
             drawables = buildResult.drawables
             debugInfo = buildResult.debugInfo
+            environment = buildResult.environment
+            sectors = buildResult.sectors
+            runtimeWorld = buildResult.runtimeWorld
+            alwaysLoadedIndices = buildResult.alwaysLoadedIndices
         } catch {
             let fallbackResult = FallbackSceneFactory.build(
                 device: device,
@@ -42,14 +66,115 @@ final class BootstrapScene {
 
             drawables = fallbackResult.drawables
             debugInfo = fallbackResult.debugInfo
+            environment = fallbackResult.environment
+            sectors = fallbackResult.sectors
+            runtimeWorld = fallbackResult.runtimeWorld
+            alwaysLoadedIndices = fallbackResult.alwaysLoadedIndices
             print("[Scene] Falling back to procedural scene: \(error)")
         }
+    }
+
+    func configureGameCore() {
+        runtimeWorld.sectorBounds.withUnsafeBufferPointer { sectorBounds in
+            runtimeWorld.collisionVolumes.withUnsafeBufferPointer { collisionVolumes in
+                runtimeWorld.groundSurfaces.withUnsafeBufferPointer { groundSurfaces in
+                    GameCoreConfigureWorld(
+                        sectorBounds.baseAddress,
+                        Int32(sectorBounds.count),
+                        collisionVolumes.baseAddress,
+                        Int32(collisionVolumes.count),
+                        groundSurfaces.baseAddress,
+                        Int32(groundSurfaces.count)
+                    )
+                }
+            }
+        }
+    }
+
+    func activeDrawables(for cameraPosition: SIMD3<Float>) -> [SceneDrawable] {
+        let activeIndices = Set(activeSectorIndices(for: cameraPosition))
+        let streamedIndices = sectors.enumerated().flatMap { index, sector in
+            activeIndices.contains(index) ? Array(sector.drawableRange) : []
+        }
+
+        let drawIndices = alwaysLoadedIndices + streamedIndices
+        return drawIndices.map { drawables[$0] }
+    }
+
+    func streamingState(for cameraPosition: SIMD3<Float>) -> SceneStreamingState {
+        let activeIndices = activeSectorIndices(for: cameraPosition)
+        let activeSectors = activeIndices.map { sectors[$0] }
+        let activeNames = activeSectors.map(\.displayName)
+        let currentSector = sectors.first(where: { $0.contains(cameraPosition) })?.displayName ?? "Outside district bounds"
+        let activeDrawableCount = alwaysLoadedIndices.count + activeSectors.reduce(0) { $0 + $1.drawableRange.count }
+
+        return SceneStreamingState(
+            summary: "Chunks: \(activeSectors.count) active / \(sectors.count) total",
+            details: [
+                "Active: \(activeNames.isEmpty ? "Fallback load" : activeNames.joined(separator: ", "))",
+                "Current Sector: \(currentSector)",
+            ],
+            activeDrawableCount: activeDrawableCount
+        )
+    }
+
+    private func activeSectorIndices(for cameraPosition: SIMD3<Float>) -> [Int] {
+        let active = sectors.enumerated().compactMap { index, sector in
+            sector.isActive(for: cameraPosition) ? index : nil
+        }
+
+        guard !active.isEmpty else {
+            guard let nearest = sectors.enumerated().min(by: { $0.element.distanceSquared(to: cameraPosition) < $1.element.distanceSquared(to: cameraPosition) }) else {
+                return []
+            }
+            return [nearest.offset]
+        }
+
+        return active
     }
 }
 
 private struct SceneBuildResult {
     let drawables: [SceneDrawable]
     let debugInfo: SceneDebugInfo
+    let environment: SceneEnvironment
+    let sectors: [SceneSectorRuntime]
+    let runtimeWorld: SceneRuntimeWorld
+    let alwaysLoadedIndices: [Int]
+}
+
+private struct SceneRuntimeWorld {
+    let sectorBounds: [GameSectorBounds]
+    let collisionVolumes: [GameCollisionVolume]
+    let groundSurfaces: [GameGroundSurface]
+}
+
+private struct SceneSectorRuntime {
+    let id: String
+    let displayName: String
+    let minimum: SIMD3<Float>
+    let maximum: SIMD3<Float>
+    let activationPadding: Float
+    let drawableRange: Range<Int>
+
+    func contains(_ point: SIMD3<Float>) -> Bool {
+        point.x >= minimum.x && point.x <= maximum.x && point.z >= minimum.z && point.z <= maximum.z
+    }
+
+    func isActive(for point: SIMD3<Float>) -> Bool {
+        point.x >= (minimum.x - activationPadding) &&
+            point.x <= (maximum.x + activationPadding) &&
+            point.z >= (minimum.z - activationPadding) &&
+            point.z <= (maximum.z + activationPadding)
+    }
+
+    func distanceSquared(to point: SIMD3<Float>) -> Float {
+        let clampedX = min(max(point.x, minimum.x), maximum.x)
+        let clampedZ = min(max(point.z, minimum.z), maximum.z)
+        let dx = point.x - clampedX
+        let dz = point.z - clampedZ
+        return (dx * dx) + (dz * dz)
+    }
 }
 
 private final class ScenePackageBuilder {
@@ -82,14 +207,31 @@ private final class ScenePackageBuilder {
         )
 
         var sceneDrawables: [SceneDrawable] = []
+        var alwaysLoadedIndices: [Int] = []
+        var sceneSectors: [SceneSectorRuntime] = []
+        var worldSectors: [GameSectorBounds] = []
+        var worldCollisionVolumes: [GameCollisionVolume] = []
+        var worldGroundSurfaces: [GameGroundSurface] = []
         var proceduralCount = 0
         var assetCount = 0
+        var terrainCount = 0
+        var roadCount = 0
         var grayboxCount = 0
+        var collisionCount = 0
 
         for element in sceneConfiguration.proceduralElements {
             if let drawable = proceduralDrawable(from: element) {
+                alwaysLoadedIndices.append(sceneDrawables.count)
                 sceneDrawables.append(drawable)
                 proceduralCount += 1
+            }
+        }
+
+        for assetInstance in sceneConfiguration.assetInstances {
+            if let drawable = assetDrawable(from: assetInstance) {
+                alwaysLoadedIndices.append(sceneDrawables.count)
+                sceneDrawables.append(drawable)
+                assetCount += 1
             }
         }
 
@@ -99,29 +241,75 @@ private final class ScenePackageBuilder {
 
         let loadedSectors = includedSectorIDs.compactMap { sectorLookup[$0] }
         for sector in loadedSectors {
+            let minimum = sector.bounds.minimum
+            let maximum = sector.bounds.maximum
+            let activationPadding = sector.streamingPadding ?? 10
+            let drawStart = sceneDrawables.count
+
+            worldSectors.append(
+                GameSectorBounds(
+                    minX: minimum.x,
+                    minZ: minimum.z,
+                    maxX: maximum.x,
+                    maxZ: maximum.z,
+                    activationPadding: activationPadding
+                )
+            )
+
+            for terrainPatch in sector.terrainPatches {
+                if let drawable = terrainDrawable(from: terrainPatch, sectorID: sector.id) {
+                    sceneDrawables.append(drawable)
+                    terrainCount += 1
+                }
+                worldGroundSurfaces.append(groundSurface(from: terrainPatch))
+            }
+
+            for roadStrip in sector.roadStrips {
+                if let drawable = roadDrawable(from: roadStrip, sectorID: sector.id) {
+                    sceneDrawables.append(drawable)
+                    roadCount += 1
+                }
+                worldGroundSurfaces.append(groundSurface(from: roadStrip))
+            }
+
             for block in sector.grayboxBlocks {
                 if let drawable = grayboxDrawable(from: block, sectorID: sector.id) {
                     sceneDrawables.append(drawable)
                     grayboxCount += 1
                 }
+                if block.collisionEnabled ?? true {
+                    worldCollisionVolumes.append(collisionVolume(from: block))
+                    collisionCount += 1
+                }
             }
-        }
 
-        for assetInstance in sceneConfiguration.assetInstances {
-            if let drawable = assetDrawable(from: assetInstance) {
-                sceneDrawables.append(drawable)
-                assetCount += 1
+            for volume in sector.collisionVolumes {
+                worldCollisionVolumes.append(collisionVolume(from: volume))
+                collisionCount += 1
             }
+
+            sceneSectors.append(
+                SceneSectorRuntime(
+                    id: sector.id,
+                    displayName: sector.displayName,
+                    minimum: minimum,
+                    maximum: maximum,
+                    activationPadding: activationPadding,
+                    drawableRange: drawStart..<sceneDrawables.count
+                )
+            )
         }
 
         let detailLines = [
             "Grid: \(coordinateSystem.name)",
             "Axes: x \(coordinateSystem.axisX) / z \(coordinateSystem.axisZ)",
+            "Spawn: \(sceneConfiguration.spawn.label ?? "District start")",
             "Sectors: \(loadedSectors.map(\.displayName).joined(separator: ", "))",
+            "District: \(terrainCount) terrain / \(roadCount) roads / \(collisionCount) blockers",
             "Data Root: \(URL(fileURLWithPath: worldDataRoot).lastPathComponent)",
         ]
 
-        let summary = "\(assetCount) assets, \(grayboxCount) graybox, \(proceduralCount) procedural"
+        let summary = "\(assetCount) assets, \(terrainCount) terrain, \(roadCount) roads, \(grayboxCount) structures"
 
         return SceneBuildResult(
             drawables: sceneDrawables,
@@ -130,7 +318,22 @@ private final class ScenePackageBuilder {
                 summary: summary,
                 details: detailLines,
                 spawn: sceneConfiguration.spawn
-            )
+            ),
+            environment: SceneEnvironment(
+                skyHorizonColor: sceneConfiguration.sky.horizonColorVector,
+                skyZenithColor: sceneConfiguration.sky.zenithColorVector,
+                sunDirection: sceneConfiguration.sun.directionVector,
+                sunColor: sceneConfiguration.sun.colorVector,
+                ambientIntensity: sceneConfiguration.sun.ambientIntensity,
+                diffuseIntensity: sceneConfiguration.sun.diffuseIntensity
+            ),
+            sectors: sceneSectors,
+            runtimeWorld: SceneRuntimeWorld(
+                sectorBounds: worldSectors,
+                collisionVolumes: worldCollisionVolumes,
+                groundSurfaces: worldGroundSurfaces
+            ),
+            alwaysLoadedIndices: alwaysLoadedIndices
         )
     }
 
@@ -208,6 +411,51 @@ private final class ScenePackageBuilder {
         )
     }
 
+    private func terrainDrawable(from configuration: TerrainPatchConfiguration, sectorID: String) -> SceneDrawable? {
+        let vertices = GeometryBuilder.makeTerrainPatch(
+            size: configuration.sizeVector,
+            cornerHeights: configuration.cornerHeightVector,
+            subdivisions: configuration.subdivisions ?? 10,
+            color: configuration.colorVector
+        )
+
+        guard let buffer = makeBuffer(from: vertices) else {
+            return nil
+        }
+
+        let rotation = simd_float4x4.rotation(y: (configuration.yawDegrees ?? 0) * (.pi / 180.0))
+        return SceneDrawable(
+            name: "\(sectorID):\(configuration.name)",
+            vertexBuffer: buffer,
+            vertexCount: vertices.count,
+            modelMatrix: simd_float4x4.translation(configuration.positionVector) * rotation
+        )
+    }
+
+    private func roadDrawable(from configuration: RoadStripConfiguration, sectorID: String) -> SceneDrawable? {
+        let vertices = GeometryBuilder.makeRoadStrip(
+            size: configuration.sizeVector,
+            shoulderWidth: configuration.shoulderWidth ?? 1.2,
+            centerLineWidth: configuration.centerLineWidth ?? 0.24,
+            roadColor: configuration.roadColorVector,
+            shoulderColor: configuration.shoulderColorVector,
+            lineColor: configuration.lineColorVector,
+            crownHeight: configuration.crownHeight ?? 0.04
+        )
+
+        guard let buffer = makeBuffer(from: vertices) else {
+            return nil
+        }
+
+        let rotation = simd_float4x4.rotation(y: (configuration.yawDegrees ?? 0) * (.pi / 180.0))
+        return SceneDrawable(
+            name: "\(sectorID):\(configuration.name)",
+            vertexBuffer: buffer,
+            vertexCount: vertices.count,
+            modelMatrix: simd_float4x4.translation(configuration.positionVector) * rotation
+        )
+    }
+
     private func assetDrawable(from configuration: AssetInstanceConfiguration) -> SceneDrawable? {
         let cacheKey = "\(configuration.category)/\(configuration.name)"
         let loadedAsset: LoadedAsset
@@ -252,6 +500,60 @@ private final class ScenePackageBuilder {
         device.makeBuffer(
             bytes: vertices,
             length: MemoryLayout<SceneVertex>.stride * vertices.count
+        )
+    }
+
+    private func groundSurface(from configuration: TerrainPatchConfiguration) -> GameGroundSurface {
+        let cornerHeights = configuration.cornerHeightVector
+        return GameGroundSurface(
+            centerX: configuration.positionVector.x,
+            centerZ: configuration.positionVector.z,
+            halfWidth: configuration.sizeVector.x * 0.5,
+            halfDepth: configuration.sizeVector.y * 0.5,
+            yawDegrees: configuration.yawDegrees ?? 0,
+            northWestHeight: configuration.positionVector.y + cornerHeights.x,
+            northEastHeight: configuration.positionVector.y + cornerHeights.y,
+            southEastHeight: configuration.positionVector.y + cornerHeights.z,
+            southWestHeight: configuration.positionVector.y + cornerHeights.w
+        )
+    }
+
+    private func groundSurface(from configuration: RoadStripConfiguration) -> GameGroundSurface {
+        let elevation = configuration.positionVector.y
+        return GameGroundSurface(
+            centerX: configuration.positionVector.x,
+            centerZ: configuration.positionVector.z,
+            halfWidth: configuration.sizeVector.x * 0.5,
+            halfDepth: configuration.sizeVector.y * 0.5,
+            yawDegrees: configuration.yawDegrees ?? 0,
+            northWestHeight: elevation,
+            northEastHeight: elevation,
+            southEastHeight: elevation,
+            southWestHeight: elevation
+        )
+    }
+
+    private func collisionVolume(from configuration: GrayboxBlockConfiguration) -> GameCollisionVolume {
+        GameCollisionVolume(
+            centerX: configuration.positionVector.x,
+            centerY: configuration.positionVector.y,
+            centerZ: configuration.positionVector.z,
+            halfWidth: configuration.halfExtentsVector.x,
+            halfHeight: configuration.halfExtentsVector.y,
+            halfDepth: configuration.halfExtentsVector.z,
+            yawDegrees: configuration.yawDegrees ?? 0
+        )
+    }
+
+    private func collisionVolume(from configuration: CollisionVolumeConfiguration) -> GameCollisionVolume {
+        GameCollisionVolume(
+            centerX: configuration.positionVector.x,
+            centerY: configuration.positionVector.y,
+            centerZ: configuration.positionVector.z,
+            halfWidth: configuration.halfExtentsVector.x,
+            halfHeight: configuration.halfExtentsVector.y,
+            halfDepth: configuration.halfExtentsVector.z,
+            yawDegrees: configuration.yawDegrees ?? 0
         )
     }
 
@@ -302,11 +604,27 @@ private enum FallbackSceneFactory {
                     "Error: \(errorDescription)",
                 ],
                 spawn: SpawnConfiguration(
+                    label: "Fallback start",
                     position: [0, 1.65, 6],
                     yawDegrees: 0,
                     pitchDegrees: -10
                 )
-            )
+            ),
+            environment: SceneEnvironment(
+                skyHorizonColor: SIMD4<Float>(0.52, 0.66, 0.82, 1),
+                skyZenithColor: SIMD4<Float>(0.18, 0.29, 0.46, 1),
+                sunDirection: SIMD3<Float>(-0.45, -1.0, -0.25),
+                sunColor: SIMD3<Float>(1.0, 0.93, 0.84),
+                ambientIntensity: 0.34,
+                diffuseIntensity: 0.78
+            ),
+            sectors: [],
+            runtimeWorld: SceneRuntimeWorld(
+                sectorBounds: [],
+                collisionVolumes: [],
+                groundSurfaces: []
+            ),
+            alwaysLoadedIndices: Array(drawables.indices)
         )
     }
 }
@@ -380,6 +698,94 @@ private enum GeometryBuilder {
         appendQuad(to: &vertices, p0: backBottomLeft, p1: backBottomRight, p2: frontBottomRight, p3: frontBottomLeft, color: color)
 
         return vertices
+    }
+
+    static func makeTerrainPatch(
+        size: SIMD2<Float>,
+        cornerHeights: SIMD4<Float>,
+        subdivisions: Int,
+        color: SIMD4<Float>
+    ) -> [SceneVertex] {
+        let width = max(size.x, 0.5)
+        let depth = max(size.y, 0.5)
+        let segmentCount = max(subdivisions, 1)
+        var vertices: [SceneVertex] = []
+
+        for row in 0..<segmentCount {
+            let v0 = Float(row) / Float(segmentCount)
+            let v1 = Float(row + 1) / Float(segmentCount)
+            let z0 = (-depth * 0.5) + (depth * v0)
+            let z1 = (-depth * 0.5) + (depth * v1)
+
+            for column in 0..<segmentCount {
+                let u0 = Float(column) / Float(segmentCount)
+                let u1 = Float(column + 1) / Float(segmentCount)
+                let x0 = (-width * 0.5) + (width * u0)
+                let x1 = (-width * 0.5) + (width * u1)
+
+                appendQuad(
+                    to: &vertices,
+                    p0: SIMD3<Float>(x0, bilinearHeight(u: u0, v: v0, cornerHeights: cornerHeights), z0),
+                    p1: SIMD3<Float>(x1, bilinearHeight(u: u1, v: v0, cornerHeights: cornerHeights), z0),
+                    p2: SIMD3<Float>(x1, bilinearHeight(u: u1, v: v1, cornerHeights: cornerHeights), z1),
+                    p3: SIMD3<Float>(x0, bilinearHeight(u: u0, v: v1, cornerHeights: cornerHeights), z1),
+                    color: color
+                )
+            }
+        }
+
+        return vertices
+    }
+
+    static func makeRoadStrip(
+        size: SIMD2<Float>,
+        shoulderWidth: Float,
+        centerLineWidth: Float,
+        roadColor: SIMD4<Float>,
+        shoulderColor: SIMD4<Float>,
+        lineColor: SIMD4<Float>,
+        crownHeight: Float
+    ) -> [SceneVertex] {
+        let halfWidth = max(size.x * 0.5, 0.5)
+        let halfDepth = max(size.y * 0.5, 0.5)
+        let clampedShoulderWidth = min(max(shoulderWidth, 0.1), halfWidth * 0.45)
+        let clampedCenterLine = min(max(centerLineWidth, 0.05), halfWidth * 0.2)
+        var vertices: [SceneVertex] = []
+
+        let strips: [(Float, Float, SIMD4<Float>)] = [
+            (-halfWidth, -halfWidth + clampedShoulderWidth, shoulderColor),
+            (-halfWidth + clampedShoulderWidth, -clampedCenterLine * 0.5, roadColor),
+            (-clampedCenterLine * 0.5, clampedCenterLine * 0.5, lineColor),
+            (clampedCenterLine * 0.5, halfWidth - clampedShoulderWidth, roadColor),
+            (halfWidth - clampedShoulderWidth, halfWidth, shoulderColor),
+        ]
+
+        for (x0, x1, color) in strips where x1 > x0 {
+            appendQuad(
+                to: &vertices,
+                p0: SIMD3<Float>(x0, roadCrownHeight(x: x0, halfWidth: halfWidth, crownHeight: crownHeight), -halfDepth),
+                p1: SIMD3<Float>(x1, roadCrownHeight(x: x1, halfWidth: halfWidth, crownHeight: crownHeight), -halfDepth),
+                p2: SIMD3<Float>(x1, roadCrownHeight(x: x1, halfWidth: halfWidth, crownHeight: crownHeight), halfDepth),
+                p3: SIMD3<Float>(x0, roadCrownHeight(x: x0, halfWidth: halfWidth, crownHeight: crownHeight), halfDepth),
+                color: color
+            )
+        }
+
+        return vertices
+    }
+
+    private static func bilinearHeight(u: Float, v: Float, cornerHeights: SIMD4<Float>) -> Float {
+        let north = cornerHeights.x + ((cornerHeights.y - cornerHeights.x) * u)
+        let south = cornerHeights.w + ((cornerHeights.z - cornerHeights.w) * u)
+        return north + ((south - north) * v)
+    }
+
+    private static func roadCrownHeight(x: Float, halfWidth: Float, crownHeight: Float) -> Float {
+        guard halfWidth > 0 else {
+            return 0
+        }
+        let normalizedDistance = min(abs(x) / halfWidth, 1)
+        return crownHeight * (1 - normalizedDistance)
     }
 
     private static func appendQuad(

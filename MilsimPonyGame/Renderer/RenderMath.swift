@@ -12,6 +12,13 @@ struct SceneUniforms {
     var modelMatrix: simd_float4x4
     var lightDirection: SIMD3<Float>
     var ambientIntensity: Float
+    var sunColor: SIMD3<Float>
+    var diffuseIntensity: Float
+}
+
+struct SkyUniforms {
+    var horizonColor: SIMD4<Float>
+    var zenithColor: SIMD4<Float>
 }
 
 enum RenderMath {

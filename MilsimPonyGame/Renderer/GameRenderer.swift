@@ -7,6 +7,7 @@ final class GameRenderer: NSObject, MTKViewDelegate {
     let deviceName: String
 
     private let commandQueue: MTLCommandQueue
+    private let skyPipelineState: MTLRenderPipelineState
     private let renderPipelineState: MTLRenderPipelineState
     private let depthStencilState: MTLDepthStencilState
     private let scene: BootstrapScene
@@ -36,6 +37,12 @@ final class GameRenderer: NSObject, MTKViewDelegate {
             worldManifestPath: session.worldManifestPath
         )
 
+        let skyPipelineDescriptor = MTLRenderPipelineDescriptor()
+        skyPipelineDescriptor.label = "Bootstrap Sky Pipeline"
+        skyPipelineDescriptor.vertexFunction = library.makeFunction(name: "skyVertexMain")
+        skyPipelineDescriptor.fragmentFunction = library.makeFunction(name: "skyFragmentMain")
+        skyPipelineDescriptor.colorAttachments[0].pixelFormat = view.colorPixelFormat
+
         let pipelineDescriptor = MTLRenderPipelineDescriptor()
         pipelineDescriptor.label = "Bootstrap Scene Pipeline"
         pipelineDescriptor.vertexFunction = library.makeFunction(name: "bootstrapVertexMain")
@@ -44,6 +51,7 @@ final class GameRenderer: NSObject, MTKViewDelegate {
         pipelineDescriptor.depthAttachmentPixelFormat = view.depthStencilPixelFormat
 
         do {
+            skyPipelineState = try device.makeRenderPipelineState(descriptor: skyPipelineDescriptor)
             renderPipelineState = try device.makeRenderPipelineState(descriptor: pipelineDescriptor)
         } catch {
             print("[Renderer] Failed to create pipeline state: \(error)")
@@ -61,6 +69,7 @@ final class GameRenderer: NSObject, MTKViewDelegate {
 
         super.init()
 
+        scene.configureGameCore()
         let spawn = scene.debugInfo.spawn.positionVector
         GameCoreConfigureSpawn(
             spawn.x,
@@ -90,11 +99,18 @@ final class GameRenderer: NSObject, MTKViewDelegate {
 
         GameCoreTick(deltaTime)
         let snapshot = GameCoreGetSnapshot()
+        let cameraPosition = SIMD3<Float>(snapshot.cameraX, snapshot.cameraY, snapshot.cameraZ)
+        let streamingState = scene.streamingState(for: cameraPosition)
+        let activeDrawables = scene.activeDrawables(for: cameraPosition)
 
         if now - lastOverlayUpdateTime > 0.12 {
             lastOverlayUpdateTime = now
             DispatchQueue.main.async { [weak self] in
                 self?.session?.accept(snapshot: snapshot, drawableSize: view.drawableSize)
+                self?.session?.noteStreamingState(
+                    summary: streamingState.summary,
+                    details: streamingState.details
+                )
             }
         }
 
@@ -109,7 +125,7 @@ final class GameRenderer: NSObject, MTKViewDelegate {
                 self?.session?.noteFrameTiming(
                     milliseconds: averageFrameTime * 1000,
                     framesPerSecond: framesPerSecond,
-                    drawableCount: self?.scene.drawables.count ?? 0
+                    drawableCount: streamingState.activeDrawableCount
                 )
             }
         }
@@ -128,9 +144,9 @@ final class GameRenderer: NSObject, MTKViewDelegate {
 
         renderPassDescriptor.colorAttachments[0].loadAction = .clear
         renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColor(
-            red: 0.03 + strafeTint,
-            green: 0.04 + forwardTint,
-            blue: 0.08 + pulse,
+            red: Double(scene.environment.skyHorizonColor.x) + strafeTint,
+            green: Double(scene.environment.skyHorizonColor.y) + forwardTint,
+            blue: Double(scene.environment.skyZenithColor.z) + pulse,
             alpha: 1
         )
         renderPassDescriptor.depthAttachment.loadAction = .clear
@@ -141,6 +157,15 @@ final class GameRenderer: NSObject, MTKViewDelegate {
         }
 
         encoder.label = "Bootstrap Scene Pass"
+        var skyUniforms = SkyUniforms(
+            horizonColor: scene.environment.skyHorizonColor,
+            zenithColor: scene.environment.skyZenithColor
+        )
+        encoder.setRenderPipelineState(skyPipelineState)
+        encoder.setCullMode(.none)
+        encoder.setFragmentBytes(&skyUniforms, length: MemoryLayout<SkyUniforms>.stride, index: 0)
+        encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
+
         encoder.setRenderPipelineState(renderPipelineState)
         encoder.setDepthStencilState(depthStencilState)
         encoder.setCullMode(.back)
@@ -154,7 +179,6 @@ final class GameRenderer: NSObject, MTKViewDelegate {
             farZ: 100.0
         )
 
-        let cameraPosition = SIMD3<Float>(snapshot.cameraX, snapshot.cameraY, snapshot.cameraZ)
         let forward = RenderMath.forwardVector(yawDegrees: snapshot.yawDegrees, pitchDegrees: snapshot.pitchDegrees)
         let viewMatrix = simd_float4x4.lookAt(
             eye: cameraPosition,
@@ -163,14 +187,16 @@ final class GameRenderer: NSObject, MTKViewDelegate {
         )
 
         let viewProjectionMatrix = projectionMatrix * viewMatrix
-        let lightDirection = simd_normalize(SIMD3<Float>(-0.6, -1.0, -0.45))
+        let lightDirection = simd_normalize(scene.environment.sunDirection)
 
-        for drawableItem in scene.drawables {
+        for drawableItem in activeDrawables {
             var uniforms = SceneUniforms(
                 viewProjectionMatrix: viewProjectionMatrix,
                 modelMatrix: drawableItem.modelMatrix,
                 lightDirection: lightDirection,
-                ambientIntensity: 0.32
+                ambientIntensity: scene.environment.ambientIntensity,
+                sunColor: scene.environment.sunColor,
+                diffuseIntensity: scene.environment.diffuseIntensity
             )
 
             encoder.setVertexBuffer(drawableItem.vertexBuffer, offset: 0, index: 0)

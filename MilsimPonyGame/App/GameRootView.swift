@@ -11,13 +11,13 @@ struct GameRootView: View {
 
             VStack(alignment: .leading, spacing: 14) {
                 overlayCard(
-                    title: "Cycle 2 Data Slice",
+                    title: "Cycle 3 District Slice",
                     subtitle: session.statusLine,
                     lines: session.overlayLines
                 )
                 overlayCard(
                     title: "Input Map",
-                    subtitle: "Boot-time hooks wired for debugging",
+                    subtitle: "Grounded traversal and sprint debug controls",
                     lines: InputBindings.launchHints
                 )
             }
