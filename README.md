@@ -10,7 +10,11 @@ The game engine is written in METAL, SwiftUI and C with most of the engine exist
 
 Before the general game rendering starts it is important to have a relatively detailed view of Canberra, its streets and its general architecture. There are a number of resources online including Google Maps.
 
-The first aim of the engine is to render Canberra in a first person perspective realistic setting. Once that is done, this README will update with further work. Please outline a series of cycle based tasks which will conclude with the Canberra first person perspective engine as a playable demo. This timeframe will be adhered to.
+The immediate priority is no longer a narrow Parliament House corridor slice. The next development phase must show Canberra at a much larger scale, including Lake Burley Griffin and the broader landscape from Woden to Belconnen at a resolution high enough to support long-range observation and firing.
+
+The first usable weapon in the game will be a sniper rifle with 4x magnification. That requirement drives the map plan: higher-resolution terrain, road, landmark, and collision data; longer sightlines; and stable distant rendering are now first-order priorities rather than polish tasks.
+
+Please keep the cycle plan aligned to this broader Canberra goal until it is fully delivered as a playable and reviewable demo.
 
 Please make sure a Mac Xcode project called:
 

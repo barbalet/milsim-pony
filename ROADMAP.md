@@ -2,14 +2,16 @@
 
 ## Goal
 
-Deliver a playable Mac demo that launches into a first-person Canberra experience centered on New Parliament House, using a Metal renderer, a SwiftUI application shell, and a C-heavy core engine.
+Deliver a playable Mac demo that launches into a first-person Canberra experience using a Metal renderer, a SwiftUI application shell, and a C-heavy core engine, with visible basin-scale coverage from Woden to Belconnen, Lake Burley Griffin as a readable landmark, and a usable sniper rifle with 4x magnification.
 
 ## Current Starting Point
 
 - The repository currently contains art assets under `MilsimPonyGame/Assets/PrimaryAssets/`.
-- There is no `MilsimPonyGame.xcodeproj` yet.
-- There is no engine, gameplay, or tooling code checked in yet.
-- The README defines the immediate target as a first-person Canberra rendering demo that can be played end to end.
+- `MilsimPonyGame.xcodeproj` exists and builds on macOS.
+- The current demo includes a functioning app shell, renderer, packaged world data, and a small Parliament-adjacent playable slice.
+- Reviewer feedback has established that the current slice is too narrow and does not yet show Canberra in part or whole.
+- The next five cycles must prioritize a basin-scale Canberra view including Lake Burley Griffin and the landscape from Woden to Belconnen.
+- The first usable weapon will be a sniper rifle with 4x magnification, which raises the required terrain, landmark, collision, and long-range rendering resolution.
 
 ## Planning Assumptions
 
@@ -20,7 +22,9 @@ Deliver a playable Mac demo that launches into a first-person Canberra experienc
   - `World/Data`: Canberra layout, terrain, roads, landmarks, asset prep.
   - `Gameplay/QA`: first-person controller, demo flow, test coverage, tuning.
 - If this is a solo effort, keep the same order of work and expect the schedule to roughly double.
-- The first playable demo should prioritize the Parliament House precinct and the first ring of suburban escape routes over full-city coverage.
+- Basin-scale Canberra coverage now takes priority over adding more corridor-only scripting.
+- The world plan must support hierarchical resolution: macro Canberra coverage plus denser streamed data around long-range viewpoints and combat lanes.
+- The sniper rifle requires stable distant rendering, high-confidence collision queries, and authored long-sightline tests.
 
 ## Milestones
 
@@ -65,6 +69,17 @@ Exit criteria:
 - Performance, controls, and level readability are tuned.
 - A distributable demo package and review build checklist exist.
 
+### Milestone 5: Canberra Basin And Sniper Foundation
+
+Cycles `10` to `14`
+
+Exit criteria:
+
+- The demo visibly includes Lake Burley Griffin and the broader landscape from Woden to Belconnen.
+- Basin-scale terrain, roads, landmark silhouettes, and collision are available at a resolution that supports long-range observation.
+- The first usable weapon is a sniper rifle with 4x magnification.
+- Scoped observation and firing are stable enough to be used as a core gameplay pillar rather than a prototype gimmick.
+
 ## Workstream Division
 
 ### Engine/Core
@@ -80,7 +95,7 @@ Exit criteria:
 ### World/Data
 
 - Own Canberra reference gathering, coordinate conventions, terrain/road data preparation, blockouts, landmark placement, and asset conversion.
-- Focus detail where the demo path needs it most rather than spreading fidelity evenly across the whole city.
+- Deliver basin-wide Canberra readability first, then concentrate extra fidelity around travel lanes, major landmarks, and sniper firing positions.
 
 ### Gameplay/QA
 
@@ -101,6 +116,11 @@ Exit criteria:
 | `7` | Demo alpha | Stabilize saves or session state as needed, plus crash logging | Add menu shell, settings, and pause support | Lock playable bounds and final route dressing | Add win condition, fail condition, and full demo script | A full start-to-finish playable demo works without developer intervention |
 | `8` | Beta hardening | Fix memory, streaming, and collision edge cases | Tune frame time, shadows, and LOD behavior | Clean collision gaps and visual seams | Run structured playtests and close blocker bugs | Demo is stable enough for outside review |
 | `9` | Release candidate | Finalize build versioning and packaging steps | Final visual polish and capture settings | Lock content and fallback paths | Regression test, checklist sign-off, release notes | Shareable demo package is ready |
+| `10` | Basin data reset | Replace corridor-first assumptions with basin-scale sector and tile rules | Add first macro Canberra render path for large extents and lake coverage | Import first-pass Canberra basin coverage from Woden to Belconnen, including Lake Burley Griffin footprint | Define sniper use cases, firing distances, and review criteria | App loads a basin-scale Canberra preview with lake and district extents visible |
+| `11` | Macro Canberra readability | Add large-world streaming support, far-field terrain residency, and long-sightline culling rules | Improve distant terrain, water, haze, and skyline readability | Build recognizable basin silhouettes, district massing, and arterial layout | Add macro navigation and sightline review route | Lake, Woden-side landscape, and Belconnen-side landscape all read from authored viewpoints |
+| `12` | Scope and resolution foundation | Add higher-resolution tile streaming and query hooks for long-range play | Add 4x magnified scope camera, reticle, and LOD stabilization | Densify terrain, roads, and landmark data around central basin and sniper lanes | Add sniper perch tests and scoped landmark validation | Player can inspect distant Canberra landmarks through a stable 4x scope |
+| `13` | Sniper rifle usable pass | Add accurate long-range hit query support and firing validation hooks | Add scoped firing feedback, impact readability, and long-range target presentation | Raise collision and cover fidelity around firing lanes and target zones | Add the first usable sniper rifle: equip, zoom, fire, reload, and target confirmation | Sniper rifle works reliably against authored long-range targets across Canberra sightlines |
+| `14` | Basin demo integration | Tune streaming, memory, and large-world edge cases for the expanded map | Polish water, skyline, terrain, and long-range clarity for review captures | Close major gaps between Woden, the lake, and Belconnen while preserving landmark readability | Integrate traversal and sniper observation into one reviewable loop | Review build demonstrates Lake Burley Griffin plus Woden-to-Belconnen landscape with a usable 4x sniper rifle |
 
 ## Standard Cycle Rhythm
 
@@ -114,12 +134,15 @@ Exit criteria:
 
 - Do not start broad Canberra content production before the coordinate system, scale rules, and chunk format are stable.
 - Treat the Parliament House district as the anchor slice; every later cycle should keep that slice runnable.
+- Treat Lake Burley Griffin and basin ridgelines as the new world anchors for scale, orientation, and long-range validation.
 - Keep the SwiftUI layer minimal and avoid moving engine logic out of the C core unless there is a strong platform reason.
-- Add fidelity only after traversal and performance are acceptable, otherwise the project will accumulate expensive rework.
+- Do not prioritize another corridor-only cycle ahead of basin-scale readability from Woden to Belconnen.
+- Do not ship the sniper rifle until the map supports stable distant observation and reliable long-range collision.
+- Add fidelity in layers: basin coverage first, then higher resolution around travel lanes, landmarks, and sniper perches.
 
 ## Near-Term Next Actions
 
-1. Create `MilsimPonyGame.xcodeproj` in the repo root as the first deliverable of cycle `0`.
-2. Establish the initial source tree for `App`, `Renderer`, `Core`, `World`, and `Gameplay`.
-3. Build a one-room or open-pad render test using one imported asset and the intended first-person camera path.
-4. Choose the first Canberra reference set and lock scale conventions before any large content pass begins.
+1. Lock the expanded Canberra extents and tile plan for coverage from Woden through the lake basin to Belconnen.
+2. Build a first-pass basin dataset that includes Lake Burley Griffin, macro terrain, and major landmark silhouettes.
+3. Define the sniper rifle requirements in engine terms: target distances, zoom behavior, long-range collision, and scoped rendering acceptance.
+4. Author the first review viewpoints that must prove Canberra reads at large scale before another corridor-only content pass is accepted.

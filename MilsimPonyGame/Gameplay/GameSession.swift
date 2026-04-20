@@ -136,8 +136,9 @@ final class GameSession: ObservableObject {
     }
 
     var inputCardSubtitle: String {
-        menuPanel == nil
-            ? "Cycle 7 demo alpha shell, pause support, and routed escape controls"
+        let cycleLabel = overlayTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        return menuPanel == nil
+            ? "\(cycleLabel) traversal, stability hardening, and routed escape controls"
             : "Deploy, pause, retry, and tune persistent field settings"
     }
 
@@ -624,6 +625,8 @@ final class GameSession: ObservableObject {
             "Mission: leave the Parliament precinct and clear the Deakin South Escape route.",
             "Script: State Circle Cutthrough, Cross Street Junction, Deakin Service Lane, then Extraction Canopy.",
             "Risk: crossing open observer lanes forces a checkpoint fallback instead of a clean run.",
+            "Release: \(configuration.releaseDisplayName) / \(configuration.bundleIdentifier)",
+            "Content: \(configuration.contentSourceSummary)",
             "Deploy: press Space or Return, then use Esc at any time for the pause shell.",
         ]
 
@@ -675,6 +678,7 @@ final class GameSession: ObservableObject {
                 snapshot?.restartCount ?? 0
             ),
             "Outcome: the playable Canberra slice now runs from briefing to extraction without developer prompts.",
+            "Release: \(configuration.releaseDisplayName) / \(configuration.contentSourceSummary)",
             "Script: title shell, live route, fail or retry loop, and extraction summary all resolve in one session.",
             "New Run restarts the mission immediately. Briefing returns to the title shell.",
         ]
@@ -685,6 +689,9 @@ final class GameSession: ObservableObject {
             String(format: "Look scale: %.2fx of the authored cycle tuning", lookSensitivityScale),
             "Invert Y: \(invertLookY ? "enabled" : "disabled")",
             String(format: "HUD opacity: %.0f%%", hudOpacity * 100),
+            "Build: \(configuration.releaseDisplayName)",
+            "Bundle: \(configuration.bundleIdentifier)",
+            "Content: \(configuration.contentSourceSummary)",
             "These settings persist between launches.",
         ]
     }
@@ -713,9 +720,13 @@ final class GameSession: ObservableObject {
         let headerLines = [
             "Mode: \(configuration.bootMode)",
             "Demo: \(demoFlowState.label)\(isSettingsPresented ? " / settings" : "")",
+            "Release: \(configuration.releaseDisplayName)",
+            "Bundle: \(configuration.bundleIdentifier)",
+            "Content: \(configuration.contentSourceSummary)",
             "Scene: \(sceneLabel)",
             "World: \(configuration.worldName)",
             "Assets: \(shortenedPath(configuration.assetRoot))",
+            "World Data: \(shortenedPath(configuration.worldDataRoot))",
             "Manifest: \(shortenedPath(configuration.worldManifestPath))",
             "Renderer: \(rendererName)",
             "Scene Summary: \(sceneSummary)",

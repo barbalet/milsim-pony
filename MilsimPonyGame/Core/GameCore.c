@@ -9,6 +9,11 @@
 #define GAME_CORE_MAX_GROUND_SURFACES 128
 #define GAME_CORE_MAX_ROUTE_CHECKPOINTS 16
 #define GAME_CORE_MAX_THREAT_OBSERVERS 16
+#define GAME_CORE_MAX_TICK_DELTA_SECONDS 0.25f
+#define GAME_CORE_MAX_SIMULATION_STEP_SECONDS (1.0f / 60.0f)
+#define GAME_CORE_MAX_MOVEMENT_STEP_DISTANCE 0.05f
+#define GAME_CORE_LOS_SAMPLE_SPACING_METERS 0.10f
+#define GAME_CORE_MAX_LOS_SAMPLES 256
 
 typedef struct GameCoreState {
     double elapsedSeconds;
@@ -98,6 +103,8 @@ static float GameCoreLerp(float start, float end, float t) {
 static float GameCoreDegreesToRadians(float degrees) {
     return degrees * (float)M_PI / 180.0f;
 }
+
+static void GameCoreUpdateDetection(double deltaTime);
 
 static void GameCoreRotateIntoLocalFrame(float x, float z, float yawDegrees, float *localX, float *localZ) {
     const float radians = (-yawDegrees) * (float)M_PI / 180.0f;
@@ -341,13 +348,23 @@ static bool GameCoreHasLineOfSightToPoint(
     float endY,
     float endZ
 ) {
-    const int sampleCount = 24;
+    const float deltaX = endX - startX;
+    const float deltaY = endY - startY;
+    const float deltaZ = endZ - startZ;
+    const float distance = sqrtf((deltaX * deltaX) + (deltaY * deltaY) + (deltaZ * deltaZ));
+    int sampleCount = (int)ceilf(distance / GAME_CORE_LOS_SAMPLE_SPACING_METERS);
+
+    if (sampleCount < 2) {
+        sampleCount = 2;
+    } else if (sampleCount > GAME_CORE_MAX_LOS_SAMPLES) {
+        sampleCount = GAME_CORE_MAX_LOS_SAMPLES;
+    }
 
     for (int sample = 1; sample < sampleCount; sample++) {
         const float t = (float)sample / (float)sampleCount;
-        const float sampleX = startX + ((endX - startX) * t);
-        const float sampleY = startY + ((endY - startY) * t);
-        const float sampleZ = startZ + ((endZ - startZ) * t);
+        const float sampleX = startX + (deltaX * t);
+        const float sampleY = startY + (deltaY * t);
+        const float sampleZ = startZ + (deltaZ * t);
 
         for (int index = 0; index < gameState.collisionVolumeCount; index++) {
             const GameCollisionVolume *volume = &gameState.collisionVolumes[index];
@@ -375,6 +392,77 @@ static bool GameCoreHasLineOfSightToPoint(
     }
 
     return true;
+}
+
+static void GameCoreAdvanceSimulationStep(float deltaTime) {
+    gameState.elapsedSeconds += deltaTime;
+
+    if (gameState.routeFailed) {
+        gameState.moveSpeed = 0;
+        GameCoreRefreshGrounding();
+        GameCoreUpdateDetection(deltaTime);
+        return;
+    }
+
+    {
+        const float baseMoveSpeed = gameState.sprinting ? gameState.sprintSpeed : gameState.walkSpeed;
+        float moveX = gameState.strafeIntent;
+        float moveZ = gameState.forwardIntent;
+
+        const float magnitude = sqrtf((moveX * moveX) + (moveZ * moveZ));
+        if (magnitude > 1.0f) {
+            moveX /= magnitude;
+            moveZ /= magnitude;
+        }
+
+        gameState.moveSpeed = baseMoveSpeed * magnitude;
+
+        if (magnitude > 0.0f) {
+            const float yawRadians = gameState.yawDegrees * (float)M_PI / 180.0f;
+            const float rightX = cosf(yawRadians);
+            const float rightZ = sinf(yawRadians);
+            const float forwardX = sinf(yawRadians);
+            const float forwardZ = -cosf(yawRadians);
+            const float worldMoveX = (rightX * moveX) + (forwardX * moveZ);
+            const float worldMoveZ = (rightZ * moveX) + (forwardZ * moveZ);
+            const float fullStepDistance = baseMoveSpeed * magnitude * deltaTime;
+            int movementSteps = (int)ceilf(fullStepDistance / GAME_CORE_MAX_MOVEMENT_STEP_DISTANCE);
+
+            if (movementSteps < 1) {
+                movementSteps = 1;
+            }
+
+            {
+                const float stepMoveX = (worldMoveX * baseMoveSpeed * deltaTime) / (float)movementSteps;
+                const float stepMoveZ = (worldMoveZ * baseMoveSpeed * deltaTime) / (float)movementSteps;
+
+                for (int movementStep = 0; movementStep < movementSteps; movementStep++) {
+                    float nextX = gameState.cameraX + stepMoveX;
+                    float nextZ = gameState.cameraZ;
+                    float candidateGroundHeight = GameCoreSampleGroundHeight(nextX, nextZ, gameState.groundHeight, NULL);
+
+                    if (!GameCoreWouldCollide(nextX, nextZ, candidateGroundHeight)) {
+                        gameState.cameraX = nextX;
+                        gameState.groundHeight = candidateGroundHeight;
+                    }
+
+                    nextX = gameState.cameraX;
+                    nextZ = gameState.cameraZ + stepMoveZ;
+                    candidateGroundHeight = GameCoreSampleGroundHeight(nextX, nextZ, gameState.groundHeight, NULL);
+
+                    if (!GameCoreWouldCollide(nextX, nextZ, candidateGroundHeight)) {
+                        gameState.cameraZ = nextZ;
+                        gameState.groundHeight = candidateGroundHeight;
+                    }
+                }
+            }
+        }
+    }
+
+    GameCoreRefreshGrounding();
+
+    GameCoreUpdateRouteProgress();
+    GameCoreUpdateDetection(deltaTime);
 }
 
 static void GameCoreUpdateDetection(double deltaTime) {
@@ -640,72 +728,32 @@ void GameCoreTick(double deltaTime) {
         GameCoreBootstrap("implicit");
     }
 
-    gameState.elapsedSeconds += deltaTime;
-
-    if (gameState.routeFailed) {
-        gameState.moveSpeed = 0;
-        GameCoreRefreshGrounding();
-        GameCoreUpdateDetection(deltaTime);
+    if (!(deltaTime > 0.0)) {
         return;
     }
 
     {
-        const float startingX = gameState.cameraX;
-        const float startingZ = gameState.cameraZ;
-        const float baseMoveSpeed = gameState.sprinting ? gameState.sprintSpeed : gameState.walkSpeed;
-        float moveX = gameState.strafeIntent;
-        float moveZ = gameState.forwardIntent;
+        // Clamp hitch-sized frame times, then substep so movement and detection stay stable.
+        float remainingTime = GameCoreClamp((float)deltaTime, 0, GAME_CORE_MAX_TICK_DELTA_SECONDS);
 
-        const float magnitude = sqrtf((moveX * moveX) + (moveZ * moveZ));
-        if (magnitude > 1.0f) {
-            moveX /= magnitude;
-            moveZ /= magnitude;
-        }
+        while (remainingTime > 0.0f) {
+            const float stepTime = remainingTime > GAME_CORE_MAX_SIMULATION_STEP_SECONDS
+                ? GAME_CORE_MAX_SIMULATION_STEP_SECONDS
+                : remainingTime;
+            const float startingX = gameState.cameraX;
+            const float startingZ = gameState.cameraZ;
 
-        {
-            const float yawRadians = gameState.yawDegrees * (float)M_PI / 180.0f;
-            const float rightX = cosf(yawRadians);
-            const float rightZ = sinf(yawRadians);
-            const float forwardX = sinf(yawRadians);
-            const float forwardZ = -cosf(yawRadians);
-            const float worldMoveX = (rightX * moveX) + (forwardX * moveZ);
-            const float worldMoveZ = (rightZ * moveX) + (forwardZ * moveZ);
-            const float stepDistance = baseMoveSpeed * (float)deltaTime;
+            GameCoreAdvanceSimulationStep(stepTime);
 
-            gameState.moveSpeed = baseMoveSpeed * magnitude;
-
-            if (magnitude > 0.0f) {
-                float nextX = gameState.cameraX + (worldMoveX * stepDistance);
-                float nextZ = gameState.cameraZ;
-                float candidateGroundHeight = GameCoreSampleGroundHeight(nextX, nextZ, gameState.groundHeight, NULL);
-
-                if (!GameCoreWouldCollide(nextX, nextZ, candidateGroundHeight)) {
-                    gameState.cameraX = nextX;
-                    gameState.groundHeight = candidateGroundHeight;
-                }
-
-                nextX = gameState.cameraX;
-                nextZ = gameState.cameraZ + (worldMoveZ * stepDistance);
-                candidateGroundHeight = GameCoreSampleGroundHeight(nextX, nextZ, gameState.groundHeight, NULL);
-
-                if (!GameCoreWouldCollide(nextX, nextZ, candidateGroundHeight)) {
-                    gameState.cameraZ = nextZ;
-                    gameState.groundHeight = candidateGroundHeight;
-                }
+            {
+                const float deltaX = gameState.cameraX - startingX;
+                const float deltaZ = gameState.cameraZ - startingZ;
+                gameState.routeDistanceMeters += sqrtf((deltaX * deltaX) + (deltaZ * deltaZ));
             }
-        }
 
-        GameCoreRefreshGrounding();
-
-        {
-            const float deltaX = gameState.cameraX - startingX;
-            const float deltaZ = gameState.cameraZ - startingZ;
-            gameState.routeDistanceMeters += sqrtf((deltaX * deltaX) + (deltaZ * deltaZ));
+            remainingTime -= stepTime;
         }
     }
-
-    GameCoreUpdateRouteProgress();
-    GameCoreUpdateDetection(deltaTime);
 }
 
 GameFrameSnapshot GameCoreGetSnapshot(void) {

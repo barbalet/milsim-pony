@@ -261,8 +261,10 @@
 			buildSettings = {
 				CLANG_C_LANGUAGE_STANDARD = gnu17;
 				CLANG_ENABLE_MODULES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 9;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleShortVersionString = "$(MARKETING_VERSION)";
+				INFOPLIST_KEY_CFBundleVersion = "$(CURRENT_PROJECT_VERSION)";
 				HEADER_SEARCH_PATHS = "$(SRCROOT)/MilsimPonyGame/Core/include";
 				INFOPLIST_KEY_CFBundleDisplayName = MilsimPonyGame;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.games";
@@ -271,7 +273,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.1.0;
+				MARKETING_VERSION = 0.9.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				PRODUCT_BUNDLE_IDENTIFIER = com.milsimpony.game;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -289,8 +291,10 @@
 			buildSettings = {
 				CLANG_C_LANGUAGE_STANDARD = gnu17;
 				CLANG_ENABLE_MODULES = YES;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 9;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleShortVersionString = "$(MARKETING_VERSION)";
+				INFOPLIST_KEY_CFBundleVersion = "$(CURRENT_PROJECT_VERSION)";
 				HEADER_SEARCH_PATHS = "$(SRCROOT)/MilsimPonyGame/Core/include";
 				INFOPLIST_KEY_CFBundleDisplayName = MilsimPonyGame;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.games";
@@ -299,7 +303,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.1.0;
+				MARKETING_VERSION = 0.9.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				PRODUCT_BUNDLE_IDENTIFIER = com.milsimpony.game;
 				PRODUCT_NAME = "$(TARGET_NAME)";
