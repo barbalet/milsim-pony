@@ -98,23 +98,31 @@ struct GameRootView: View {
         }
     }
 
-    private func overheadMapOverlay(snapshot: OverheadMapSnapshot) -> some View {
+    private func overheadMapOverlay(snapshot: OverheadMapSnapshot, layout: CanberraMapLayout) -> some View {
         shellCard(
-            title: "Canberra Overhead Map",
+            title: "Canberra Map",
             subtitle: snapshot.nextCheckpointLabel.map {
                 "Sector: \(snapshot.currentSectorName) • next marker: \($0)"
             } ?? "Sector: \(snapshot.currentSectorName) • route complete",
-            maxWidth: 360
+            maxWidth: layout.cardWidth
         ) {
-            OverheadMapCanvas(snapshot: snapshot)
+            OverheadMapCanvas(
+                snapshot: snapshot,
+                canvasHeight: layout.canvasHeight
+            )
                 .frame(maxWidth: .infinity)
         }
-        .frame(width: 360, alignment: .leading)
+        .frame(width: layout.cardWidth, alignment: .leading)
     }
 
     private func mapShell(snapshot: OverheadMapSnapshot) -> some View {
-        VStack(spacing: 18) {
-            overheadMapOverlay(snapshot: snapshot)
+        GeometryReader { geometry in
+            let layout = CanberraMapLayout.fitting(in: geometry.size)
+
+            VStack(spacing: 18) {
+                overheadMapOverlay(snapshot: snapshot, layout: layout)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
@@ -169,7 +177,7 @@ struct GameRootView: View {
                     set: { session.setMapPresented($0) }
                 )
             ) {
-                Text(session.canShowMap ? "Show Overhead Map" : "Overhead Map Loading")
+                Text(session.canShowMap ? "Show Canberra Map" : "Canberra Map Loading")
                     .font(.system(size: 12, weight: .semibold, design: .monospaced))
                     .foregroundStyle(.white.opacity(0.92))
             }
@@ -368,7 +376,7 @@ private struct ControlDeck: View {
                     ControlLegendRow(
                         keycaps: ["M"],
                         title: mapVisible ? "Map Open" : "Canberra Map",
-                        detail: mapAvailable ? "Toggle the overhead Canberra locator" : "Unlocks when scene data is ready",
+                        detail: mapAvailable ? "Toggle the Canberra map" : "Unlocks when scene data is ready",
                         active: mapVisible,
                         accent: Color(red: 0.34, green: 0.78, blue: 0.96),
                         dimmed: !mapAvailable
@@ -548,17 +556,47 @@ private struct KeycapView: View {
     }
 }
 
+private struct CanberraMapLayout {
+    let cardWidth: CGFloat
+    let canvasHeight: CGFloat
+
+    static func fitting(in size: CGSize) -> CanberraMapLayout {
+        let availableWidth = max(size.width - 56, 360)
+        let availableHeight = max(size.height - 56, 360)
+        let preferredCardWidth = min(max(availableWidth * 0.86, 720), 1080)
+        let cardWidth = min(preferredCardWidth, availableWidth)
+        let preferredCanvasHeight = cardWidth * 0.72
+        let maxCanvasHeight = min(max(availableHeight - 154, 320), 780)
+        let canvasHeight = max(min(preferredCanvasHeight, maxCanvasHeight), 320)
+
+        return CanberraMapLayout(
+            cardWidth: cardWidth,
+            canvasHeight: canvasHeight
+        )
+    }
+}
+
 private struct OverheadMapCanvas: View {
     let snapshot: OverheadMapSnapshot
+    let canvasHeight: CGFloat
+
+    private var canvasScale: CGFloat {
+        min(max(canvasHeight / 258, 1), 3)
+    }
+
+    private var markerScale: CGFloat {
+        min(canvasScale, 1.7)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             GeometryReader { geometry in
+                let drawingInset = max(min(12 * canvasScale, 28), 12)
                 let drawingRect = CGRect(
-                    x: 12,
-                    y: 12,
-                    width: max(geometry.size.width - 24, 1),
-                    height: max(geometry.size.height - 24, 1)
+                    x: drawingInset,
+                    y: drawingInset,
+                    width: max(geometry.size.width - (drawingInset * 2), 1),
+                    height: max(geometry.size.height - (drawingInset * 2), 1)
                 )
 
                 ZStack {
@@ -594,11 +632,11 @@ private struct OverheadMapCanvas: View {
 
                         if sectorRect.width > 70, sectorRect.height > 24 {
                             Text(sector.shortLabel)
-                                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                                .font(.system(size: min(9 * canvasScale, 20), weight: .semibold, design: .monospaced))
                                 .foregroundStyle(.white.opacity(0.72))
                                 .lineLimit(1)
-                                .minimumScaleFactor(0.75)
-                                .frame(width: sectorRect.width - 12)
+                                .minimumScaleFactor(0.6)
+                                .frame(width: max(sectorRect.width - (12 * canvasScale), 24))
                                 .position(x: sectorRect.midX, y: sectorRect.midY)
                         }
                     }
@@ -626,10 +664,13 @@ private struct OverheadMapCanvas: View {
                         let labelWidth = hypot(endPoint.x - startPoint.x, endPoint.y - startPoint.y)
                         if labelWidth > 80 {
                             Text(road.shortLabel)
-                                .font(.system(size: 8, weight: .bold, design: .monospaced))
+                                .font(.system(size: min(8 * canvasScale, 18), weight: .bold, design: .monospaced))
                                 .foregroundStyle(Color(red: 0.95, green: 0.95, blue: 0.97).opacity(0.86))
-                                .padding(.horizontal, 5)
-                                .padding(.vertical, 2)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.55)
+                                .frame(width: max(labelWidth - (10 * canvasScale), 40))
+                                .padding(.horizontal, max(5 * canvasScale, 5))
+                                .padding(.vertical, max(2 * canvasScale, 2))
                                 .background(Color.black.opacity(0.54), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
                                 .rotationEffect(.degrees(Double(-road.yawDegrees)))
                                 .position(midpoint)
@@ -659,7 +700,7 @@ private struct OverheadMapCanvas: View {
 
                     RoundedRectangle(cornerRadius: 3, style: .continuous)
                         .fill(Color.white.opacity(0.92))
-                        .frame(width: 10, height: 10)
+                        .frame(width: 10 * markerScale, height: 10 * markerScale)
                         .position(spawnPoint)
 
                     ForEach(Array(snapshot.configuration.checkpoints.enumerated()), id: \.element.id) { index, checkpoint in
@@ -695,7 +736,7 @@ private struct OverheadMapCanvas: View {
 
                     Circle()
                         .fill(Color(red: 0.34, green: 0.82, blue: 0.98))
-                        .frame(width: 11, height: 11)
+                        .frame(width: 11 * markerScale, height: 11 * markerScale)
                         .overlay(
                             Circle()
                                 .stroke(Color.white.opacity(0.78), lineWidth: 1)
@@ -704,16 +745,16 @@ private struct OverheadMapCanvas: View {
 
                     Circle()
                         .fill(Color(red: 0.34, green: 0.82, blue: 0.98).opacity(0.82))
-                        .frame(width: 7, height: 7)
+                        .frame(width: 7 * markerScale, height: 7 * markerScale)
                         .position(headingPoint)
 
                     Text("N")
-                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .font(.system(size: min(10 * canvasScale, 20), weight: .bold, design: .monospaced))
                         .foregroundStyle(.white.opacity(0.82))
-                        .position(x: drawingRect.midX, y: drawingRect.minY + 8)
+                        .position(x: drawingRect.midX, y: drawingRect.minY + max(8 * canvasScale, 8))
                 }
             }
-            .frame(height: 258)
+            .frame(height: canvasHeight)
 
             HStack(spacing: 12) {
                 legendItem(color: .white.opacity(0.92), label: "Spawn")
@@ -723,17 +764,17 @@ private struct OverheadMapCanvas: View {
             }
 
             Text("Route: \(snapshot.completedCheckpointCount) / \(snapshot.totalCheckpointCount) checkpoints\(snapshot.nextCheckpointLabel.map { " • next \($0)" } ?? " • route complete")")
-                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.72))
                 .fixedSize(horizontal: false, vertical: true)
 
             Text("Atlas: \(snapshot.configuration.roads.count) named road strips across \(snapshot.configuration.sectors.count) Canberra sectors")
-                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.62))
                 .fixedSize(horizontal: false, vertical: true)
 
             Text(String(format: "Position: %.0f east / %.0f south", snapshot.playerX, snapshot.playerZ))
-                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.58))
         }
     }
@@ -742,10 +783,10 @@ private struct OverheadMapCanvas: View {
         HStack(spacing: 6) {
             Circle()
                 .fill(color)
-                .frame(width: 8, height: 8)
+                .frame(width: max(8 * markerScale, 8), height: max(8 * markerScale, 8))
 
             Text(label)
-                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                .font(.system(size: min(10 * canvasScale, 15), weight: .semibold, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.74))
         }
     }
@@ -789,13 +830,15 @@ private struct OverheadMapCanvas: View {
     }
 
     private func checkpointSize(for index: Int) -> CGFloat {
-        index == snapshot.completedCheckpointCount ? 11 : 9
+        (index == snapshot.completedCheckpointCount ? 11 : 9) * markerScale
     }
 
     private func roadLineWidth(for road: SceneMapRoad, in drawingRect: CGRect) -> CGFloat {
         let averageScale = (drawingRect.width / CGFloat(snapshot.configuration.width)
             + drawingRect.height / CGFloat(snapshot.configuration.depth)) * 0.5
-        return max(CGFloat(road.width) * averageScale, 1.4)
+        let rawWidth = CGFloat(road.width) * averageScale
+        let maxWidth = max(3.4 * markerScale, 1.4)
+        return min(max(rawWidth, 1.4), maxWidth)
     }
 
     private func rect(for sector: SceneMapSector, in drawingRect: CGRect) -> CGRect {

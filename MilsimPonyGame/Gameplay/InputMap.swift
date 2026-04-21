@@ -26,7 +26,7 @@ enum InputCommand: String, CaseIterable, Hashable {
         case .interact:
             return "Interact"
         case .toggleMap:
-            return "Overhead Map"
+            return "Canberra Map"
         case .restart:
             return "Restart Route"
         case .pause:
@@ -75,7 +75,7 @@ enum InputBindings {
         "Shift: sprint",
         "Mouse move: look",
         "Space / Return: deploy, confirm, or toggle 4x scope",
-        "M: toggle the overhead Canberra map",
+        "M: toggle the Canberra map",
         "R: restart or retry from last checkpoint",
         "Esc: pause or resume the demo shell",
     ]

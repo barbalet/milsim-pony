@@ -478,8 +478,8 @@ final class GameSession: ObservableObject {
             isMapPresented = false
             if value {
                 statusLine = sceneReady
-                    ? "Overhead Canberra map unavailable in this scene"
-                    : "Overhead Canberra map unlocks when Canberra finishes loading"
+                    ? "Canberra map unavailable in this scene"
+                    : "Canberra map unlocks when Canberra finishes loading"
                 rebuildOverlay()
             }
             return
@@ -490,7 +490,7 @@ final class GameSession: ObservableObject {
         }
 
         isMapPresented = value
-        statusLine = value ? "Overhead Canberra map opened" : statusLineForCurrentFlowState()
+        statusLine = value ? "Canberra map opened" : statusLineForCurrentFlowState()
         rebuildOverlay()
     }
 
@@ -792,7 +792,7 @@ final class GameSession: ObservableObject {
             "Release: \(configuration.releaseDisplayName) / \(configuration.bundleIdentifier)",
             "Content: \(configuration.contentSourceSummary)",
             String(format: "Optic: %.1fx scope ready for live review markers.", scopeMagnification),
-            "Locator: press M at any time to raise the overhead Canberra map.",
+            "Locator: press M at any time to raise the Canberra map.",
             "Deploy: press Space or Return, then use Esc at any time for the pause shell.",
         ]
 
@@ -907,7 +907,7 @@ final class GameSession: ObservableObject {
             "Assets: \(shortenedPath(configuration.assetRoot))",
             "World Data: \(shortenedPath(configuration.worldDataRoot))",
             "Manifest: \(shortenedPath(configuration.worldManifestPath))",
-            "Locator: \(isMapPresented ? "overhead map open" : "overhead map hidden") / \(overheadMapSnapshot?.currentSectorName ?? "waiting for Canberra layout")",
+            "Locator: \(isMapPresented ? "Canberra map open" : "Canberra map hidden") / \(overheadMapSnapshot?.currentSectorName ?? "waiting for Canberra layout")",
             "Renderer: \(rendererName)",
             "Scene Summary: \(sceneSummary)",
             String(
