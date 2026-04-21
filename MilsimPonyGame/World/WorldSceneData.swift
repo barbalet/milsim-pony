@@ -26,6 +26,7 @@ struct SceneConfiguration: Decodable {
     let sun: SunConfiguration
     let atmosphere: AtmosphereConfiguration?
     let player: PlayerConfiguration?
+    let scope: ScopeConfiguration?
     let route: RouteConfiguration
     let detection: DetectionConfiguration?
     let guidance: GuidanceConfiguration?
@@ -70,6 +71,38 @@ struct PlayerConfiguration: Decodable {
         self.walkSpeed = walkSpeed
         self.sprintSpeed = sprintSpeed
         self.lookSensitivity = lookSensitivity
+    }
+}
+
+struct ScopeConfiguration: Decodable {
+    let label: String?
+    let magnification: Float
+    let fieldOfViewDegrees: Float
+    let lookSensitivityMultiplier: Float?
+    let drawDistanceMultiplier: Float?
+    let farPlaneMultiplier: Float?
+    let reticleColor: [Float]?
+
+    init(
+        label: String? = nil,
+        magnification: Float = 4.0,
+        fieldOfViewDegrees: Float = 15.0,
+        lookSensitivityMultiplier: Float? = 0.26,
+        drawDistanceMultiplier: Float? = 2.4,
+        farPlaneMultiplier: Float? = 1.35,
+        reticleColor: [Float]? = nil
+    ) {
+        self.label = label
+        self.magnification = magnification
+        self.fieldOfViewDegrees = fieldOfViewDegrees
+        self.lookSensitivityMultiplier = lookSensitivityMultiplier
+        self.drawDistanceMultiplier = drawDistanceMultiplier
+        self.farPlaneMultiplier = farPlaneMultiplier
+        self.reticleColor = reticleColor
+    }
+
+    var reticleColorVector: SIMD4<Float> {
+        reticleColor?.simdColor(or: SIMD4<Float>(0.92, 0.86, 0.42, 0.94)) ?? SIMD4<Float>(0.92, 0.86, 0.42, 0.94)
     }
 }
 
@@ -274,12 +307,20 @@ struct AssetInstanceConfiguration: Decodable {
 struct SectorConfiguration: Decodable {
     let id: String
     let displayName: String
+    let residency: SectorResidency?
+    let farFieldPadding: Float?
     let bounds: BoundsConfiguration
     let streamingPadding: Float?
     let terrainPatches: [TerrainPatchConfiguration]
     let roadStrips: [RoadStripConfiguration]
     let grayboxBlocks: [GrayboxBlockConfiguration]
     let collisionVolumes: [CollisionVolumeConfiguration]
+}
+
+enum SectorResidency: String, Decodable {
+    case local
+    case farField
+    case always
 }
 
 struct BoundsConfiguration: Decodable {

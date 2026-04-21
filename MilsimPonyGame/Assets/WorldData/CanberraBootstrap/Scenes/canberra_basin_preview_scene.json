@@ -1,11 +1,11 @@
 {
-  "cycleLabel": "Cycle 10 Woden-Belconnen Survey",
-  "sceneName": "Canberra Basin Survey",
+  "cycleLabel": "Cycle 12 Scope And Resolution Foundation",
+  "sceneName": "Canberra Scope Validation Review",
   "spawn": {
-    "label": "Lake Burley Griffin East Lookout",
-    "position": [102.0, 22.0, 18.0],
-    "yawDegrees": 270.0,
-    "pitchDegrees": -12.0
+    "label": "East Basin Scope Terrace",
+    "position": [96.0, 22.0, 14.0],
+    "yawDegrees": 268.0,
+    "pitchDegrees": -8.0
   },
   "sky": {
     "horizonColor": [0.71, 0.78, 0.86, 1.0],
@@ -18,63 +18,83 @@
     "diffuseIntensity": 0.90
   },
   "atmosphere": {
-    "fogColor": [0.74, 0.79, 0.83, 1.0],
-    "fogNear": 190.0,
-    "fogFar": 760.0,
-    "hazeStrength": 0.05
+    "fogColor": [0.71, 0.77, 0.82, 1.0],
+    "fogNear": 250.0,
+    "fogFar": 1320.0,
+    "hazeStrength": 0.07
   },
   "player": {
-    "walkSpeed": 5.2,
-    "sprintSpeed": 8.6,
+    "walkSpeed": 5.8,
+    "sprintSpeed": 10.4,
     "lookSensitivity": 0.082
   },
+  "scope": {
+    "label": "Canberra 4x Observation Scope",
+    "magnification": 4.0,
+    "fieldOfViewDegrees": 15.0,
+    "lookSensitivityMultiplier": 0.24,
+    "drawDistanceMultiplier": 2.9,
+    "farPlaneMultiplier": 1.55,
+    "reticleColor": [0.94, 0.86, 0.44, 0.96]
+  },
   "route": {
-    "name": "Woden To Belconnen Survey",
-    "summary": "Survey Lake Burley Griffin, confirm Parliament House on the basin axis, then verify Woden and Belconnen read as one Canberra model.",
+    "name": "Canberra Scope Landmark Validation",
+    "summary": "Move through authored perches that prove Lake Burley Griffin, Parliament House, Woden, Black Mountain, and Belconnen remain readable through the 4x scope.",
     "checkpoints": [
       {
-        "id": "lake_basin_marker",
-        "label": "Lake Burley Griffin Marker",
-        "position": [58.0, 21.0, -8.0],
-        "triggerRadius": 10.0,
-        "yawDegrees": 274.0,
-        "pitchDegrees": -10.0,
+        "id": "east_basin_scope_perch",
+        "label": "East Basin Scope Perch",
+        "position": [86.0, 22.0, 8.0],
+        "triggerRadius": 8.5,
+        "yawDegrees": 270.0,
+        "pitchDegrees": -8.0,
         "goal": false,
         "beaconColor": [0.34, 0.76, 0.96, 0.84],
         "beaconHeight": 5.4
       },
       {
-        "id": "parliament_axis_marker",
-        "label": "Parliament House Axis",
-        "position": [18.0, 20.0, 4.0],
-        "triggerRadius": 9.5,
-        "yawDegrees": 278.0,
-        "pitchDegrees": -8.0,
+        "id": "parliament_axis_scope_test",
+        "label": "Parliament Axis Scope Test",
+        "position": [0.0, 1.2, -1.0],
+        "triggerRadius": 10.5,
+        "yawDegrees": 358.0,
+        "pitchDegrees": -4.0,
         "goal": false,
         "beaconColor": [0.92, 0.84, 0.38, 0.84],
         "beaconHeight": 5.6
       },
       {
-        "id": "woden_south_marker",
-        "label": "Woden Valley Marker",
-        "position": [54.0, 22.0, 96.0],
-        "triggerRadius": 11.0,
-        "yawDegrees": 220.0,
-        "pitchDegrees": -7.0,
+        "id": "woden_tower_scope_test",
+        "label": "Woden Tower Scope Test",
+        "position": [8.0, 1.0, 156.0],
+        "triggerRadius": 11.5,
+        "yawDegrees": 184.0,
+        "pitchDegrees": -5.0,
         "goal": false,
         "beaconColor": [0.36, 0.84, 0.60, 0.84],
         "beaconHeight": 5.8
       },
       {
-        "id": "belconnen_horizon_marker",
-        "label": "Belconnen Basin Horizon",
-        "position": [-72.0, 24.0, -118.0],
+        "id": "black_mountain_scope_test",
+        "label": "Black Mountain Scope Test",
+        "position": [-42.0, 10.0, -154.0],
         "triggerRadius": 11.5,
-        "yawDegrees": 304.0,
-        "pitchDegrees": -8.0,
+        "yawDegrees": 300.0,
+        "pitchDegrees": -7.0,
+        "goal": false,
+        "beaconColor": [0.40, 0.80, 0.94, 0.86],
+        "beaconHeight": 5.8
+      },
+      {
+        "id": "belconnen_horizon_scope_test",
+        "label": "Belconnen Horizon Scope Test",
+        "position": [-132.0, 7.0, -188.0],
+        "triggerRadius": 12.0,
+        "yawDegrees": 118.0,
+        "pitchDegrees": -6.0,
         "goal": true,
         "beaconColor": [0.38, 0.88, 0.58, 0.88],
-        "beaconHeight": 6.0
+        "beaconHeight": 6.2
       }
     ]
   },
@@ -86,66 +106,93 @@
   "guidance": {
     "coverPoints": [
       {
-        "id": "north_parapet_cover",
-        "label": "North Parapet",
+        "id": "scope_terrace_wall",
+        "label": "Scope Terrace Wall",
         "kind": "cover",
-        "position": [84.0, 22.0, 12.0],
-        "yawDegrees": 352.0,
+        "position": [84.0, 22.0, 6.0],
+        "yawDegrees": 350.0,
         "color": [0.30, 0.78, 0.58, 0.92],
         "height": 1.10
       },
       {
-        "id": "south_shelf_cover",
-        "label": "South Shelf",
+        "id": "central_lane_cover",
+        "label": "Central Basin Screen",
         "kind": "cover",
-        "position": [118.0, 22.0, 28.0],
-        "yawDegrees": 22.0,
+        "position": [20.0, 0.7, -12.0],
+        "yawDegrees": 8.0,
         "color": [0.32, 0.80, 0.60, 0.92],
         "height": 1.00
+      },
+      {
+        "id": "woden_perch_cover",
+        "label": "Woden Perch Wall",
+        "kind": "cover",
+        "position": [18.0, 1.0, 160.0],
+        "yawDegrees": 8.0,
+        "color": [0.33, 0.80, 0.62, 0.92],
+        "height": 1.08
+      },
+      {
+        "id": "bruce_scope_cover",
+        "label": "Bruce Scope Saddle",
+        "kind": "cover",
+        "position": [-34.0, 8.0, -148.0],
+        "yawDegrees": 24.0,
+        "color": [0.34, 0.82, 0.64, 0.92],
+        "height": 1.14
       }
     ],
     "signposts": [
       {
         "id": "lake_axis_sign",
-        "label": "Lake Burley Griffin Axis",
+        "label": "Lake Basin Scope Lane",
         "kind": "signpost",
-        "position": [64.0, 21.0, -4.0],
+        "position": [70.0, 22.0, 2.0],
         "yawDegrees": 276.0,
         "color": [0.94, 0.84, 0.38, 0.92],
         "height": 2.32
       },
       {
         "id": "parliament_axis_sign",
-        "label": "Parliament House Axis",
+        "label": "Parliament Scope Axis",
         "kind": "signpost",
-        "position": [22.0, 20.0, 4.0],
-        "yawDegrees": 280.0,
+        "position": [0.0, 1.2, -0.8],
+        "yawDegrees": 0.0,
         "color": [0.95, 0.85, 0.40, 0.92],
         "height": 2.28
       },
       {
         "id": "woden_south_sign",
-        "label": "Woden Valley",
+        "label": "Woden Scope Frame",
         "kind": "signpost",
-        "position": [58.0, 22.0, 94.0],
-        "yawDegrees": 220.0,
+        "position": [10.0, 1.0, 150.0],
+        "yawDegrees": 184.0,
         "color": [0.96, 0.86, 0.40, 0.92],
         "height": 2.34
       },
       {
-        "id": "belconnen_horizon_sign",
-        "label": "Belconnen Basin",
+        "id": "black_mountain_sign",
+        "label": "Black Mountain Scope Frame",
         "kind": "signpost",
-        "position": [-68.0, 24.0, -116.0],
-        "yawDegrees": 304.0,
+        "position": [-36.0, 8.5, -150.0],
+        "yawDegrees": 300.0,
+        "color": [0.94, 0.86, 0.42, 0.92],
+        "height": 2.32
+      },
+      {
+        "id": "belconnen_horizon_sign",
+        "label": "Belconnen Horizon Frame",
+        "kind": "signpost",
+        "position": [-126.0, 7.0, -182.0],
+        "yawDegrees": 118.0,
         "color": [0.96, 0.88, 0.42, 0.94],
         "height": 2.38
       },
       {
         "id": "scope_lane_sign",
-        "label": "4x Scope Review Lane",
+        "label": "Raise 4x Scope",
         "kind": "signpost",
-        "position": [122.0, 22.0, 28.0],
+        "position": [104.0, 22.0, 24.0],
         "yawDegrees": 286.0,
         "color": [0.90, 0.82, 0.34, 0.92],
         "height": 2.30
@@ -166,13 +213,33 @@
       "position": [-60.0, 18.0, -320.0],
       "halfExtents": [240.0, 18.0, 8.0],
       "color": [0.28, 0.33, 0.31, 1.0]
+    },
+    {
+      "kind": "box",
+      "name": "FarWesternRange",
+      "position": [-248.0, 22.0, -96.0],
+      "halfExtents": [10.0, 22.0, 236.0],
+      "color": [0.27, 0.32, 0.30, 1.0]
+    },
+    {
+      "kind": "box",
+      "name": "NorthEasternRange",
+      "position": [214.0, 16.0, -78.0],
+      "halfExtents": [10.0, 16.0, 182.0],
+      "color": [0.29, 0.35, 0.32, 1.0]
     }
   ],
   "assetInstances": [],
   "includedSectors": [
     "east_basin_overlook_sector",
+    "east_basin_scope_lane_sector",
+    "parliamentary_triangle_edge_sector",
+    "parliament_precinct_sector",
     "central_lake_basin_sector",
+    "central_basin_scope_lane_sector",
     "woden_valley_sector",
+    "woden_scope_perch_sector",
+    "black_mountain_scope_perch_sector",
     "black_mountain_belconnen_sector"
   ]
 }

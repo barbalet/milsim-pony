@@ -4,8 +4,14 @@
   "coordinateSystemFile": "CoordinateSystems/parliament_local_grid.json",
   "sectorFiles": [
     "Sectors/east_basin_overlook_sector.json",
+    "Sectors/east_basin_scope_lane_sector.json",
+    "Sectors/parliamentary_triangle_edge_sector.json",
+    "Sectors/parliament_precinct_sector.json",
     "Sectors/central_lake_basin_sector.json",
+    "Sectors/central_basin_scope_lane_sector.json",
     "Sectors/woden_valley_sector.json",
+    "Sectors/woden_scope_perch_sector.json",
+    "Sectors/black_mountain_scope_perch_sector.json",
     "Sectors/black_mountain_belconnen_sector.json"
   ]
 }

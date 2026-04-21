@@ -1,6 +1,7 @@
 {
   "id": "parliamentary_triangle_edge_sector",
   "displayName": "Parliamentary Triangle Edge",
+  "residency": "local",
   "bounds": {
     "min": [-34.0, 0.0, 4.0],
     "max": [34.0, 8.0, 28.0]

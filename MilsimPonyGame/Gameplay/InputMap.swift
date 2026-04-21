@@ -51,7 +51,7 @@ enum InputBindings {
         "W A S D: grounded movement",
         "Shift: sprint",
         "Mouse move: look",
-        "Space / Return: deploy, confirm, or interact placeholder",
+        "Space / Return: deploy, confirm, or toggle 4x scope",
         "R: restart or retry from last checkpoint",
         "Esc: pause or resume the demo shell",
     ]

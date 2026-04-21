@@ -1,6 +1,8 @@
 {
   "id": "black_mountain_belconnen_sector",
   "displayName": "Black Mountain And Belconnen",
+  "residency": "farField",
+  "farFieldPadding": 340.0,
   "bounds": {
     "min": [-270.0, 0.0, -280.0],
     "max": [70.0, 92.0, -40.0]
@@ -33,6 +35,24 @@
       "subdivisions": 16,
       "color": [0.34, 0.41, 0.30, 1.0],
       "yawDegrees": 0.0
+    },
+    {
+      "name": "GinninderraRise",
+      "position": [-176.0, 4.0, -152.0],
+      "size": [120.0, 112.0],
+      "cornerHeights": [10.0, 8.0, 5.0, 6.0],
+      "subdivisions": 14,
+      "color": [0.34, 0.41, 0.30, 1.0],
+      "yawDegrees": 0.0
+    },
+    {
+      "name": "NorthernBelconnenRise",
+      "position": [-164.0, 5.0, -248.0],
+      "size": [182.0, 118.0],
+      "cornerHeights": [8.0, 6.0, 4.0, 5.0],
+      "subdivisions": 14,
+      "color": [0.33, 0.40, 0.29, 1.0],
+      "yawDegrees": -4.0
     }
   ],
   "roadStrips": [
@@ -59,6 +79,30 @@
       "centerLineWidth": 0.18,
       "crownHeight": 0.04,
       "yawDegrees": 0.0
+    },
+    {
+      "name": "BarryDriveApproach",
+      "position": [-52.0, 0.82, -118.0],
+      "size": [9.5, 148.0],
+      "roadColor": [0.20, 0.20, 0.22, 1.0],
+      "shoulderColor": [0.39, 0.42, 0.36, 1.0],
+      "lineColor": [0.89, 0.84, 0.50, 1.0],
+      "shoulderWidth": 0.9,
+      "centerLineWidth": 0.18,
+      "crownHeight": 0.04,
+      "yawDegrees": 34.0
+    },
+    {
+      "name": "GinninderraDrive",
+      "position": [-158.0, 0.76, -210.0],
+      "size": [9.5, 122.0],
+      "roadColor": [0.19, 0.19, 0.21, 1.0],
+      "shoulderColor": [0.38, 0.41, 0.35, 1.0],
+      "lineColor": [0.88, 0.83, 0.48, 1.0],
+      "shoulderWidth": 0.9,
+      "centerLineWidth": 0.18,
+      "crownHeight": 0.04,
+      "yawDegrees": 88.0
     }
   ],
   "grayboxBlocks": [
@@ -110,6 +154,38 @@
       "halfExtents": [10.0, 4.5, 8.0],
       "color": [0.42, 0.45, 0.48, 1.0],
       "yawDegrees": 0.0
+    },
+    {
+      "name": "BelconnenMallMass",
+      "position": [-144.0, 10.0, -204.0],
+      "halfExtents": [28.0, 10.0, 16.0],
+      "color": [0.45, 0.48, 0.52, 1.0],
+      "yawDegrees": 0.0,
+      "collisionEnabled": false
+    },
+    {
+      "name": "EmuBankBand",
+      "position": [-166.0, 5.0, -164.0],
+      "halfExtents": [20.0, 5.0, 10.0],
+      "color": [0.44, 0.47, 0.50, 1.0],
+      "yawDegrees": 0.0,
+      "collisionEnabled": false
+    },
+    {
+      "name": "UCCampusCore",
+      "position": [-74.0, 7.0, -178.0],
+      "halfExtents": [22.0, 7.0, 18.0],
+      "color": [0.43, 0.46, 0.49, 1.0],
+      "yawDegrees": 0.0,
+      "collisionEnabled": false
+    },
+    {
+      "name": "AISArena",
+      "position": [-12.0, 6.0, -150.0],
+      "halfExtents": [12.0, 6.0, 10.0],
+      "color": [0.45, 0.48, 0.52, 1.0],
+      "yawDegrees": 0.0,
+      "collisionEnabled": false
     }
   ],
   "collisionVolumes": []

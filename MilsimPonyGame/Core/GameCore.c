@@ -309,9 +309,8 @@ static void GameCoreUpdateRouteProgress(void) {
 
         const GameRouteCheckpoint *checkpoint = &gameState.routeCheckpoints[nextCheckpointIndex];
         const float deltaX = gameState.cameraX - checkpoint->positionX;
-        const float deltaY = gameState.cameraY - checkpoint->positionY;
         const float deltaZ = gameState.cameraZ - checkpoint->positionZ;
-        const float distance = sqrtf((deltaX * deltaX) + (deltaY * deltaY) + (deltaZ * deltaZ));
+        const float distance = sqrtf((deltaX * deltaX) + (deltaZ * deltaZ));
 
         gameState.distanceToNextCheckpointMeters = distance;
 
@@ -331,10 +330,9 @@ static void GameCoreUpdateRouteProgress(void) {
         {
             const GameRouteCheckpoint *upcomingCheckpoint = &gameState.routeCheckpoints[gameState.completedCheckpointCount];
             const float nextDeltaX = gameState.cameraX - upcomingCheckpoint->positionX;
-            const float nextDeltaY = gameState.cameraY - upcomingCheckpoint->positionY;
             const float nextDeltaZ = gameState.cameraZ - upcomingCheckpoint->positionZ;
             gameState.distanceToNextCheckpointMeters = sqrtf(
-                (nextDeltaX * nextDeltaX) + (nextDeltaY * nextDeltaY) + (nextDeltaZ * nextDeltaZ)
+                (nextDeltaX * nextDeltaX) + (nextDeltaZ * nextDeltaZ)
             );
         }
     }

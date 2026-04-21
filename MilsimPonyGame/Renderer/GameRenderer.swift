@@ -94,6 +94,7 @@ final class GameRenderer: NSObject, MTKViewDelegate {
             details: scene.debugInfo.details
         )
         session.noteOverlayTitle(scene.debugInfo.cycleLabel)
+        session.noteScopeConfiguration(scene.scopeConfiguration)
         print("[Renderer] Metal bootstrap ready on \(device.name) with \(scene.debugInfo.summary)")
     }
 
@@ -114,7 +115,12 @@ final class GameRenderer: NSObject, MTKViewDelegate {
         let snapshot = GameCoreGetSnapshot()
         let cameraPosition = SIMD3<Float>(snapshot.cameraX, snapshot.cameraY, snapshot.cameraZ)
         let forwardVector = RenderMath.forwardVector(yawDegrees: snapshot.yawDegrees, pitchDegrees: snapshot.pitchDegrees)
-        let visibilityState = scene.visibilityState(for: cameraPosition, forwardVector: forwardVector)
+        let scopeActive = session?.isScopeActive ?? false
+        let visibilityState = scene.visibilityState(
+            for: cameraPosition,
+            forwardVector: forwardVector,
+            scopeActive: scopeActive
+        )
         let streamingState = scene.streamingState(
             for: cameraPosition,
             visibleDrawableCount: visibilityState.drawables.count,
@@ -209,11 +215,20 @@ final class GameRenderer: NSObject, MTKViewDelegate {
         encoder.setFrontFacing(.counterClockwise)
 
         let aspectRatio = max(Float(view.drawableSize.width / max(view.drawableSize.height, 1)), 0.1)
+        let unscopedFieldOfViewY: Float = 60.0 * (.pi / 180.0)
+        let scopedFieldOfViewY = session?.scopeFieldOfViewYRadians
+            ?? max(scene.scopeConfiguration.fieldOfViewDegrees, 4.0) * (.pi / 180.0)
+        let fieldOfViewY = scopeActive ? scopedFieldOfViewY : unscopedFieldOfViewY
+        let baseFarPlane = max(scene.environment.fogFar * 1.05, 180.0)
+        let scopedFarPlane = max(
+            scene.environment.fogFar * (session?.scopeFarPlaneMultiplier ?? max(scene.scopeConfiguration.farPlaneMultiplier ?? 1.35, 1.0)),
+            baseFarPlane
+        )
         let projectionMatrix = simd_float4x4.perspective(
-            fieldOfViewY: 60.0 * (.pi / 180.0),
+            fieldOfViewY: fieldOfViewY,
             aspectRatio: aspectRatio,
             nearZ: 0.1,
-            farZ: 100.0
+            farZ: scopeActive ? scopedFarPlane : baseFarPlane
         )
 
         let viewMatrix = simd_float4x4.lookAt(

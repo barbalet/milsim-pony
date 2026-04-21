@@ -1,6 +1,7 @@
 {
   "id": "east_basin_overlook_sector",
   "displayName": "Lake Burley Griffin East Lookout",
+  "residency": "local",
   "bounds": {
     "min": [40.0, 0.0, -160.0],
     "max": [170.0, 44.0, 60.0]
@@ -33,6 +34,15 @@
       "subdivisions": 14,
       "color": [0.34, 0.40, 0.29, 1.0],
       "yawDegrees": 0.0
+    },
+    {
+      "name": "EasternRidgeNorthFace",
+      "position": [132.0, 8.0, -48.0],
+      "size": [118.0, 124.0],
+      "cornerHeights": [14.0, 10.0, 5.0, 8.0],
+      "subdivisions": 16,
+      "color": [0.33, 0.39, 0.29, 1.0],
+      "yawDegrees": -12.0
     }
   ],
   "roadStrips": [
@@ -59,6 +69,18 @@
       "centerLineWidth": 0.12,
       "crownHeight": 0.02,
       "yawDegrees": 58.0
+    },
+    {
+      "name": "LookoutTerraceWalk",
+      "position": [86.0, 22.05, 8.0],
+      "size": [5.4, 40.0],
+      "roadColor": [0.23, 0.24, 0.26, 1.0],
+      "shoulderColor": [0.48, 0.50, 0.45, 1.0],
+      "lineColor": [0.86, 0.82, 0.48, 1.0],
+      "shoulderWidth": 0.6,
+      "centerLineWidth": 0.10,
+      "crownHeight": 0.01,
+      "yawDegrees": -8.0
     }
   ],
   "grayboxBlocks": [
@@ -90,6 +112,22 @@
       "halfExtents": [0.45, 1.4, 0.45],
       "color": [0.72, 0.74, 0.78, 1.0],
       "yawDegrees": 0.0
+    },
+    {
+      "name": "LookoutShelter",
+      "position": [110.0, 23.5, 10.0],
+      "halfExtents": [2.4, 1.4, 3.6],
+      "color": [0.48, 0.50, 0.54, 1.0],
+      "yawDegrees": 18.0,
+      "collisionEnabled": false
+    },
+    {
+      "name": "SurveyWall",
+      "position": [84.0, 23.1, 6.0],
+      "halfExtents": [7.0, 0.9, 0.6],
+      "color": [0.49, 0.51, 0.55, 1.0],
+      "yawDegrees": -10.0,
+      "collisionEnabled": false
     }
   ],
   "collisionVolumes": [

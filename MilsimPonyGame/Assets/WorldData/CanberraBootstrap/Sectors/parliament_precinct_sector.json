@@ -1,6 +1,7 @@
 {
   "id": "parliament_precinct_sector",
   "displayName": "Parliament Precinct",
+  "residency": "local",
   "bounds": {
     "min": [-26.0, 0.0, -24.0],
     "max": [26.0, 12.0, 8.0]

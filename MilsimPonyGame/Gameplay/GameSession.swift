@@ -1,6 +1,7 @@
 import AppKit
 import Combine
 import Foundation
+import simd
 
 enum DemoFlowState: String {
     case title
@@ -42,9 +43,10 @@ private struct StoredSessionSettings {
 final class GameSession: ObservableObject {
     @Published private(set) var statusLine = "Bootstrapping game session"
     @Published private(set) var overlayLines: [String] = []
-    @Published private(set) var overlayTitle = "Canberra Basin Survey"
+    @Published private(set) var overlayTitle = "Cycle 12 Scope And Resolution Foundation"
     @Published private(set) var demoFlowState: DemoFlowState = .title
     @Published private(set) var isSettingsPresented = false
+    @Published private(set) var isScopeActive = false
     @Published private(set) var hudOpacity: Double
     @Published private(set) var invertLookY: Bool
     @Published private(set) var lookSensitivityScale: Double
@@ -75,6 +77,13 @@ final class GameSession: ObservableObject {
     private var baseWalkSpeed: Float?
     private var baseSprintSpeed: Float?
     private var baseLookSensitivity: Float?
+    private var scopeLabel = "4x Scope"
+    private var scopeMagnification: Float = 4.0
+    private var scopeFieldOfViewDegrees: Float = 15.0
+    private var scopeLookSensitivityMultiplier: Float = 0.26
+    private var scopeDrawDistanceMultiplier: Float = 2.4
+    private var scopeFarPlaneMultiplierValue: Float = 1.35
+    private var scopeReticleColorComponents = SIMD4<Float>(0.92, 0.86, 0.42, 0.94)
 
     init(configuration: LaunchConfiguration) {
         let storedSettings = Self.loadStoredSettings()
@@ -131,14 +140,14 @@ final class GameSession: ObservableObject {
         case .title?, .settings?:
             return max(hudOpacity * 0.55, 0.22)
         default:
-            return hudOpacity
+            return isScopeActive ? max(hudOpacity * 0.62, 0.20) : hudOpacity
         }
     }
 
     var inputCardSubtitle: String {
         let cycleLabel = overlayTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         return menuPanel == nil
-            ? "\(cycleLabel) traversal, basin survey, and observation controls"
+            ? "\(cycleLabel) traversal, scoped observation, and landmark validation controls"
             : "Deploy, pause, retry, and tune persistent field settings"
     }
 
@@ -146,10 +155,39 @@ final class GameSession: ObservableObject {
         sceneReady
     }
 
+    var scopeStatusText: String {
+        if isScopeActive {
+            return String(format: "%.1fx scope active / %.1f deg FOV", scopeMagnification, scopeFieldOfViewDegrees)
+        }
+
+        return String(format: "%.1fx scope ready / press Space", scopeMagnification)
+    }
+
+    var scopeInstructionText: String {
+        isScopeActive ? "Press Space to lower scope" : "Raise scope on the review markers"
+    }
+
+    var scopeReticleColor: NSColor {
+        NSColor(
+            calibratedRed: CGFloat(scopeReticleColorComponents.x),
+            green: CGFloat(scopeReticleColorComponents.y),
+            blue: CGFloat(scopeReticleColorComponents.z),
+            alpha: CGFloat(scopeReticleColorComponents.w)
+        )
+    }
+
+    var scopeFieldOfViewYRadians: Float {
+        max(scopeFieldOfViewDegrees, 4.0) * (.pi / 180.0)
+    }
+
+    var scopeFarPlaneMultiplier: Float {
+        max(scopeFarPlaneMultiplierValue, 1.0)
+    }
+
     func menuTitle(for panel: GameMenuPanel) -> String {
         switch panel {
         case .title:
-            return sceneReady ? sceneLabel : "Loading Canberra Basin Survey"
+            return sceneReady ? sceneLabel : "Loading Canberra Scope Validation Review"
         case .paused:
             return "Demo Paused"
         case .failed:
@@ -164,7 +202,7 @@ final class GameSession: ObservableObject {
     func menuSubtitle(for panel: GameMenuPanel) -> String {
         switch panel {
         case .title:
-            return sceneReady ? overlayTitle : "Loading Canberra basin survey"
+            return sceneReady ? overlayTitle : "Loading Canberra scope validation review"
         case .paused:
             return routeSummary
         case .failed:
@@ -226,6 +264,17 @@ final class GameSession: ObservableObject {
         rebuildOverlay()
     }
 
+    func noteScopeConfiguration(_ configuration: ScopeConfiguration) {
+        scopeLabel = configuration.label ?? "4x Scope"
+        scopeMagnification = max(configuration.magnification, 1.0)
+        scopeFieldOfViewDegrees = max(configuration.fieldOfViewDegrees, 4.0)
+        scopeLookSensitivityMultiplier = max(configuration.lookSensitivityMultiplier ?? 0.26, 0.08)
+        scopeDrawDistanceMultiplier = max(configuration.drawDistanceMultiplier ?? 2.4, 1.0)
+        scopeFarPlaneMultiplierValue = max(configuration.farPlaneMultiplier ?? 1.35, 1.0)
+        scopeReticleColorComponents = configuration.reticleColorVector
+        rebuildOverlay()
+    }
+
     func noteFrameTiming(milliseconds: Double, framesPerSecond: Double, drawableCount: Int) {
         frameTimingLine = String(
             format: "Frame: %.2f ms / %.1f fps / %d drawables",
@@ -270,7 +319,7 @@ final class GameSession: ObservableObject {
         isSettingsPresented = false
         demoFlowState = .playing
         resetMissionRuntime()
-        statusLine = "Demo live - move through the current survey route"
+        statusLine = "Demo live - move through the current scope validation route"
         rebuildOverlay()
     }
 
@@ -379,6 +428,10 @@ final class GameSession: ObservableObject {
                 print("[Input] \(command.label) pressed")
                 rebuildOverlay()
                 return
+            case .interact where toggleScopeIfPossible():
+                print("[Input] \(command.label) pressed")
+                rebuildOverlay()
+                return
             case .restart where handleMenuRestartAction():
                 print("[Input] \(command.label) pressed")
                 rebuildOverlay()
@@ -415,8 +468,6 @@ final class GameSession: ObservableObject {
             statusLine = (latestSnapshot?.routeFailed ?? false)
                 ? "Retry triggered from checkpoint"
                 : "Route restart triggered"
-        case .interact where isPressed:
-            statusLine = "Interact placeholder triggered"
         default:
             statusLine = "\(command.label) \(isPressed ? "pressed" : "released")"
         }
@@ -555,10 +606,12 @@ final class GameSession: ObservableObject {
 
     private func clearGameplayInputState() {
         pressedCommands.removeAll()
+        isScopeActive = false
         lastMouseDelta = .zero
         shouldIgnoreNextMouseDelta = true
         GameCoreSetMoveIntent(0, 0)
         GameCoreSetSprint(false)
+        applyLookSettings()
     }
 
     private func refreshSnapshotFromCore() {
@@ -596,9 +649,22 @@ final class GameSession: ObservableObject {
         GameCoreConfigureTraversal(
             walkSpeed,
             sprintSpeed,
-            baseLookSensitivity * Float(lookSensitivityScale)
+            baseLookSensitivity * Float(lookSensitivityScale) * (isScopeActive ? scopeLookSensitivityMultiplier : 1.0)
         )
         refreshSnapshotFromCore()
+    }
+
+    private func toggleScopeIfPossible() -> Bool {
+        guard sceneReady, demoFlowState == .playing, menuPanel == nil else {
+            return false
+        }
+
+        isScopeActive.toggle()
+        applyLookSettings()
+        statusLine = isScopeActive
+            ? String(format: "%.1fx scope active", scopeMagnification)
+            : String(format: "%.1fx scope lowered", scopeMagnification)
+        return true
     }
 
     private func synchronizeMovementIntent() {
@@ -629,11 +695,12 @@ final class GameSession: ObservableObject {
         }
 
         var lines = [
-            "Objective: survey the current Canberra build and move through the authored review markers.",
-            "Priority: validate Lake Burley Griffin, the Woden-side basin, the Belconnen skyline, and future 4x firing lanes.",
+            "Objective: survey the current Canberra build and move through the authored scope validation markers.",
+            "Priority: validate Lake Burley Griffin, the Parliament axis, Woden Valley, Black Mountain, and the Belconnen skyline through the 4x optic.",
             riskLine,
             "Release: \(configuration.releaseDisplayName) / \(configuration.bundleIdentifier)",
             "Content: \(configuration.contentSourceSummary)",
+            String(format: "Optic: %.1fx scope ready for live review markers.", scopeMagnification),
             "Deploy: press Space or Return, then use Esc at any time for the pause shell.",
         ]
 
@@ -654,8 +721,9 @@ final class GameSession: ObservableObject {
     private func pausedPanelLines() -> [String] {
         [
             briefingSummary,
-            routeDetails.first ?? "Route: continue south through the current checkpoint leg.",
+            routeDetails.first ?? "Route: continue through the current review markers.",
             evasionDetails.first ?? "Threats: preview pressure and world updates are frozen while paused.",
+            String(format: "Scope: %.1fx optic %@.", scopeMagnification, isScopeActive ? "was active before the pause shell" : "can be raised again when live"),
             "Resume keeps the current survey live. Restart returns to the authored basin spawn.",
         ]
     }
@@ -684,9 +752,10 @@ final class GameSession: ObservableObject {
                 snapshot?.routeDistanceMeters ?? 0,
                 snapshot?.restartCount ?? 0
             ),
-            "Outcome: the current Canberra basin survey route is complete and ready for the next world-data pass.",
+            "Outcome: the current Canberra scope validation route is complete and ready for the next resolution pass.",
             "Release: \(configuration.releaseDisplayName) / \(configuration.contentSourceSummary)",
-            "Script: title shell, live survey route, optional fail or retry loop, and completion summary all resolve in one session.",
+            String(format: "Optic: %.1fx scoped review remained available across the full route.", scopeMagnification),
+            "Script: title shell, live scope route, optional fail or retry loop, and completion summary all resolve in one session.",
             "New Run restarts the survey immediately. Briefing returns to the title shell.",
         ]
     }
@@ -695,6 +764,7 @@ final class GameSession: ObservableObject {
         [
             String(format: "Look scale: %.2fx of the authored cycle tuning", lookSensitivityScale),
             "Invert Y: \(invertLookY ? "enabled" : "disabled")",
+            String(format: "Scope: %.1fx / %.1f deg / x%.1f draw", scopeMagnification, scopeFieldOfViewDegrees, scopeDrawDistanceMultiplier),
             String(format: "HUD opacity: %.0f%%", hudOpacity * 100),
             "Build: \(configuration.releaseDisplayName)",
             "Bundle: \(configuration.bundleIdentifier)",
@@ -708,7 +778,9 @@ final class GameSession: ObservableObject {
         case .title:
             return "Demo briefing ready"
         case .playing:
-            return "Demo live - move through the current survey route"
+            return isScopeActive
+                ? String(format: "%.1fx scope active - inspect distant landmarks", scopeMagnification)
+                : "Demo live - move through the current scope validation route"
         case .paused:
             return "Demo paused"
         case .failed:
@@ -737,6 +809,13 @@ final class GameSession: ObservableObject {
             "Manifest: \(shortenedPath(configuration.worldManifestPath))",
             "Renderer: \(rendererName)",
             "Scene Summary: \(sceneSummary)",
+            String(
+                format: "Scope: %@ / %.1fx / %.1f deg / x%.1f draw",
+                isScopeActive ? "active" : "ready",
+                scopeMagnification,
+                scopeFieldOfViewDegrees,
+                scopeDrawDistanceMultiplier
+            ),
             briefingSummary,
             routeSummary,
             evasionSummary,
@@ -754,6 +833,7 @@ final class GameSession: ObservableObject {
                 snapshot?.sprintSpeed ?? 0,
                 snapshot?.lookSensitivity ?? 0
             ),
+            String(format: "Optic: %@ / %.1fx", isScopeActive ? "raised" : "lowered", scopeMagnification),
             String(format: "Settings: look x%.2f / %@ / HUD %.0f%%", lookSensitivityScale, invertLookY ? "invert Y" : "standard Y", hudOpacity * 100),
             String(format: "Ground: %.2f m / %@ / %d active sectors", snapshot?.groundHeight ?? 0, (snapshot?.grounded ?? false) ? "grounded" : "fallback", snapshot?.activeSectorCount ?? 0),
             String(format: "Route Metrics: %.0fm / %d restarts", snapshot?.routeDistanceMeters ?? 0, snapshot?.restartCount ?? 0),

@@ -77,6 +77,7 @@ final class BootstrapScene {
     let drawables: [SceneDrawable]
     let debugInfo: SceneDebugInfo
     let environment: SceneEnvironment
+    let scopeConfiguration: ScopeConfiguration
 
     private let sectors: [SceneSectorRuntime]
     private let runtimeWorld: SceneRuntimeWorld
@@ -98,6 +99,7 @@ final class BootstrapScene {
             drawables = buildResult.drawables
             debugInfo = buildResult.debugInfo
             environment = buildResult.environment
+            scopeConfiguration = buildResult.scopeConfiguration
             sectors = buildResult.sectors
             runtimeWorld = buildResult.runtimeWorld
             alwaysLoadedIndices = buildResult.alwaysLoadedIndices
@@ -115,6 +117,7 @@ final class BootstrapScene {
             drawables = fallbackResult.drawables
             debugInfo = fallbackResult.debugInfo
             environment = fallbackResult.environment
+            scopeConfiguration = fallbackResult.scopeConfiguration
             sectors = fallbackResult.sectors
             runtimeWorld = fallbackResult.runtimeWorld
             alwaysLoadedIndices = fallbackResult.alwaysLoadedIndices
@@ -161,24 +164,31 @@ final class BootstrapScene {
         )
     }
 
-    func visibilityState(for cameraPosition: SIMD3<Float>, forwardVector: SIMD3<Float>) -> SceneVisibilityState {
-        let drawIndices = alwaysLoadedIndices + streamedDrawIndices(for: cameraPosition)
+    func visibilityState(
+        for cameraPosition: SIMD3<Float>,
+        forwardVector: SIMD3<Float>,
+        scopeActive: Bool
+    ) -> SceneVisibilityState {
+        let drawIndices = alwaysLoadedIndices + residentDrawIndices(for: cameraPosition)
         var visibleDrawables: [SceneDrawable] = []
         var culledCount = 0
+        let scopeDrawDistanceMultiplier = scopeActive ? max(scopeConfiguration.drawDistanceMultiplier ?? 2.4, 1) : 1
 
         for drawIndex in drawIndices {
             let drawable = drawables[drawIndex]
             let offset = drawable.worldCenter - cameraPosition
             let distance = simd_length(offset)
+            let maximumDrawDistance = drawable.maxDrawDistance * scopeDrawDistanceMultiplier
+            let minimumViewDot = scopeActive ? -1 : drawable.minimumViewDot
 
-            if distance - drawable.boundingRadius > drawable.maxDrawDistance {
+            if distance - drawable.boundingRadius > maximumDrawDistance {
                 culledCount += 1
                 continue
             }
 
-            if distance > 18, drawable.minimumViewDot > -1, simd_length_squared(offset) > 0.001 {
+            if distance > 18, minimumViewDot > -1, simd_length_squared(offset) > 0.001 {
                 let viewDirection = simd_normalize(offset)
-                if simd_dot(viewDirection, forwardVector) < drawable.minimumViewDot {
+                if simd_dot(viewDirection, forwardVector) < minimumViewDot {
                     culledCount += 1
                     continue
                 }
@@ -196,19 +206,28 @@ final class BootstrapScene {
         culledCount: Int
     ) -> SceneStreamingState {
         let activeIndices = activeSectorIndices(for: cameraPosition)
+        let residentIndices = residentSectorIndices(for: cameraPosition)
+        let activeIndexSet = Set(activeIndices)
         let activeSectors = activeIndices.map { sectors[$0] }
+        let residentOnlySectors = residentIndices
+            .filter { !activeIndexSet.contains($0) }
+            .map { sectors[$0] }
         let activeNames = activeSectors.map(\.displayName)
+        let residentNames = residentOnlySectors.map(\.displayName)
         let currentSector = sectors.first(where: { $0.contains(cameraPosition) })?.displayName ?? "Outside basin bounds"
-        let streamedDrawableCount = activeSectors.reduce(0) { $0 + $1.drawableRange.count }
+        let residentDrawableCount = residentIndices.reduce(0) { count, index in
+            count + sectors[index].drawableRange.count
+        }
 
         return SceneStreamingState(
-            summary: "Chunks: \(activeSectors.count) active / \(sectors.count) total",
+            summary: "Chunks: \(activeSectors.count) near / \(residentIndices.count) resident / \(sectors.count) total",
             details: [
                 "Active: \(activeNames.isEmpty ? "Fallback load" : activeNames.joined(separator: ", "))",
+                "Far Field: \(residentNames.isEmpty ? "None" : residentNames.joined(separator: ", "))",
                 "Current Sector: \(currentSector)",
                 "Visibility: \(visibleDrawableCount) drawn / \(culledCount) culled",
             ],
-            activeDrawableCount: alwaysLoadedIndices.count + streamedDrawableCount
+            activeDrawableCount: alwaysLoadedIndices.count + residentDrawableCount
         )
     }
 
@@ -358,7 +377,7 @@ final class BootstrapScene {
 
     private func activeSectorIndices(for cameraPosition: SIMD3<Float>) -> [Int] {
         let active = sectors.enumerated().compactMap { index, sector in
-            sector.isActive(for: cameraPosition) ? index : nil
+            sector.isNearFieldActive(for: cameraPosition) ? index : nil
         }
 
         guard !active.isEmpty else {
@@ -371,8 +390,23 @@ final class BootstrapScene {
         return active
     }
 
-    private func streamedDrawIndices(for cameraPosition: SIMD3<Float>) -> [Int] {
-        let activeIndices = Set(activeSectorIndices(for: cameraPosition))
+    private func residentSectorIndices(for cameraPosition: SIMD3<Float>) -> [Int] {
+        let resident = sectors.enumerated().compactMap { index, sector in
+            sector.isResident(for: cameraPosition) ? index : nil
+        }
+
+        guard !resident.isEmpty else {
+            guard let nearest = sectors.enumerated().min(by: { $0.element.distanceSquared(to: cameraPosition) < $1.element.distanceSquared(to: cameraPosition) }) else {
+                return []
+            }
+            return [nearest.offset]
+        }
+
+        return resident
+    }
+
+    private func residentDrawIndices(for cameraPosition: SIMD3<Float>) -> [Int] {
+        let activeIndices = Set(residentSectorIndices(for: cameraPosition))
         return sectors.enumerated().flatMap { index, sector in
             activeIndices.contains(index) ? Array(sector.drawableRange) : []
         }
@@ -405,6 +439,7 @@ private struct SceneBuildResult {
     let drawables: [SceneDrawable]
     let debugInfo: SceneDebugInfo
     let environment: SceneEnvironment
+    let scopeConfiguration: ScopeConfiguration
     let sectors: [SceneSectorRuntime]
     let runtimeWorld: SceneRuntimeWorld
     let alwaysLoadedIndices: [Int]
@@ -431,20 +466,36 @@ private struct SceneTraversalTuning {
 private struct SceneSectorRuntime {
     let id: String
     let displayName: String
+    let residency: SectorResidency
     let minimum: SIMD3<Float>
     let maximum: SIMD3<Float>
     let activationPadding: Float
+    let farFieldPadding: Float
     let drawableRange: Range<Int>
 
     func contains(_ point: SIMD3<Float>) -> Bool {
         point.x >= minimum.x && point.x <= maximum.x && point.z >= minimum.z && point.z <= maximum.z
     }
 
-    func isActive(for point: SIMD3<Float>) -> Bool {
+    func isNearFieldActive(for point: SIMD3<Float>) -> Bool {
         point.x >= (minimum.x - activationPadding) &&
             point.x <= (maximum.x + activationPadding) &&
             point.z >= (minimum.z - activationPadding) &&
             point.z <= (maximum.z + activationPadding)
+    }
+
+    func isResident(for point: SIMD3<Float>) -> Bool {
+        switch residency {
+        case .always:
+            return true
+        case .farField:
+            return point.x >= (minimum.x - farFieldPadding) &&
+                point.x <= (maximum.x + farFieldPadding) &&
+                point.z >= (minimum.z - farFieldPadding) &&
+                point.z <= (maximum.z + farFieldPadding)
+        case .local:
+            return isNearFieldActive(for: point)
+        }
     }
 
     func distanceSquared(to point: SIMD3<Float>) -> Float {
@@ -488,6 +539,7 @@ private final class ScenePackageBuilder {
         let detectionConfiguration = sceneConfiguration.detection ?? DetectionConfiguration()
         let guidanceConfiguration = sceneConfiguration.guidance ?? GuidanceConfiguration()
         let playerConfiguration = sceneConfiguration.player ?? PlayerConfiguration()
+        let scopeConfiguration = sceneConfiguration.scope ?? ScopeConfiguration()
         let traversalTuning = SceneTraversalTuning(
             walkSpeed: max(playerConfiguration.walkSpeed ?? 4.2, 1.0),
             sprintSpeed: max(playerConfiguration.sprintSpeed ?? 6.8, max(playerConfiguration.walkSpeed ?? 4.2, 1.0) + 0.6),
@@ -560,10 +612,22 @@ private final class ScenePackageBuilder {
             : sceneConfiguration.includedSectors
 
         let loadedSectors = includedSectorIDs.compactMap { sectorLookup[$0] }
+        let residencyCounts = loadedSectors.reduce(into: (local: 0, farField: 0, always: 0)) { counts, sector in
+            switch sector.residency ?? .local {
+            case .local:
+                counts.local += 1
+            case .farField:
+                counts.farField += 1
+            case .always:
+                counts.always += 1
+            }
+        }
         for sector in loadedSectors {
             let minimum = sector.bounds.minimum
             let maximum = sector.bounds.maximum
             let activationPadding = sector.streamingPadding ?? 10
+            let residency = sector.residency ?? .local
+            let farFieldPadding = sector.farFieldPadding ?? max(activationPadding * 2.0, activationPadding + 140)
             let drawStart = sceneDrawables.count
 
             worldSectors.append(
@@ -577,7 +641,11 @@ private final class ScenePackageBuilder {
             )
 
             for terrainPatch in sector.terrainPatches {
-                if let drawable = terrainDrawable(from: terrainPatch, sectorID: sector.id) {
+                if let drawable = terrainDrawable(
+                    from: terrainPatch,
+                    sectorID: sector.id,
+                    residency: residency
+                ) {
                     sceneDrawables.append(drawable)
                     terrainCount += 1
                 }
@@ -585,7 +653,11 @@ private final class ScenePackageBuilder {
             }
 
             for roadStrip in sector.roadStrips {
-                if let drawable = roadDrawable(from: roadStrip, sectorID: sector.id) {
+                if let drawable = roadDrawable(
+                    from: roadStrip,
+                    sectorID: sector.id,
+                    residency: residency
+                ) {
                     sceneDrawables.append(drawable)
                     roadCount += 1
                 }
@@ -593,7 +665,11 @@ private final class ScenePackageBuilder {
             }
 
             for block in sector.grayboxBlocks {
-                if let drawable = grayboxDrawable(from: block, sectorID: sector.id) {
+                if let drawable = grayboxDrawable(
+                    from: block,
+                    sectorID: sector.id,
+                    residency: residency
+                ) {
                     sceneDrawables.append(drawable)
                     grayboxCount += 1
                 }
@@ -615,9 +691,11 @@ private final class ScenePackageBuilder {
                 SceneSectorRuntime(
                     id: sector.id,
                     displayName: sector.displayName,
+                    residency: residency,
                     minimum: minimum,
                     maximum: maximum,
                     activationPadding: activationPadding,
+                    farFieldPadding: farFieldPadding,
                     drawableRange: drawStart..<sceneDrawables.count
                 )
             )
@@ -628,7 +706,14 @@ private final class ScenePackageBuilder {
             "Axes: x \(coordinateSystem.axisX) / z \(coordinateSystem.axisZ)",
             "Spawn: \(sceneConfiguration.spawn.label ?? "District start")",
             "Sectors: \(loadedSectors.map(\.displayName).joined(separator: ", "))",
+            "Residency: \(residencyCounts.always) always / \(residencyCounts.farField) far-field / \(residencyCounts.local) local",
             "World: \(terrainCount) terrain / \(roadCount) roads / \(collisionCount) blockers",
+            String(
+                format: "Scope: %.1fx / %.1f deg / x%.1f draw stabilization",
+                scopeConfiguration.magnification,
+                scopeConfiguration.fieldOfViewDegrees,
+                scopeConfiguration.drawDistanceMultiplier ?? 2.4
+            ),
             "Route: \(sceneConfiguration.route.name) / \(sceneConfiguration.route.checkpoints.count) checkpoints",
             "Threats: \(detectionConfiguration.observers.count) observers / \(guidanceConfiguration.coverPoints.count) cover / \(guidanceConfiguration.signposts.count) signs",
             String(
@@ -645,7 +730,7 @@ private final class ScenePackageBuilder {
         return SceneBuildResult(
             drawables: sceneDrawables,
             debugInfo: SceneDebugInfo(
-                cycleLabel: sceneConfiguration.cycleLabel ?? "Canberra Basin Survey",
+                cycleLabel: sceneConfiguration.cycleLabel ?? "Canberra Basin Readability",
                 sceneName: sceneConfiguration.sceneName,
                 summary: summary,
                 details: detailLines,
@@ -663,6 +748,7 @@ private final class ScenePackageBuilder {
                 fogFar: max(atmosphereConfiguration.fogFar ?? 118, max(atmosphereConfiguration.fogNear ?? 38, 8) + 1),
                 hazeStrength: max(atmosphereConfiguration.hazeStrength ?? 0.16, 0)
             ),
+            scopeConfiguration: scopeConfiguration,
             sectors: sceneSectors,
             runtimeWorld: SceneRuntimeWorld(
                 sectorBounds: worldSectors,
@@ -759,7 +845,11 @@ private final class ScenePackageBuilder {
         }
     }
 
-    private func grayboxDrawable(from configuration: GrayboxBlockConfiguration, sectorID: String) -> SceneDrawable? {
+    private func grayboxDrawable(
+        from configuration: GrayboxBlockConfiguration,
+        sectorID: String,
+        residency: SectorResidency
+    ) -> SceneDrawable? {
         let vertices = GeometryBuilder.makeBox(
             halfExtents: configuration.halfExtentsVector,
             color: configuration.colorVector
@@ -778,11 +868,11 @@ private final class ScenePackageBuilder {
             worldCenter: configuration.positionVector,
             boundingRadius: simd_length(configuration.halfExtentsVector),
             maxDrawDistance: adaptiveDrawDistance(
-                defaultValue: 130,
+                defaultValue: visibilityDefault(130, for: residency),
                 boundingRadius: simd_length(configuration.halfExtentsVector),
-                multiplier: 3.8
+                multiplier: visibilityMultiplier(3.8, for: residency)
             ),
-            minimumViewDot: -0.55
+            minimumViewDot: visibilityMinimumViewDot(-0.55, for: residency)
         )
     }
 
@@ -817,7 +907,11 @@ private final class ScenePackageBuilder {
         )
     }
 
-    private func terrainDrawable(from configuration: TerrainPatchConfiguration, sectorID: String) -> SceneDrawable? {
+    private func terrainDrawable(
+        from configuration: TerrainPatchConfiguration,
+        sectorID: String,
+        residency: SectorResidency
+    ) -> SceneDrawable? {
         let vertices = GeometryBuilder.makeTerrainPatch(
             size: configuration.sizeVector,
             cornerHeights: configuration.cornerHeightVector,
@@ -838,15 +932,19 @@ private final class ScenePackageBuilder {
             worldCenter: configuration.positionVector,
             boundingRadius: simd_length(SIMD3<Float>(configuration.sizeVector.x * 0.5, 1.8, configuration.sizeVector.y * 0.5)),
             maxDrawDistance: adaptiveDrawDistance(
-                defaultValue: 180,
+                defaultValue: visibilityDefault(180, for: residency),
                 boundingRadius: simd_length(SIMD3<Float>(configuration.sizeVector.x * 0.5, 1.8, configuration.sizeVector.y * 0.5)),
-                multiplier: 2.6
+                multiplier: visibilityMultiplier(2.6, for: residency)
             ),
             minimumViewDot: -1
         )
     }
 
-    private func roadDrawable(from configuration: RoadStripConfiguration, sectorID: String) -> SceneDrawable? {
+    private func roadDrawable(
+        from configuration: RoadStripConfiguration,
+        sectorID: String,
+        residency: SectorResidency
+    ) -> SceneDrawable? {
         let vertices = GeometryBuilder.makeRoadStrip(
             size: configuration.sizeVector,
             shoulderWidth: configuration.shoulderWidth ?? 1.2,
@@ -870,9 +968,9 @@ private final class ScenePackageBuilder {
             worldCenter: configuration.positionVector,
             boundingRadius: simd_length(SIMD3<Float>(configuration.sizeVector.x * 0.5, 0.5, configuration.sizeVector.y * 0.5)),
             maxDrawDistance: adaptiveDrawDistance(
-                defaultValue: 175,
+                defaultValue: visibilityDefault(175, for: residency),
                 boundingRadius: simd_length(SIMD3<Float>(configuration.sizeVector.x * 0.5, 0.5, configuration.sizeVector.y * 0.5)),
-                multiplier: 2.8
+                multiplier: visibilityMultiplier(2.8, for: residency)
             ),
             minimumViewDot: -1
         )
@@ -1173,6 +1271,43 @@ private final class ScenePackageBuilder {
         max(defaultValue, boundingRadius * multiplier)
     }
 
+    private func visibilityDefault(_ baseValue: Float, for residency: SectorResidency) -> Float {
+        switch residency {
+        case .local:
+            return baseValue
+        case .farField:
+            return baseValue * 1.9
+        case .always:
+            return baseValue * 2.4
+        }
+    }
+
+    private func visibilityMultiplier(_ baseValue: Float, for residency: SectorResidency) -> Float {
+        switch residency {
+        case .local:
+            return baseValue
+        case .farField:
+            return baseValue * 1.4
+        case .always:
+            return baseValue * 1.7
+        }
+    }
+
+    private func visibilityMinimumViewDot(_ baseValue: Float, for residency: SectorResidency) -> Float {
+        guard baseValue > -1 else {
+            return baseValue
+        }
+
+        switch residency {
+        case .local:
+            return baseValue
+        case .farField:
+            return min(baseValue, -0.82)
+        case .always:
+            return -1
+        }
+    }
+
     private func groundSurface(from configuration: TerrainPatchConfiguration) -> GameGroundSurface {
         let cornerHeights = configuration.cornerHeightVector
         return GameGroundSurface(
@@ -1322,6 +1457,7 @@ private enum FallbackSceneFactory {
                 fogFar: 108,
                 hazeStrength: 0.14
             ),
+            scopeConfiguration: ScopeConfiguration(),
             sectors: [],
             runtimeWorld: SceneRuntimeWorld(
                 sectorBounds: [],

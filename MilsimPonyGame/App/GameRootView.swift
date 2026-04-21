@@ -28,6 +28,12 @@ struct GameRootView: View {
             .padding(16)
             .opacity(session.hudCardOpacity)
 
+            if session.isScopeActive && session.menuPanel == nil {
+                scopeOverlay
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+            }
+
             if let panel = session.menuPanel {
                 menuShell(for: panel)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -58,6 +64,14 @@ struct GameRootView: View {
                 actionStack(for: panel)
             }
         }
+    }
+
+    private var scopeOverlay: some View {
+        ScopeOverlay(
+            statusText: session.scopeStatusText,
+            instructionText: session.scopeInstructionText,
+            reticleColor: Color(nsColor: session.scopeReticleColor)
+        )
     }
 
     private var settingsControls: some View {
@@ -229,5 +243,105 @@ struct GameRootView: View {
                 .stroke(.white.opacity(0.10), lineWidth: 1)
         )
         .shadow(color: .black.opacity(0.28), radius: 20, y: 10)
+    }
+}
+
+private struct ScopeOverlay: View {
+    let statusText: String
+    let instructionText: String
+    let reticleColor: Color
+
+    var body: some View {
+        GeometryReader { geometry in
+            let size = geometry.size
+            let diameter = min(size.width, size.height) * 0.82
+            let apertureRect = CGRect(
+                x: (size.width - diameter) * 0.5,
+                y: (size.height - diameter) * 0.5,
+                width: diameter,
+                height: diameter
+            )
+            let centerX = size.width * 0.5
+            let centerY = size.height * 0.5
+            let centerGap = diameter * 0.07
+            let reticleInset = diameter * 0.05
+            let armLength = max((diameter * 0.5) - reticleInset - (centerGap * 0.5), 24)
+            let armThickness = max(diameter * 0.0028, 1.4)
+            let labelY = min(apertureRect.maxY + 52, size.height - 38)
+
+            ZStack {
+                ScopeOcclusionShape(apertureRect: apertureRect)
+                    .fill(Color.black.opacity(0.82), style: FillStyle(eoFill: true))
+
+                Circle()
+                    .stroke(Color.black.opacity(0.55), lineWidth: 14)
+                    .frame(width: diameter, height: diameter)
+                    .position(x: centerX, y: centerY)
+
+                Circle()
+                    .stroke(reticleColor.opacity(0.92), lineWidth: 2)
+                    .frame(width: diameter, height: diameter)
+                    .position(x: centerX, y: centerY)
+
+                Circle()
+                    .stroke(reticleColor.opacity(0.35), lineWidth: 1)
+                    .frame(width: diameter * 0.64, height: diameter * 0.64)
+                    .position(x: centerX, y: centerY)
+
+                reticleArm(length: armLength, thickness: armThickness)
+                    .position(x: centerX - ((centerGap + armLength) * 0.5), y: centerY)
+
+                reticleArm(length: armLength, thickness: armThickness)
+                    .position(x: centerX + ((centerGap + armLength) * 0.5), y: centerY)
+
+                reticleArm(length: armLength, thickness: armThickness)
+                    .rotationEffect(.degrees(90))
+                    .position(x: centerX, y: centerY - ((centerGap + armLength) * 0.5))
+
+                reticleArm(length: armLength, thickness: armThickness)
+                    .rotationEffect(.degrees(90))
+                    .position(x: centerX, y: centerY + ((centerGap + armLength) * 0.5))
+
+                Circle()
+                    .fill(reticleColor.opacity(0.96))
+                    .frame(width: 6, height: 6)
+                    .position(x: centerX, y: centerY)
+
+                VStack(spacing: 6) {
+                    Text(statusText)
+                        .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.96))
+
+                    Text(instructionText)
+                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                        .foregroundStyle(reticleColor.opacity(0.94))
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(reticleColor.opacity(0.28), lineWidth: 1)
+                )
+                .position(x: centerX, y: labelY)
+            }
+        }
+    }
+
+    private func reticleArm(length: CGFloat, thickness: CGFloat) -> some View {
+        Rectangle()
+            .fill(reticleColor.opacity(0.94))
+            .frame(width: length, height: thickness)
+    }
+}
+
+private struct ScopeOcclusionShape: Shape {
+    let apertureRect: CGRect
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.addRect(rect)
+        path.addEllipse(in: apertureRect)
+        return path
     }
 }
