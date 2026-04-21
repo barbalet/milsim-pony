@@ -8,9 +8,9 @@ Deliver a playable Mac demo that launches into a first-person Canberra experienc
 
 - The repository currently contains art assets under `MilsimPonyGame/Assets/PrimaryAssets/`.
 - `MilsimPonyGame.xcodeproj` exists and builds on macOS.
-- The current demo includes a functioning app shell, renderer, packaged world data, and a small Parliament-adjacent playable slice.
-- Reviewer feedback has established that the current slice is too narrow and does not yet show Canberra in part or whole.
-- The next five calibrated cycles must prioritize a basin-scale Canberra view including Lake Burley Griffin and the landscape from Woden to Belconnen.
+- The current demo includes a functioning app shell, renderer, packaged world data, and an expanded Canberra street-atlas review covering the east basin, Parliament axis, Civic, Woden, Black Mountain, and Belconnen.
+- Reviewer feedback has established that the current Canberra model still needs denser district detail, more named roads, and stronger online reference coverage before it reads as a convincing city-scale environment.
+- The next six calibrated cycles must prioritize a basin-scale Canberra atlas including Lake Burley Griffin, the district street network from Woden to Belconnen, and a reference-backed gallery drawn from online sources plus in-game captures.
 - The first usable weapon will be a sniper rifle with 4x magnification, which raises the required terrain, landmark, collision, and long-range rendering resolution.
 
 ## Planning Assumptions
@@ -23,7 +23,7 @@ Deliver a playable Mac demo that launches into a first-person Canberra experienc
   - `Rendering/Platform`: Metal renderer, SwiftUI shell, input, build integration.
   - `World/Data`: Canberra layout, terrain, roads, landmarks, asset prep.
   - `Gameplay/QA`: first-person controller, demo flow, test coverage, tuning.
-- For a four-lane team, cycles `10` to `14` now imply roughly `10` to `15` weeks of work. For a solo effort, keep the same order of work and expect roughly `20` to `30` weeks.
+- For a four-lane team, cycles `10` to `20` now imply roughly `12` to `24` weeks of work. For a solo effort, keep the same order of work and expect roughly `24` to `40` weeks.
 - Every lane must ship Canberra-model value each cycle. Engine, rendering, and gameplay tasks are support work unless they directly improve or validate basin coverage.
 - Basin-scale Canberra coverage now takes priority over adding more corridor-only scripting.
 - The world plan must support hierarchical resolution: macro Canberra coverage plus denser streamed data around long-range viewpoints and combat lanes.
@@ -83,6 +83,26 @@ Exit criteria:
 - The first usable weapon is a sniper rifle with 4x magnification.
 - Scoped observation and firing are stable enough to be used as a core gameplay pillar rather than a prototype gimmick.
 
+### Milestone 6: Canberra Street Atlas Expansion
+
+Cycles `15` to `17`
+
+Exit criteria:
+
+- The overhead map reads as a Canberra street atlas rather than only a sector sketch.
+- Civic, Barton-Russell, Woden Town Centre, and Belconnen Town Centre each have their own higher-detail street pass.
+- Online reference capture from Google Maps and official ACT transport material is attached to the repo as a reusable gallery.
+
+### Milestone 7: District Integration And Combat Readiness
+
+Cycles `18` to `20`
+
+Exit criteria:
+
+- Black Mountain, Belconnen, Woden, the central basin, and the east approach connect into one coherent review route.
+- The street-atlas layer, scoped review flow, and future combat lanes all agree on district names, road anchors, and capture viewpoints.
+- Review builds include evidence packs that compare in-game results against source references.
+
 ## Workstream Division
 
 ### Engine/Core
@@ -124,12 +144,20 @@ Exit criteria:
 | `12` | Scope and resolution foundation | Add higher-resolution tile streaming and query hooks for long-range play | Add 4x magnified scope camera, reticle, and LOD stabilization | Densify terrain, roads, and landmark data around central basin and sniper lanes | Add sniper perch tests and scoped landmark validation | Player can inspect distant Canberra landmarks through a stable 4x scope |
 | `13` | Sniper rifle usable pass | Add accurate long-range hit query support and firing validation hooks | Add scoped firing feedback, impact readability, and long-range target presentation | Raise collision and cover fidelity around firing lanes and target zones | Add the first usable sniper rifle: equip, zoom, fire, reload, and target confirmation | Sniper rifle works reliably against authored long-range targets across Canberra sightlines |
 | `14` | Basin demo integration | Tune streaming, memory, and large-world edge cases for the expanded map | Polish water, skyline, terrain, and long-range clarity for review captures | Close major gaps between Woden, the lake, and Belconnen while preserving landmark readability | Integrate traversal and sniper observation into one reviewable loop | Review build demonstrates Lake Burley Griffin plus Woden-to-Belconnen landscape with a usable 4x sniper rifle |
+| `15` | Street atlas expansion reset | Stabilize scene-package support for denser district data and route metadata | Draw named road strips in the overhead map and retune atlas readability | Expand the Canberra package with Civic, Barton-Russell, Woden Town Centre, Belconnen Town Centre, and supporting sectors | Reframe the demo as a district-atlas survey and capture the first reference gallery | The game opens into a street-atlas review with more districts and visible named roads |
+| `16` | Woden and inner-south district pass | Improve local streaming transitions and collision ownership for overlapping district sectors | Tune map legibility, labels, and district readouts for denser road clusters | Densify Woden, Deakin, State Circle, and west-basin roads, landmarks, and blockers | Add Woden and inner-south verification checkpoints plus smoke coverage | Woden and the inner south read as connected districts rather than isolated pads |
+| `17` | Civic-Barton-Russell pass | Add higher-confidence sector residency and route telemetry for dense central districts | Improve water-edge, bridge, and arterial readability around the central basin | Densify Civic, City Hill, Barton, Russell, Mount Ainslie, and east-basin roads and massing | Add central-district review markers and update the source gallery with corrected captures | Central Canberra reads as a connected street network from the lake to the inner north and east |
+| `18` | Belconnen and Black Mountain pass | Extend long-range culling and collision support across denser northern district targets | Improve skyline layering and atlas readability for Black Mountain and Belconnen | Densify Belconnen Town Centre, Bruce, Ginninderra approaches, and Black Mountain connectors | Add Belconnen district review flow and long-range validation metrics | Belconnen and Black Mountain read as distinct, navigable components of the atlas |
+| `19` | Cross-district route integration | Tune streaming, restart, and route logic for a longer multi-district survey | Polish route visibility, map-state feedback, and screenshot-ready overlays | Close remaining holes between Woden, Civic, the lake, Black Mountain, and Belconnen | Build one review loop that samples every major district and atlas corridor | A single route proves the expanded Canberra atlas without developer explanation |
+| `20` | Reference-backed review pack | Lock data interfaces for capture automation, comparison notes, and regression review | Polish review overlays, capture framing, and atlas presentation for release candidates | Finalize the first reference-backed Canberra package with curated Google Maps and in-game gallery assets | Ship a review pack, smoke test, and capture notes that connect atlas work to future combat lanes | Reviewers can compare the in-game Canberra atlas against source references and sign off the next combat-focused phase |
 
 ## Standard Cycle Cadence
 
 - `Week 1`: lock Canberra references, extents, acceptance criteria, and the exact Woden-to-Belconnen coverage gain required for the cycle.
 - `Week 2`: integrate terrain, roads, landmarks, streaming, and review viewpoints until the demo reads as Canberra without developer narration.
 - `Week 3`: use only when needed for reference correction, world-data rebuilds, performance cleanup, and another review pass if the coverage gate is still not met.
+
+For cycles `15` to `20`, use `Week 1` to lock Google Maps and official Canberra reference captures, `Week 2` to author and integrate the district pass, and `Week 3` to capture gallery deltas plus fix atlas readability regressions.
 
 ## Recommended Sequencing Rules
 
@@ -141,10 +169,12 @@ Exit criteria:
 - Do not close a cycle that fails to add clear Canberra-model progress or still leaves the demo opening from an unconvincing survey location.
 - Do not ship the sniper rifle until the map supports stable distant observation and reliable long-range collision.
 - Add fidelity in layers: basin coverage first, then higher resolution around travel lanes, landmarks, and sniper perches.
+- Treat the online reference gallery as production data: every district pass should add or replace source captures when the target streets change.
+- Require each cycle from `15` to `20` to improve both the atlas overlay and the in-world district pass.
 
 ## Near-Term Next Actions
 
-1. Lock the expanded Canberra extents and tile plan for coverage from Woden through the lake basin to Belconnen.
-2. Build a first-pass basin dataset that includes Lake Burley Griffin, macro terrain, and major landmark silhouettes.
-3. Define the sniper rifle requirements in engine terms: target distances, zoom behavior, long-range collision, and scoped rendering acceptance.
-4. Author the first review viewpoints that must prove Canberra reads at large scale before another corridor-only content pass is accepted.
+1. Lock the street-atlas sector list and district naming for Civic, Barton-Russell, Woden, Belconnen, Mount Ainslie, and the west basin.
+2. Capture baseline Google Maps and official ACT transport references for each district and keep them in a reviewable gallery.
+3. Densify the road network so the overhead map shows a convincing Canberra street structure rather than only coarse traversal lanes.
+4. Build a longer review route that proves the atlas reads across the full Woden-to-Belconnen package before another combat-heavy pass is accepted.

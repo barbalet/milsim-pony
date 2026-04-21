@@ -1,17 +1,25 @@
 {
-  "worldName": "Canberra Woden-Belconnen Basin",
+  "worldName": "Canberra Basin Street Atlas",
   "sceneFile": "Scenes/canberra_basin_preview_scene.json",
   "coordinateSystemFile": "CoordinateSystems/parliament_local_grid.json",
   "sectorFiles": [
+    "Sectors/mount_ainslie_campbell_sector.json",
     "Sectors/east_basin_overlook_sector.json",
     "Sectors/east_basin_scope_lane_sector.json",
+    "Sectors/barton_russell_sector.json",
     "Sectors/parliamentary_triangle_edge_sector.json",
     "Sectors/parliament_precinct_sector.json",
+    "Sectors/state_circle_approach_sector.json",
+    "Sectors/deakin_escape_corridor_sector.json",
+    "Sectors/west_basin_yarralumla_sector.json",
     "Sectors/central_lake_basin_sector.json",
     "Sectors/central_basin_scope_lane_sector.json",
+    "Sectors/city_hill_civic_sector.json",
     "Sectors/woden_valley_sector.json",
+    "Sectors/woden_town_centre_sector.json",
     "Sectors/woden_scope_perch_sector.json",
     "Sectors/black_mountain_scope_perch_sector.json",
-    "Sectors/black_mountain_belconnen_sector.json"
+    "Sectors/black_mountain_belconnen_sector.json",
+    "Sectors/belconnen_town_centre_sector.json"
   ]
 }

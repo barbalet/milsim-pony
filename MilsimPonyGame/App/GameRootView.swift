@@ -603,6 +603,39 @@ private struct OverheadMapCanvas: View {
                         }
                     }
 
+                    ForEach(snapshot.configuration.roads) { road in
+                        let startPoint = point(forX: road.startPoint.x, z: road.startPoint.z, in: drawingRect)
+                        let endPoint = point(forX: road.endPoint.x, z: road.endPoint.z, in: drawingRect)
+                        let midpoint = CGPoint(
+                            x: (startPoint.x + endPoint.x) * 0.5,
+                            y: (startPoint.y + endPoint.y) * 0.5
+                        )
+
+                        Path { path in
+                            path.move(to: startPoint)
+                            path.addLine(to: endPoint)
+                        }
+                        .stroke(
+                            Color(red: 0.84, green: 0.86, blue: 0.90).opacity(0.84),
+                            style: StrokeStyle(
+                                lineWidth: roadLineWidth(for: road, in: drawingRect),
+                                lineCap: .round
+                            )
+                        )
+
+                        let labelWidth = hypot(endPoint.x - startPoint.x, endPoint.y - startPoint.y)
+                        if labelWidth > 80 {
+                            Text(road.shortLabel)
+                                .font(.system(size: 8, weight: .bold, design: .monospaced))
+                                .foregroundStyle(Color(red: 0.95, green: 0.95, blue: 0.97).opacity(0.86))
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 2)
+                                .background(Color.black.opacity(0.54), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                                .rotationEffect(.degrees(Double(-road.yawDegrees)))
+                                .position(midpoint)
+                        }
+                    }
+
                     Path { path in
                         guard let first = snapshot.configuration.checkpoints.first else {
                             return
@@ -684,6 +717,7 @@ private struct OverheadMapCanvas: View {
 
             HStack(spacing: 12) {
                 legendItem(color: .white.opacity(0.92), label: "Spawn")
+                legendItem(color: Color(red: 0.84, green: 0.86, blue: 0.90), label: "Roads")
                 legendItem(color: Color(red: 0.94, green: 0.84, blue: 0.40), label: "Route")
                 legendItem(color: Color(red: 0.34, green: 0.82, blue: 0.98), label: "You")
             }
@@ -691,6 +725,11 @@ private struct OverheadMapCanvas: View {
             Text("Route: \(snapshot.completedCheckpointCount) / \(snapshot.totalCheckpointCount) checkpoints\(snapshot.nextCheckpointLabel.map { " • next \($0)" } ?? " • route complete")")
                 .font(.system(size: 10, weight: .medium, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.72))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text("Atlas: \(snapshot.configuration.roads.count) named road strips across \(snapshot.configuration.sectors.count) Canberra sectors")
+                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.62))
                 .fixedSize(horizontal: false, vertical: true)
 
             Text(String(format: "Position: %.0f east / %.0f south", snapshot.playerX, snapshot.playerZ))
@@ -751,6 +790,12 @@ private struct OverheadMapCanvas: View {
 
     private func checkpointSize(for index: Int) -> CGFloat {
         index == snapshot.completedCheckpointCount ? 11 : 9
+    }
+
+    private func roadLineWidth(for road: SceneMapRoad, in drawingRect: CGRect) -> CGFloat {
+        let averageScale = (drawingRect.width / CGFloat(snapshot.configuration.width)
+            + drawingRect.height / CGFloat(snapshot.configuration.depth)) * 0.5
+        return max(CGFloat(road.width) * averageScale, 1.4)
     }
 
     private func rect(for sector: SceneMapSector, in drawingRect: CGRect) -> CGRect {

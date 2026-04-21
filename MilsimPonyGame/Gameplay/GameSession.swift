@@ -55,7 +55,7 @@ struct OverheadMapSnapshot {
 final class GameSession: ObservableObject {
     @Published private(set) var statusLine = "Bootstrapping game session"
     @Published private(set) var overlayLines: [String] = []
-    @Published private(set) var overlayTitle = "Cycle 12 Scope And Resolution Foundation"
+    @Published private(set) var overlayTitle = "Cycle 15 Canberra Street Atlas Expansion"
     @Published private(set) var demoFlowState: DemoFlowState = .title
     @Published private(set) var isSettingsPresented = false
     @Published private(set) var isScopeActive = false
@@ -243,7 +243,7 @@ final class GameSession: ObservableObject {
     func menuTitle(for panel: GameMenuPanel) -> String {
         switch panel {
         case .title:
-            return sceneReady ? sceneLabel : "Loading Canberra Scope Validation Review"
+            return sceneReady ? sceneLabel : "Loading Canberra Street Atlas Review"
         case .paused:
             return "Demo Paused"
         case .failed:
@@ -258,7 +258,7 @@ final class GameSession: ObservableObject {
     func menuSubtitle(for panel: GameMenuPanel) -> String {
         switch panel {
         case .title:
-            return sceneReady ? overlayTitle : "Loading Canberra scope validation review"
+            return sceneReady ? overlayTitle : "Loading Canberra street atlas review"
         case .paused:
             return routeSummary
         case .failed:
@@ -380,7 +380,7 @@ final class GameSession: ObservableObject {
         isSettingsPresented = false
         demoFlowState = .playing
         resetMissionRuntime()
-        statusLine = "Demo live - move through the current scope validation route"
+        statusLine = "Demo live - move through the current Canberra atlas survey"
         rebuildOverlay()
     }
 
@@ -786,8 +786,8 @@ final class GameSession: ObservableObject {
         }
 
         var lines = [
-            "Objective: survey the current Canberra build and move through the authored scope validation markers.",
-            "Priority: validate Lake Burley Griffin, the Parliament axis, Woden Valley, Black Mountain, and the Belconnen skyline through the 4x optic.",
+            "Objective: survey the expanded Canberra street atlas and move through the authored district review markers.",
+            "Priority: validate Lake Burley Griffin, the Parliament axis, Civic, Barton-Russell, Woden Valley, Black Mountain, and the Belconnen skyline through the 4x optic.",
             riskLine,
             "Release: \(configuration.releaseDisplayName) / \(configuration.bundleIdentifier)",
             "Content: \(configuration.contentSourceSummary)",
@@ -795,6 +795,13 @@ final class GameSession: ObservableObject {
             "Locator: press M at any time to raise the overhead Canberra map.",
             "Deploy: press Space or Return, then use Esc at any time for the pause shell.",
         ]
+
+        let planningLines = sceneDetails.filter { detail in
+            detail.hasPrefix("Plan:")
+                || detail.hasPrefix("Breakdown:")
+                || detail.hasPrefix("Reference:")
+        }
+        lines.append(contentsOf: planningLines.prefix(3))
 
         if sceneReady {
             lines.append("Route: \(routeSummary)")
@@ -844,7 +851,7 @@ final class GameSession: ObservableObject {
                 snapshot?.routeDistanceMeters ?? 0,
                 snapshot?.restartCount ?? 0
             ),
-            "Outcome: the current Canberra scope validation route is complete and ready for the next resolution pass.",
+            "Outcome: the current Canberra atlas survey is complete and ready for the next district densification pass.",
             "Release: \(configuration.releaseDisplayName) / \(configuration.contentSourceSummary)",
             String(format: "Optic: %.1fx scoped review remained available across the full route.", scopeMagnification),
             "Script: title shell, live scope route, optional fail or retry loop, and completion summary all resolve in one session.",
@@ -873,7 +880,7 @@ final class GameSession: ObservableObject {
         case .playing:
             return isScopeActive
                 ? String(format: "%.1fx scope active - inspect distant landmarks", scopeMagnification)
-                : "Demo live - move through the current scope validation route"
+                : "Demo live - move through the current Canberra atlas survey"
         case .paused:
             return "Demo paused"
         case .failed:

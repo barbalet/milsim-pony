@@ -1,0 +1,133 @@
+{
+  "id": "woden_town_centre_sector",
+  "displayName": "Woden Town Centre",
+  "residency": "local",
+  "bounds": {
+    "min": [-48.0, 0.0, 122.0],
+    "max": [78.0, 24.0, 228.0]
+  },
+  "streamingPadding": 118.0,
+  "terrainPatches": [
+    {
+      "name": "WodenCorePlateau",
+      "position": [10.0, 2.0, 172.0],
+      "size": [92.0, 72.0],
+      "cornerHeights": [2.0, 2.4, 1.0, 1.0],
+      "subdivisions": 16,
+      "color": [0.38, 0.44, 0.33, 1.0],
+      "yawDegrees": 4.0
+    },
+    {
+      "name": "PhillipNorthRise",
+      "position": [44.0, 2.0, 152.0],
+      "size": [52.0, 56.0],
+      "cornerHeights": [2.0, 3.0, 1.0, 0.8],
+      "subdivisions": 12,
+      "color": [0.37, 0.43, 0.32, 1.0],
+      "yawDegrees": 8.0
+    }
+  ],
+  "roadStrips": [
+    {
+      "name": "MelroseDriveCore",
+      "position": [22.0, 1.04, 172.0],
+      "size": [8.2, 96.0],
+      "roadColor": [0.20, 0.20, 0.22, 1.0],
+      "shoulderColor": [0.40, 0.43, 0.37, 1.0],
+      "lineColor": [0.92, 0.87, 0.54, 1.0],
+      "shoulderWidth": 0.8,
+      "centerLineWidth": 0.14,
+      "crownHeight": 0.03,
+      "yawDegrees": 2.0
+    },
+    {
+      "name": "HindmarshDriveEast",
+      "position": [10.0, 1.02, 194.0],
+      "size": [8.2, 116.0],
+      "roadColor": [0.19, 0.19, 0.21, 1.0],
+      "shoulderColor": [0.39, 0.42, 0.36, 1.0],
+      "lineColor": [0.89, 0.84, 0.49, 1.0],
+      "shoulderWidth": 0.8,
+      "centerLineWidth": 0.14,
+      "crownHeight": 0.03,
+      "yawDegrees": 90.0
+    },
+    {
+      "name": "YambaDrive",
+      "position": [48.0, 0.98, 166.0],
+      "size": [7.8, 88.0],
+      "roadColor": [0.19, 0.19, 0.21, 1.0],
+      "shoulderColor": [0.38, 0.41, 0.35, 1.0],
+      "lineColor": [0.88, 0.83, 0.48, 1.0],
+      "shoulderWidth": 0.76,
+      "centerLineWidth": 0.12,
+      "crownHeight": 0.03,
+      "yawDegrees": 10.0
+    },
+    {
+      "name": "LauncestonStreet",
+      "position": [18.0, 1.00, 182.0],
+      "size": [6.2, 52.0],
+      "roadColor": [0.19, 0.19, 0.21, 1.0],
+      "shoulderColor": [0.38, 0.41, 0.35, 1.0],
+      "lineColor": [0.88, 0.83, 0.48, 1.0],
+      "shoulderWidth": 0.62,
+      "centerLineWidth": 0.10,
+      "crownHeight": 0.02,
+      "yawDegrees": 88.0
+    },
+    {
+      "name": "CallamStreet",
+      "position": [8.0, 1.00, 160.0],
+      "size": [6.0, 48.0],
+      "roadColor": [0.19, 0.19, 0.21, 1.0],
+      "shoulderColor": [0.38, 0.41, 0.35, 1.0],
+      "lineColor": [0.88, 0.83, 0.48, 1.0],
+      "shoulderWidth": 0.60,
+      "centerLineWidth": 0.10,
+      "crownHeight": 0.02,
+      "yawDegrees": 92.0
+    }
+  ],
+  "grayboxBlocks": [
+    {
+      "name": "WestfieldWodenCore",
+      "position": [8.0, 8.0, 172.0],
+      "halfExtents": [26.0, 8.0, 16.0],
+      "color": [0.45, 0.48, 0.52, 1.0],
+      "yawDegrees": 2.0,
+      "collisionEnabled": false
+    },
+    {
+      "name": "WodenInterchangeFrame",
+      "position": [8.0, 4.0, 160.0],
+      "halfExtents": [14.0, 4.0, 8.0],
+      "color": [0.46, 0.49, 0.53, 1.0],
+      "yawDegrees": 0.0,
+      "collisionEnabled": false
+    },
+    {
+      "name": "CallamOfficeTower",
+      "position": [20.0, 12.0, 188.0],
+      "halfExtents": [8.0, 12.0, 8.0],
+      "color": [0.47, 0.50, 0.54, 1.0],
+      "yawDegrees": 0.0
+    },
+    {
+      "name": "CITCampusFrame",
+      "position": [34.0, 7.0, 176.0],
+      "halfExtents": [16.0, 7.0, 10.0],
+      "color": [0.44, 0.47, 0.50, 1.0],
+      "yawDegrees": 6.0,
+      "collisionEnabled": false
+    }
+  ],
+  "collisionVolumes": [
+    {
+      "name": "InterchangeMedian",
+      "position": [12.0, 1.2, 166.0],
+      "halfExtents": [1.0, 0.9, 10.0],
+      "yawDegrees": 88.0
+    }
+  ]
+}

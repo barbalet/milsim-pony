@@ -46,6 +46,42 @@ struct SceneMapCheckpoint: Identifiable {
     let isGoal: Bool
 }
 
+struct SceneMapRoad: Identifiable {
+    let id: String
+    let displayName: String
+    let centerPoint: SceneMapPoint
+    let width: Float
+    let length: Float
+    let yawDegrees: Float
+
+    var shortLabel: String {
+        let trimmed = displayName
+            .replacingOccurrences(of: "Avenue", with: "Ave")
+            .replacingOccurrences(of: "Drive", with: "Dr")
+            .replacingOccurrences(of: "Street", with: "St")
+            .replacingOccurrences(of: "Road", with: "Rd")
+            .replacingOccurrences(of: "Parade", with: "Pde")
+            .replacingOccurrences(of: "Circuit", with: "Cct")
+        return trimmed.count <= 18 ? trimmed : String(trimmed.prefix(18))
+    }
+
+    var startPoint: SceneMapPoint {
+        let halfLength = length * 0.5
+        let yawRadians = yawDegrees * (.pi / 180.0)
+        let deltaX = sinf(yawRadians) * halfLength
+        let deltaZ = cosf(yawRadians) * halfLength
+        return SceneMapPoint(x: centerPoint.x - deltaX, z: centerPoint.z - deltaZ)
+    }
+
+    var endPoint: SceneMapPoint {
+        let halfLength = length * 0.5
+        let yawRadians = yawDegrees * (.pi / 180.0)
+        let deltaX = sinf(yawRadians) * halfLength
+        let deltaZ = cosf(yawRadians) * halfLength
+        return SceneMapPoint(x: centerPoint.x + deltaX, z: centerPoint.z + deltaZ)
+    }
+}
+
 struct SceneMapSector: Identifiable {
     let id: String
     let displayName: String
@@ -81,6 +117,7 @@ struct SceneMapConfiguration {
     let spawnPoint: SceneMapPoint
     let spawnYawDegrees: Float
     let sectors: [SceneMapSector]
+    let roads: [SceneMapRoad]
     let checkpoints: [SceneMapCheckpoint]
 
     var width: Float {
@@ -763,7 +800,7 @@ private final class ScenePackageBuilder {
             )
         }
 
-        let detailLines = [
+        var detailLines = [
             "Grid: \(coordinateSystem.name)",
             "Axes: x \(coordinateSystem.axisX) / z \(coordinateSystem.axisZ)",
             "Spawn: \(sceneConfiguration.spawn.label ?? "District start")",
@@ -786,6 +823,8 @@ private final class ScenePackageBuilder {
             ),
             "Data Root: \(URL(fileURLWithPath: worldDataRoot).lastPathComponent)",
         ]
+
+        detailLines.append(contentsOf: sceneConfiguration.planningNotes ?? [])
 
         let summary = "\(assetCount) assets, \(terrainCount) terrain, \(roadCount) roads, \(grayboxCount) structures, \(routeMarkerCount) route markers, \(guidanceMarkerCount + observerMarkerCount) evasion markers"
 
@@ -859,6 +898,21 @@ private final class ScenePackageBuilder {
                 maxZ: sector.bounds.maximum.z
             )
         }
+        let mapRoads = loadedSectors.flatMap { sector in
+            sector.roadStrips.map { road in
+                SceneMapRoad(
+                    id: "\(sector.id).\(road.name)",
+                    displayName: road.name,
+                    centerPoint: SceneMapPoint(
+                        x: road.positionVector.x,
+                        z: road.positionVector.z
+                    ),
+                    width: road.sizeVector.x,
+                    length: road.sizeVector.y,
+                    yawDegrees: road.yawDegrees ?? 0
+                )
+            }
+        }
         let mapCheckpoints = checkpoints.map { checkpoint in
             SceneMapCheckpoint(
                 id: checkpoint.id,
@@ -912,6 +966,7 @@ private final class ScenePackageBuilder {
             spawnPoint: spawnPoint,
             spawnYawDegrees: spawn.yawDegrees,
             sectors: mapSectors,
+            roads: mapRoads,
             checkpoints: mapCheckpoints
         )
     }
@@ -1609,6 +1664,7 @@ private enum FallbackSceneFactory {
                 spawnPoint: SceneMapPoint(x: 0, z: 6),
                 spawnYawDegrees: 0,
                 sectors: [],
+                roads: [],
                 checkpoints: []
             ),
             sectors: [],

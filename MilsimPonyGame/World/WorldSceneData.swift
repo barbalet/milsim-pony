@@ -21,6 +21,7 @@ struct CoordinateSystemConfiguration: Decodable {
 struct SceneConfiguration: Decodable {
     let cycleLabel: String?
     let sceneName: String
+    let planningNotes: [String]?
     let spawn: SpawnConfiguration
     let sky: SkyConfiguration
     let sun: SunConfiguration

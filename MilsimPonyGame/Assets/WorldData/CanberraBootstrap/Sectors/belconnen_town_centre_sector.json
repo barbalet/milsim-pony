@@ -1,0 +1,133 @@
+{
+  "id": "belconnen_town_centre_sector",
+  "displayName": "Belconnen Town Centre",
+  "residency": "local",
+  "bounds": {
+    "min": [-188.0, 0.0, -238.0],
+    "max": [-86.0, 18.0, -138.0]
+  },
+  "streamingPadding": 118.0,
+  "terrainPatches": [
+    {
+      "name": "BelcoCentrePad",
+      "position": [-142.0, 2.0, -192.0],
+      "size": [92.0, 72.0],
+      "cornerHeights": [2.0, 2.4, 1.0, 1.0],
+      "subdivisions": 16,
+      "color": [0.38, 0.44, 0.33, 1.0],
+      "yawDegrees": 4.0
+    },
+    {
+      "name": "EmuBankRise",
+      "position": [-166.0, 2.0, -164.0],
+      "size": [58.0, 52.0],
+      "cornerHeights": [2.0, 3.0, 1.0, 0.8],
+      "subdivisions": 12,
+      "color": [0.37, 0.43, 0.32, 1.0],
+      "yawDegrees": 8.0
+    }
+  ],
+  "roadStrips": [
+    {
+      "name": "BenjaminWay",
+      "position": [-138.0, 1.00, -190.0],
+      "size": [8.0, 86.0],
+      "roadColor": [0.20, 0.20, 0.22, 1.0],
+      "shoulderColor": [0.40, 0.43, 0.37, 1.0],
+      "lineColor": [0.92, 0.87, 0.54, 1.0],
+      "shoulderWidth": 0.8,
+      "centerLineWidth": 0.14,
+      "crownHeight": 0.03,
+      "yawDegrees": 2.0
+    },
+    {
+      "name": "CohenStreet",
+      "position": [-150.0, 0.98, -202.0],
+      "size": [6.2, 46.0],
+      "roadColor": [0.19, 0.19, 0.21, 1.0],
+      "shoulderColor": [0.39, 0.42, 0.36, 1.0],
+      "lineColor": [0.89, 0.84, 0.49, 1.0],
+      "shoulderWidth": 0.62,
+      "centerLineWidth": 0.10,
+      "crownHeight": 0.02,
+      "yawDegrees": 90.0
+    },
+    {
+      "name": "EmuBank",
+      "position": [-166.0, 0.94, -164.0],
+      "size": [7.0, 78.0],
+      "roadColor": [0.19, 0.19, 0.21, 1.0],
+      "shoulderColor": [0.38, 0.41, 0.35, 1.0],
+      "lineColor": [0.88, 0.83, 0.48, 1.0],
+      "shoulderWidth": 0.68,
+      "centerLineWidth": 0.12,
+      "crownHeight": 0.03,
+      "yawDegrees": 86.0
+    },
+    {
+      "name": "BelconnenWaySouth",
+      "position": [-116.0, 0.96, -176.0],
+      "size": [8.6, 98.0],
+      "roadColor": [0.20, 0.20, 0.22, 1.0],
+      "shoulderColor": [0.39, 0.42, 0.36, 1.0],
+      "lineColor": [0.89, 0.84, 0.49, 1.0],
+      "shoulderWidth": 0.82,
+      "centerLineWidth": 0.14,
+      "crownHeight": 0.03,
+      "yawDegrees": 18.0
+    },
+    {
+      "name": "GinninderraAccess",
+      "position": [-174.0, 0.92, -214.0],
+      "size": [6.2, 48.0],
+      "roadColor": [0.19, 0.19, 0.21, 1.0],
+      "shoulderColor": [0.38, 0.41, 0.35, 1.0],
+      "lineColor": [0.88, 0.83, 0.48, 1.0],
+      "shoulderWidth": 0.60,
+      "centerLineWidth": 0.10,
+      "crownHeight": 0.02,
+      "yawDegrees": 66.0
+    }
+  ],
+  "grayboxBlocks": [
+    {
+      "name": "BelconnenInterchangeFrame",
+      "position": [-150.0, 5.0, -202.0],
+      "halfExtents": [14.0, 5.0, 8.0],
+      "color": [0.46, 0.49, 0.53, 1.0],
+      "yawDegrees": 0.0,
+      "collisionEnabled": false
+    },
+    {
+      "name": "WestfieldBelconnenMass",
+      "position": [-138.0, 8.0, -192.0],
+      "halfExtents": [26.0, 8.0, 16.0],
+      "color": [0.45, 0.48, 0.52, 1.0],
+      "yawDegrees": 2.0,
+      "collisionEnabled": false
+    },
+    {
+      "name": "BelconnenTowerWest",
+      "position": [-124.0, 12.0, -178.0],
+      "halfExtents": [8.0, 12.0, 8.0],
+      "color": [0.47, 0.50, 0.54, 1.0],
+      "yawDegrees": 0.0
+    },
+    {
+      "name": "EmuBankOfficeBand",
+      "position": [-166.0, 5.0, -164.0],
+      "halfExtents": [18.0, 5.0, 10.0],
+      "color": [0.44, 0.47, 0.50, 1.0],
+      "yawDegrees": 8.0,
+      "collisionEnabled": false
+    }
+  ],
+  "collisionVolumes": [
+    {
+      "name": "BelcoMedian",
+      "position": [-142.0, 1.2, -190.0],
+      "halfExtents": [1.0, 0.9, 12.0],
+      "yawDegrees": 2.0
+    }
+  ]
+}

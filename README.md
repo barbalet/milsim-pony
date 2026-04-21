@@ -1,25 +1,25 @@
 # milsim-pony
 
-`milsim-pony` is a macOS first-person military-simulation prototype built with SwiftUI, Metal, and a C-heavy gameplay core. The project is centered on Canberra, Australia, and is currently focused on proving large-scale terrain readability, first-person traversal, scoped observation, and a reviewable gameplay loop that can grow into a fuller sniper-led milsim.
+`milsim-pony` is a macOS first-person military-simulation prototype built with SwiftUI, Metal, and a C-heavy gameplay core. The project is centered on Canberra, Australia, and is currently focused on proving large-scale terrain readability, a district-by-district street atlas, first-person traversal, scoped observation, and a reviewable gameplay loop that can grow into a fuller sniper-led milsim.
 
 ## Game Overview
 
-The current default build launches into **Canberra Scope Validation Review**, a basin-scale demo that starts on an elevated perch above the east basin and sends the player across a sequence of authored observation points. The route is designed to confirm that the world remains readable at distance through a 4x scope, especially around Lake Burley Griffin, the Parliament axis, Woden, Black Mountain, and the Belconnen skyline.
+The current default build launches into **Canberra Street Atlas Review**, a basin-scale demo that starts on an elevated perch above the east basin and sends the player across a sequence of authored district review points. The route is designed to confirm that the world remains readable at distance through a 4x scope, especially around Lake Burley Griffin, the Parliament axis, Civic, Barton-Russell, Woden, Black Mountain, and the Belconnen skyline.
 
-At the moment, the game is more of a traversal and observation prototype than a complete combat sandbox. You move on foot through the authored route, use the scope to inspect distant landmarks, and open the overhead map to keep your bearings and confirm which sector of Canberra you are in. The HUD, route markers, pause flow, settings screen, checkpoint restarts, and completion shell are already implemented so the build can be used as a repeatable review demo.
+At the moment, the game is more of a traversal and observation prototype than a complete combat sandbox. You move on foot through the authored route, use the scope to inspect distant landmarks, and open the overhead map to keep your bearings, confirm which sector of Canberra you are in, and read the named road network that is now drawn into the atlas overlay. The HUD, route markers, pause flow, settings screen, checkpoint restarts, and completion shell are already implemented so the build can be used as a repeatable review demo.
 
-The broader project goal is a playable Canberra milsim with long-range combat support, stable distant rendering, and a usable sniper rifle. The current scene is the foundation for that work: it proves the world scale, sightlines, streaming behavior, and scoped viewing path that later weapon systems will rely on.
+The broader project goal is a playable Canberra milsim with long-range combat support, stable distant rendering, and a usable sniper rifle. The current scene is the foundation for that work: it proves the world scale, sightlines, streaming behavior, district coverage, and scoped viewing path that later weapon systems will rely on.
 
 ## Current Demo Loop
 
 1. Launch the game and begin from the briefing shell.
 2. Spawn at the East Basin scope terrace.
-3. Walk or sprint between the authored landmark-validation checkpoints.
-4. Raise the 4x scope at review points to inspect distant Canberra features.
-5. Open the overhead map whenever you need sector context or checkpoint progress.
+3. Walk or sprint between the authored district-atlas checkpoints.
+4. Raise the 4x scope at review points to inspect distant Canberra features and street corridors.
+5. Open the overhead map whenever you need sector context, checkpoint progress, or the named road atlas.
 6. Pause, restart, retry, or return to briefing as needed.
 
-The repository also contains an earlier Parliament House escape scenario with detection, observer pressure, and checkpoint fallback logic. The default world manifest currently points at the wider Canberra basin review build instead of that smaller escape slice.
+The repository also contains an earlier Parliament House escape scenario with detection, observer pressure, and checkpoint fallback logic. The default world manifest now points at the wider Canberra street-atlas review build instead of that smaller escape slice.
 
 ## Controls
 
@@ -43,10 +43,10 @@ Click inside the game window first so the Metal view becomes the active input ta
 
 This build is not about firefights yet. The player is acting as a field observer moving through a guided Canberra survey route:
 
-- Validate that major Canberra landmarks are visible and readable at long range.
+- Validate that major Canberra landmarks and arterial streets are visible and readable at long range.
 - Confirm that scoped rendering remains stable across distant terrain and skyline silhouettes.
-- Move between authored perches that test different basin sightlines.
-- Use the overhead map to understand current location, sector, and route progress.
+- Move between authored perches that test different basin sightlines and district connectors.
+- Use the overhead map to understand current location, sector, road network, and route progress.
 - Replay the route quickly to compare world-data, streaming, and rendering changes between cycles.
 
 ## Build And Run
@@ -82,4 +82,4 @@ You can also open [MilsimPonyGame.xcodeproj](/Users/barbalet/github/milsim-pony/
 
 ## Current Focus
 
-The active direction for the project is basin-scale Canberra coverage from Woden to Belconnen, with Lake Burley Griffin as a readable anchor and the 4x scope as the core validation tool. The next major milestone is turning this observation route into a fuller sniper-capable milsim without losing the large-world readability the current demo is built to prove.
+The active direction for the project is basin-scale Canberra coverage from Woden to Belconnen, with Lake Burley Griffin as a readable anchor, a district street atlas in the overhead map, and the 4x scope as the core validation tool. The current program runs through cycles `15` to `20`, expanding district coverage, street density, online-reference capture, and route integration before the next major push toward a sniper-capable milsim.
