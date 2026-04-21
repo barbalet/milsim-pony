@@ -95,6 +95,7 @@ final class GameRenderer: NSObject, MTKViewDelegate {
         )
         session.noteOverlayTitle(scene.debugInfo.cycleLabel)
         session.noteScopeConfiguration(scene.scopeConfiguration)
+        session.noteMapConfiguration(scene.mapConfiguration)
         print("[Renderer] Metal bootstrap ready on \(device.name) with \(scene.debugInfo.summary)")
     }
 

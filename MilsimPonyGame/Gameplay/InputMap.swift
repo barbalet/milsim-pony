@@ -7,6 +7,7 @@ enum InputCommand: String, CaseIterable, Hashable {
     case strafeRight
     case sprint
     case interact
+    case toggleMap
     case restart
     case pause
 
@@ -24,10 +25,21 @@ enum InputCommand: String, CaseIterable, Hashable {
             return "Sprint"
         case .interact:
             return "Interact"
+        case .toggleMap:
+            return "Overhead Map"
         case .restart:
             return "Restart Route"
         case .pause:
             return "Pause"
+        }
+    }
+
+    var isContinuous: Bool {
+        switch self {
+        case .forward, .backward, .strafeLeft, .strafeRight, .sprint:
+            return true
+        case .interact, .toggleMap, .restart, .pause:
+            return false
         }
     }
 }
@@ -43,8 +55,19 @@ enum InputBindings {
         49: .interact,
         36: .interact,
         76: .interact,
+        46: .toggleMap,
         15: .restart,
         53: .pause,
+    ]
+
+    private static let characterMap: [String: InputCommand] = [
+        "w": .forward,
+        "s": .backward,
+        "a": .strafeLeft,
+        "d": .strafeRight,
+        "m": .toggleMap,
+        "r": .restart,
+        " ": .interact,
     ]
 
     static let launchHints: [String] = [
@@ -52,11 +75,20 @@ enum InputBindings {
         "Shift: sprint",
         "Mouse move: look",
         "Space / Return: deploy, confirm, or toggle 4x scope",
+        "M: toggle the overhead Canberra map",
         "R: restart or retry from last checkpoint",
         "Esc: pause or resume the demo shell",
     ]
 
-    static func command(for keyCode: UInt16) -> InputCommand? {
-        keyCodeMap[keyCode]
+    static func command(for keyCode: UInt16, characters: String?) -> InputCommand? {
+        if let normalizedCharacters = characters?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased(),
+           !normalizedCharacters.isEmpty,
+           let characterCommand = characterMap[normalizedCharacters] {
+            return characterCommand
+        }
+
+        return keyCodeMap[keyCode]
     }
 }

@@ -34,6 +34,64 @@ struct SceneDebugInfo {
     let spawn: SpawnConfiguration
 }
 
+struct SceneMapPoint {
+    let x: Float
+    let z: Float
+}
+
+struct SceneMapCheckpoint: Identifiable {
+    let id: String
+    let label: String
+    let point: SceneMapPoint
+    let isGoal: Bool
+}
+
+struct SceneMapSector: Identifiable {
+    let id: String
+    let displayName: String
+    let residency: SectorResidency
+    let minX: Float
+    let maxX: Float
+    let minZ: Float
+    let maxZ: Float
+
+    var shortLabel: String {
+        let trimmed = displayName
+            .replacingOccurrences(of: " Sector", with: "")
+            .replacingOccurrences(of: "Canberra ", with: "")
+        if trimmed.count <= 18 {
+            return trimmed
+        }
+
+        let words = trimmed.split(separator: " ")
+        return words.prefix(2).map(String.init).joined(separator: " ")
+    }
+
+    func contains(x: Float, z: Float) -> Bool {
+        x >= minX && x <= maxX && z >= minZ && z <= maxZ
+    }
+}
+
+struct SceneMapConfiguration {
+    let sceneName: String
+    let minX: Float
+    let maxX: Float
+    let minZ: Float
+    let maxZ: Float
+    let spawnPoint: SceneMapPoint
+    let spawnYawDegrees: Float
+    let sectors: [SceneMapSector]
+    let checkpoints: [SceneMapCheckpoint]
+
+    var width: Float {
+        max(maxX - minX, 1)
+    }
+
+    var depth: Float {
+        max(maxZ - minZ, 1)
+    }
+}
+
 struct SceneStreamingState {
     let summary: String
     let details: [String]
@@ -78,6 +136,7 @@ final class BootstrapScene {
     let debugInfo: SceneDebugInfo
     let environment: SceneEnvironment
     let scopeConfiguration: ScopeConfiguration
+    let mapConfiguration: SceneMapConfiguration
 
     private let sectors: [SceneSectorRuntime]
     private let runtimeWorld: SceneRuntimeWorld
@@ -100,6 +159,7 @@ final class BootstrapScene {
             debugInfo = buildResult.debugInfo
             environment = buildResult.environment
             scopeConfiguration = buildResult.scopeConfiguration
+            mapConfiguration = buildResult.mapConfiguration
             sectors = buildResult.sectors
             runtimeWorld = buildResult.runtimeWorld
             alwaysLoadedIndices = buildResult.alwaysLoadedIndices
@@ -118,6 +178,7 @@ final class BootstrapScene {
             debugInfo = fallbackResult.debugInfo
             environment = fallbackResult.environment
             scopeConfiguration = fallbackResult.scopeConfiguration
+            mapConfiguration = fallbackResult.mapConfiguration
             sectors = fallbackResult.sectors
             runtimeWorld = fallbackResult.runtimeWorld
             alwaysLoadedIndices = fallbackResult.alwaysLoadedIndices
@@ -440,6 +501,7 @@ private struct SceneBuildResult {
     let debugInfo: SceneDebugInfo
     let environment: SceneEnvironment
     let scopeConfiguration: ScopeConfiguration
+    let mapConfiguration: SceneMapConfiguration
     let sectors: [SceneSectorRuntime]
     let runtimeWorld: SceneRuntimeWorld
     let alwaysLoadedIndices: [Int]
@@ -749,6 +811,12 @@ private final class ScenePackageBuilder {
                 hazeStrength: max(atmosphereConfiguration.hazeStrength ?? 0.16, 0)
             ),
             scopeConfiguration: scopeConfiguration,
+            mapConfiguration: buildMapConfiguration(
+                sceneName: sceneConfiguration.sceneName,
+                loadedSectors: loadedSectors,
+                spawn: sceneConfiguration.spawn,
+                checkpoints: sceneConfiguration.route.checkpoints
+            ),
             sectors: sceneSectors,
             runtimeWorld: SceneRuntimeWorld(
                 sectorBounds: worldSectors,
@@ -771,6 +839,80 @@ private final class ScenePackageBuilder {
                 signposts: guidanceConfiguration.signposts
             ),
             traversalTuning: traversalTuning
+        )
+    }
+
+    private func buildMapConfiguration(
+        sceneName: String,
+        loadedSectors: [SectorConfiguration],
+        spawn: SpawnConfiguration,
+        checkpoints: [RouteCheckpointConfiguration]
+    ) -> SceneMapConfiguration {
+        let mapSectors = loadedSectors.map { sector in
+            SceneMapSector(
+                id: sector.id,
+                displayName: sector.displayName,
+                residency: sector.residency ?? .local,
+                minX: sector.bounds.minimum.x,
+                maxX: sector.bounds.maximum.x,
+                minZ: sector.bounds.minimum.z,
+                maxZ: sector.bounds.maximum.z
+            )
+        }
+        let mapCheckpoints = checkpoints.map { checkpoint in
+            SceneMapCheckpoint(
+                id: checkpoint.id,
+                label: checkpoint.label,
+                point: SceneMapPoint(
+                    x: checkpoint.positionVector.x,
+                    z: checkpoint.positionVector.z
+                ),
+                isGoal: checkpoint.goal ?? false
+            )
+        }
+        let spawnPoint = SceneMapPoint(
+            x: spawn.positionVector.x,
+            z: spawn.positionVector.z
+        )
+
+        var minX = mapSectors.map(\.minX).min() ?? (spawnPoint.x - 80)
+        var maxX = mapSectors.map(\.maxX).max() ?? (spawnPoint.x + 80)
+        var minZ = mapSectors.map(\.minZ).min() ?? (spawnPoint.z - 80)
+        var maxZ = mapSectors.map(\.maxZ).max() ?? (spawnPoint.z + 80)
+
+        minX = min(minX, spawnPoint.x)
+        maxX = max(maxX, spawnPoint.x)
+        minZ = min(minZ, spawnPoint.z)
+        maxZ = max(maxZ, spawnPoint.z)
+
+        for checkpoint in mapCheckpoints {
+            minX = min(minX, checkpoint.point.x)
+            maxX = max(maxX, checkpoint.point.x)
+            minZ = min(minZ, checkpoint.point.z)
+            maxZ = max(maxZ, checkpoint.point.z)
+        }
+
+        if (maxX - minX) < 1 {
+            minX -= 40
+            maxX += 40
+        }
+        if (maxZ - minZ) < 1 {
+            minZ -= 40
+            maxZ += 40
+        }
+
+        let padding = max(max(maxX - minX, maxZ - minZ) * 0.08, 18)
+
+        return SceneMapConfiguration(
+            sceneName: sceneName,
+            minX: minX - padding,
+            maxX: maxX + padding,
+            minZ: minZ - padding,
+            maxZ: maxZ + padding,
+            spawnPoint: spawnPoint,
+            spawnYawDegrees: spawn.yawDegrees,
+            sectors: mapSectors,
+            checkpoints: mapCheckpoints
         )
     }
 
@@ -1458,6 +1600,17 @@ private enum FallbackSceneFactory {
                 hazeStrength: 0.14
             ),
             scopeConfiguration: ScopeConfiguration(),
+            mapConfiguration: SceneMapConfiguration(
+                sceneName: "Fallback Bootstrap Scene",
+                minX: -60,
+                maxX: 60,
+                minZ: -60,
+                maxZ: 60,
+                spawnPoint: SceneMapPoint(x: 0, z: 6),
+                spawnYawDegrees: 0,
+                sectors: [],
+                checkpoints: []
+            ),
             sectors: [],
             runtimeWorld: SceneRuntimeWorld(
                 sectorBounds: [],

@@ -2,7 +2,13 @@ import MetalKit
 import SwiftUI
 
 protocol InputTrackingMetalViewDelegate: AnyObject {
-    func inputView(_ view: InputTrackingMetalView, keyDidChange keyCode: UInt16, isPressed: Bool)
+    func inputView(
+        _ view: InputTrackingMetalView,
+        keyDidChange keyCode: UInt16,
+        characters: String?,
+        isPressed: Bool,
+        isRepeat: Bool
+    )
     func inputView(_ view: InputTrackingMetalView, mouseDidMove deltaX: CGFloat, deltaY: CGFloat)
     func inputViewDidBecomeActive(_ view: InputTrackingMetalView)
 }
@@ -47,8 +53,19 @@ struct MetalGameView: NSViewRepresentable {
             self.session = session
         }
 
-        func inputView(_ view: InputTrackingMetalView, keyDidChange keyCode: UInt16, isPressed: Bool) {
-            session.handleKey(keyCode, isPressed: isPressed)
+        func inputView(
+            _ view: InputTrackingMetalView,
+            keyDidChange keyCode: UInt16,
+            characters: String?,
+            isPressed: Bool,
+            isRepeat: Bool
+        ) {
+            session.handleKey(
+                keyCode,
+                characters: characters,
+                isPressed: isPressed,
+                isRepeat: isRepeat
+            )
         }
 
         func inputView(_ view: InputTrackingMetalView, mouseDidMove deltaX: CGFloat, deltaY: CGFloat) {
@@ -64,6 +81,13 @@ struct MetalGameView: NSViewRepresentable {
 final class InputTrackingMetalView: MTKView {
     weak var inputDelegate: InputTrackingMetalViewDelegate?
     private var localTrackingArea: NSTrackingArea?
+    private var localKeyMonitor: Any?
+
+    deinit {
+        if let localKeyMonitor {
+            NSEvent.removeMonitor(localKeyMonitor)
+        }
+    }
 
     override var acceptsFirstResponder: Bool {
         true
@@ -73,6 +97,7 @@ final class InputTrackingMetalView: MTKView {
         super.viewDidMoveToWindow()
         window?.acceptsMouseMovedEvents = true
         window?.makeFirstResponder(self)
+        installLocalKeyMonitorIfNeeded()
         inputDelegate?.inputViewDidBecomeActive(self)
     }
 
@@ -102,21 +127,30 @@ final class InputTrackingMetalView: MTKView {
     }
 
     override func keyDown(with event: NSEvent) {
-        inputDelegate?.inputView(self, keyDidChange: event.keyCode, isPressed: true)
+        if localKeyMonitor == nil, dispatchInputEventIfHandled(event) {
+            return
+        }
+
+        super.keyDown(with: event)
     }
 
     override func keyUp(with event: NSEvent) {
-        inputDelegate?.inputView(self, keyDidChange: event.keyCode, isPressed: false)
+        if localKeyMonitor == nil, dispatchInputEventIfHandled(event) {
+            return
+        }
+
+        super.keyUp(with: event)
     }
 
     override func flagsChanged(with event: NSEvent) {
+        if localKeyMonitor == nil, dispatchInputEventIfHandled(event) {
+            return
+        }
+
         guard event.keyCode == 56 || event.keyCode == 60 else {
             super.flagsChanged(with: event)
             return
         }
-
-        let isPressed = event.modifierFlags.contains(.shift)
-        inputDelegate?.inputView(self, keyDidChange: event.keyCode, isPressed: isPressed)
     }
 
     override func mouseMoved(with event: NSEvent) {
@@ -129,5 +163,62 @@ final class InputTrackingMetalView: MTKView {
 
     override func rightMouseDragged(with event: NSEvent) {
         inputDelegate?.inputView(self, mouseDidMove: event.deltaX, deltaY: event.deltaY)
+    }
+
+    private func installLocalKeyMonitorIfNeeded() {
+        guard localKeyMonitor == nil else {
+            return
+        }
+
+        localKeyMonitor = NSEvent.addLocalMonitorForEvents(
+            matching: [.keyDown, .keyUp, .flagsChanged]
+        ) { [weak self] event in
+            guard let self else {
+                return event
+            }
+
+            if self.dispatchInputEventIfHandled(event) {
+                return nil
+            }
+
+            return event
+        }
+    }
+
+    private func dispatchInputEventIfHandled(_ event: NSEvent) -> Bool {
+        switch event.type {
+        case .flagsChanged:
+            guard event.keyCode == 56 || event.keyCode == 60 else {
+                return false
+            }
+
+            let isPressed = event.modifierFlags.contains(.shift)
+            inputDelegate?.inputView(
+                self,
+                keyDidChange: event.keyCode,
+                characters: nil,
+                isPressed: isPressed,
+                isRepeat: false
+            )
+            return true
+
+        case .keyDown, .keyUp:
+            let characters = event.charactersIgnoringModifiers
+            guard InputBindings.command(for: event.keyCode, characters: characters) != nil else {
+                return false
+            }
+
+            inputDelegate?.inputView(
+                self,
+                keyDidChange: event.keyCode,
+                characters: characters,
+                isPressed: event.type == .keyDown,
+                isRepeat: event.type == .keyDown ? event.isARepeat : false
+            )
+            return true
+
+        default:
+            return false
+        }
     }
 }

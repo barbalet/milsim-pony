@@ -40,6 +40,18 @@ private struct StoredSessionSettings {
     let lookSensitivityScale: Double
 }
 
+struct OverheadMapSnapshot {
+    let configuration: SceneMapConfiguration
+    let playerX: Float
+    let playerZ: Float
+    let headingX: Float
+    let headingZ: Float
+    let currentSectorName: String
+    let completedCheckpointCount: Int
+    let totalCheckpointCount: Int
+    let nextCheckpointLabel: String?
+}
+
 final class GameSession: ObservableObject {
     @Published private(set) var statusLine = "Bootstrapping game session"
     @Published private(set) var overlayLines: [String] = []
@@ -47,6 +59,7 @@ final class GameSession: ObservableObject {
     @Published private(set) var demoFlowState: DemoFlowState = .title
     @Published private(set) var isSettingsPresented = false
     @Published private(set) var isScopeActive = false
+    @Published private(set) var isMapPresented = false
     @Published private(set) var hudOpacity: Double
     @Published private(set) var invertLookY: Bool
     @Published private(set) var lookSensitivityScale: Double
@@ -84,6 +97,7 @@ final class GameSession: ObservableObject {
     private var scopeDrawDistanceMultiplier: Float = 2.4
     private var scopeFarPlaneMultiplierValue: Float = 1.35
     private var scopeReticleColorComponents = SIMD4<Float>(0.92, 0.86, 0.42, 0.94)
+    private var mapConfiguration: SceneMapConfiguration?
 
     init(configuration: LaunchConfiguration) {
         let storedSettings = Self.loadStoredSettings()
@@ -147,12 +161,20 @@ final class GameSession: ObservableObject {
     var inputCardSubtitle: String {
         let cycleLabel = overlayTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         return menuPanel == nil
-            ? "\(cycleLabel) traversal, scoped observation, and landmark validation controls"
-            : "Deploy, pause, retry, and tune persistent field settings"
+            ? "\(cycleLabel) traversal, scoped observation, map lookup, and landmark validation controls"
+            : "Deploy, pause, map, retry, and tune field settings"
     }
 
     var canBeginMission: Bool {
         sceneReady
+    }
+
+    var activeCommands: Set<InputCommand> {
+        pressedCommands
+    }
+
+    var canShowMap: Bool {
+        mapConfiguration != nil
     }
 
     var scopeStatusText: String {
@@ -184,6 +206,40 @@ final class GameSession: ObservableObject {
         max(scopeFarPlaneMultiplierValue, 1.0)
     }
 
+    var overheadMapSnapshot: OverheadMapSnapshot? {
+        guard let mapConfiguration else {
+            return nil
+        }
+
+        let snapshot = latestSnapshot
+        let playerX = snapshot?.cameraX ?? mapConfiguration.spawnPoint.x
+        let playerZ = snapshot?.cameraZ ?? mapConfiguration.spawnPoint.z
+        let yawDegrees = snapshot?.yawDegrees ?? mapConfiguration.spawnYawDegrees
+        let yawRadians = yawDegrees * (.pi / 180.0)
+        let completedCheckpointCount = min(
+            Int(snapshot?.completedCheckpointCount ?? 0),
+            mapConfiguration.checkpoints.count
+        )
+        let nextCheckpointLabel = completedCheckpointCount < mapConfiguration.checkpoints.count
+            ? mapConfiguration.checkpoints[completedCheckpointCount].label
+            : nil
+        let currentSectorName = mapConfiguration.sectors.first(where: { sector in
+            sector.contains(x: playerX, z: playerZ)
+        })?.displayName ?? "Outside basin bounds"
+
+        return OverheadMapSnapshot(
+            configuration: mapConfiguration,
+            playerX: playerX,
+            playerZ: playerZ,
+            headingX: sinf(yawRadians),
+            headingZ: -cosf(yawRadians),
+            currentSectorName: currentSectorName,
+            completedCheckpointCount: completedCheckpointCount,
+            totalCheckpointCount: mapConfiguration.checkpoints.count,
+            nextCheckpointLabel: nextCheckpointLabel
+        )
+    }
+
     func menuTitle(for panel: GameMenuPanel) -> String {
         switch panel {
         case .title:
@@ -210,7 +266,7 @@ final class GameSession: ObservableObject {
         case .complete:
             return routeSummary
         case .settings:
-            return "Persistent controls and overlay tuning"
+            return "Controls, Canberra locator, and overlay tuning"
         }
     }
 
@@ -272,6 +328,11 @@ final class GameSession: ObservableObject {
         scopeDrawDistanceMultiplier = max(configuration.drawDistanceMultiplier ?? 2.4, 1.0)
         scopeFarPlaneMultiplierValue = max(configuration.farPlaneMultiplier ?? 1.35, 1.0)
         scopeReticleColorComponents = configuration.reticleColorVector
+        rebuildOverlay()
+    }
+
+    func noteMapConfiguration(_ configuration: SceneMapConfiguration) {
+        mapConfiguration = configuration
         rebuildOverlay()
     }
 
@@ -412,8 +473,33 @@ final class GameSession: ObservableObject {
         rebuildOverlay()
     }
 
-    func handleKey(_ keyCode: UInt16, isPressed: Bool) {
-        guard let command = InputBindings.command(for: keyCode) else {
+    func setMapPresented(_ value: Bool) {
+        guard mapConfiguration != nil else {
+            isMapPresented = false
+            if value {
+                statusLine = sceneReady
+                    ? "Overhead Canberra map unavailable in this scene"
+                    : "Overhead Canberra map unlocks when Canberra finishes loading"
+                rebuildOverlay()
+            }
+            return
+        }
+
+        guard isMapPresented != value else {
+            return
+        }
+
+        isMapPresented = value
+        statusLine = value ? "Overhead Canberra map opened" : statusLineForCurrentFlowState()
+        rebuildOverlay()
+    }
+
+    func handleKey(_ keyCode: UInt16, characters: String?, isPressed: Bool, isRepeat: Bool) {
+        guard let command = InputBindings.command(for: keyCode, characters: characters) else {
+            return
+        }
+
+        if isPressed, isRepeat, !command.isContinuous {
             return
         }
 
@@ -421,6 +507,11 @@ final class GameSession: ObservableObject {
             switch command {
             case .pause:
                 handlePauseToggle()
+                print("[Input] \(command.label) pressed")
+                rebuildOverlay()
+                return
+            case .toggleMap:
+                setMapPresented(!isMapPresented)
                 print("[Input] \(command.label) pressed")
                 rebuildOverlay()
                 return
@@ -701,6 +792,7 @@ final class GameSession: ObservableObject {
             "Release: \(configuration.releaseDisplayName) / \(configuration.bundleIdentifier)",
             "Content: \(configuration.contentSourceSummary)",
             String(format: "Optic: %.1fx scope ready for live review markers.", scopeMagnification),
+            "Locator: press M at any time to raise the overhead Canberra map.",
             "Deploy: press Space or Return, then use Esc at any time for the pause shell.",
         ]
 
@@ -765,6 +857,7 @@ final class GameSession: ObservableObject {
             String(format: "Look scale: %.2fx of the authored cycle tuning", lookSensitivityScale),
             "Invert Y: \(invertLookY ? "enabled" : "disabled")",
             String(format: "Scope: %.1fx / %.1f deg / x%.1f draw", scopeMagnification, scopeFieldOfViewDegrees, scopeDrawDistanceMultiplier),
+            "Map: \(isMapPresented ? "open" : "hidden") / \(overheadMapSnapshot?.currentSectorName ?? "waiting for scene data")",
             String(format: "HUD opacity: %.0f%%", hudOpacity * 100),
             "Build: \(configuration.releaseDisplayName)",
             "Bundle: \(configuration.bundleIdentifier)",
@@ -807,6 +900,7 @@ final class GameSession: ObservableObject {
             "Assets: \(shortenedPath(configuration.assetRoot))",
             "World Data: \(shortenedPath(configuration.worldDataRoot))",
             "Manifest: \(shortenedPath(configuration.worldManifestPath))",
+            "Locator: \(isMapPresented ? "overhead map open" : "overhead map hidden") / \(overheadMapSnapshot?.currentSectorName ?? "waiting for Canberra layout")",
             "Renderer: \(rendererName)",
             "Scene Summary: \(sceneSummary)",
             String(

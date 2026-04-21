@@ -19,25 +19,32 @@ struct GameRootView: View {
                     subtitle: session.statusLine,
                     lines: session.overlayLines
                 )
-                overlayCard(
-                    title: "Input Map",
-                    subtitle: session.inputCardSubtitle,
-                    lines: InputBindings.launchHints
-                )
+                controlsWindow
             }
             .padding(16)
             .opacity(session.hudCardOpacity)
+            .zIndex(1)
 
             if session.isScopeActive && session.menuPanel == nil {
                 scopeOverlay
                     .ignoresSafeArea()
                     .allowsHitTesting(false)
+                    .zIndex(2)
             }
 
             if let panel = session.menuPanel {
                 menuShell(for: panel)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .padding(28)
+                    .zIndex(3)
+            }
+
+            if session.isMapPresented, let mapSnapshot = session.overheadMapSnapshot {
+                mapShell(snapshot: mapSnapshot)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(28)
+                    .allowsHitTesting(false)
+                    .zIndex(4)
             }
         }
         .frame(minWidth: 960, minHeight: 600)
@@ -72,6 +79,43 @@ struct GameRootView: View {
             instructionText: session.scopeInstructionText,
             reticleColor: Color(nsColor: session.scopeReticleColor)
         )
+    }
+
+    private var controlsWindow: some View {
+        shellCard(
+            title: "Control Deck",
+            subtitle: session.inputCardSubtitle,
+            maxWidth: 420
+        ) {
+            ControlDeck(
+                activeCommands: session.activeCommands,
+                menuPanel: session.menuPanel,
+                demoFlowState: session.demoFlowState,
+                scopeActive: session.isScopeActive,
+                mapVisible: session.isMapPresented,
+                mapAvailable: session.canShowMap
+            )
+        }
+    }
+
+    private func overheadMapOverlay(snapshot: OverheadMapSnapshot) -> some View {
+        shellCard(
+            title: "Canberra Overhead Map",
+            subtitle: snapshot.nextCheckpointLabel.map {
+                "Sector: \(snapshot.currentSectorName) • next marker: \($0)"
+            } ?? "Sector: \(snapshot.currentSectorName) • route complete",
+            maxWidth: 360
+        ) {
+            OverheadMapCanvas(snapshot: snapshot)
+                .frame(maxWidth: .infinity)
+        }
+        .frame(width: 360, alignment: .leading)
+    }
+
+    private func mapShell(snapshot: OverheadMapSnapshot) -> some View {
+        VStack(spacing: 18) {
+            overheadMapOverlay(snapshot: snapshot)
+        }
     }
 
     private var settingsControls: some View {
@@ -118,6 +162,21 @@ struct GameRootView: View {
             }
             .toggleStyle(.switch)
             .tint(Color(red: 0.36, green: 0.84, blue: 0.58))
+
+            Toggle(
+                isOn: Binding(
+                    get: { session.isMapPresented },
+                    set: { session.setMapPresented($0) }
+                )
+            ) {
+                Text(session.canShowMap ? "Show Overhead Map" : "Overhead Map Loading")
+                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.92))
+            }
+            .toggleStyle(.switch)
+            .tint(Color(red: 0.36, green: 0.74, blue: 0.96))
+            .disabled(!session.canShowMap)
+            .opacity(session.canShowMap ? 1 : 0.55)
         }
         .padding(.top, 4)
     }
@@ -243,6 +302,481 @@ struct GameRootView: View {
                 .stroke(.white.opacity(0.10), lineWidth: 1)
         )
         .shadow(color: .black.opacity(0.28), radius: 20, y: 10)
+    }
+}
+
+private struct ControlDeck: View {
+    let activeCommands: Set<InputCommand>
+    let menuPanel: GameMenuPanel?
+    let demoFlowState: DemoFlowState
+    let scopeActive: Bool
+    let mapVisible: Bool
+    let mapAvailable: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(Color(red: 0.92, green: 0.42, blue: 0.36))
+                    .frame(width: 8, height: 8)
+
+                Circle()
+                    .fill(Color(red: 0.95, green: 0.78, blue: 0.30))
+                    .frame(width: 8, height: 8)
+
+                Circle()
+                    .fill(Color(red: 0.36, green: 0.82, blue: 0.58))
+                    .frame(width: 8, height: 8)
+
+                Text("field-controls://canberra")
+                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.78))
+
+                Spacer()
+
+                Text(statusBadge)
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.82))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(Color.white.opacity(0.09))
+                    )
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(Color.white.opacity(0.05))
+
+            HStack(alignment: .top, spacing: 12) {
+                MovementCluster(activeCommands: activeCommands)
+
+                VStack(alignment: .leading, spacing: 10) {
+                    ControlLegendRow(
+                        keycaps: ["Mouse"],
+                        title: "Look",
+                        detail: "Free-look across the basin lanes",
+                        accent: Color(red: 0.72, green: 0.76, blue: 0.84)
+                    )
+                    ControlLegendRow(
+                        keycaps: menuPanel == .title ? ["Space", "Return"] : ["Space"],
+                        title: menuPanel == .title ? "Deploy / Confirm" : "4x Scope",
+                        detail: menuPanel == .title ? "Start or confirm the current shell selection" : "Raise or lower the observation optic",
+                        active: scopeActive,
+                        accent: Color(red: 0.94, green: 0.86, blue: 0.44)
+                    )
+                    ControlLegendRow(
+                        keycaps: ["M"],
+                        title: mapVisible ? "Map Open" : "Canberra Map",
+                        detail: mapAvailable ? "Toggle the overhead Canberra locator" : "Unlocks when scene data is ready",
+                        active: mapVisible,
+                        accent: Color(red: 0.34, green: 0.78, blue: 0.96),
+                        dimmed: !mapAvailable
+                    )
+                    ControlLegendRow(
+                        keycaps: ["R"],
+                        title: "Restart Route",
+                        detail: "Restart or retry from the latest checkpoint",
+                        accent: Color(red: 0.94, green: 0.54, blue: 0.42)
+                    )
+                    ControlLegendRow(
+                        keycaps: ["Esc"],
+                        title: demoFlowState == .paused ? "Resume Shell" : "Pause Shell",
+                        detail: "Pause or resume the live demo shell",
+                        active: demoFlowState == .paused,
+                        accent: Color(red: 0.90, green: 0.72, blue: 0.34)
+                    )
+                }
+            }
+            .padding(12)
+        }
+        .background(Color.black.opacity(0.44), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.white.opacity(0.10), lineWidth: 1)
+        )
+    }
+
+    private var statusBadge: String {
+        switch demoFlowState {
+        case .title:
+            return "BRIEF"
+        case .playing:
+            return mapVisible ? "LIVE+MAP" : "LIVE"
+        case .paused:
+            return "PAUSED"
+        case .failed:
+            return "RETRY"
+        case .complete:
+            return "CLEAR"
+        }
+    }
+}
+
+private struct MovementCluster: View {
+    let activeCommands: Set<InputCommand>
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Movement")
+                .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.76))
+
+            VStack(spacing: 6) {
+                HStack(spacing: 0) {
+                    Spacer(minLength: 0)
+                    KeycapView(
+                        label: "W",
+                        active: activeCommands.contains(.forward),
+                        accent: Color(red: 0.34, green: 0.74, blue: 0.96)
+                    )
+                    Spacer(minLength: 0)
+                }
+
+                HStack(spacing: 6) {
+                    KeycapView(
+                        label: "A",
+                        active: activeCommands.contains(.strafeLeft),
+                        accent: Color(red: 0.34, green: 0.74, blue: 0.96)
+                    )
+                    KeycapView(
+                        label: "S",
+                        active: activeCommands.contains(.backward),
+                        accent: Color(red: 0.34, green: 0.74, blue: 0.96)
+                    )
+                    KeycapView(
+                        label: "D",
+                        active: activeCommands.contains(.strafeRight),
+                        accent: Color(red: 0.34, green: 0.74, blue: 0.96)
+                    )
+                }
+
+                KeycapView(
+                    label: "Shift",
+                    width: 120,
+                    active: activeCommands.contains(.sprint),
+                    accent: Color(red: 0.92, green: 0.66, blue: 0.34)
+                )
+            }
+
+            Text("Ground movement, backstep, strafe, and sprint.")
+                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.58))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(12)
+        .frame(width: 144, alignment: .leading)
+        .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        )
+    }
+}
+
+private struct ControlLegendRow: View {
+    let keycaps: [String]
+    let title: String
+    let detail: String
+    var active = false
+    var accent = Color.white
+    var dimmed = false
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            HStack(spacing: 6) {
+                ForEach(keycaps, id: \.self) { keycap in
+                    KeycapView(
+                        label: keycap,
+                        width: keycapWidth(for: keycap),
+                        active: active,
+                        accent: accent,
+                        dimmed: dimmed
+                    )
+                }
+            }
+            .frame(minWidth: 94, alignment: .leading)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(dimmed ? .white.opacity(0.44) : .white.opacity(0.92))
+
+                Text(detail)
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .foregroundStyle(dimmed ? .white.opacity(0.36) : .white.opacity(0.60))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private func keycapWidth(for keycap: String) -> CGFloat? {
+        switch keycap {
+        case "Mouse":
+            return 62
+        case "Space":
+            return 58
+        case "Return":
+            return 60
+        default:
+            return keycap.count > 1 ? 52 : nil
+        }
+    }
+}
+
+private struct KeycapView: View {
+    let label: String
+    var width: CGFloat? = nil
+    var active = false
+    var accent = Color.white
+    var dimmed = false
+
+    var body: some View {
+        Text(label)
+            .font(.system(size: 11, weight: .bold, design: .monospaced))
+            .foregroundStyle(dimmed ? .white.opacity(0.42) : .white.opacity(active ? 0.98 : 0.90))
+            .frame(width: width ?? 34, height: 34)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(active ? accent.opacity(0.28) : Color.white.opacity(0.07))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(active ? accent.opacity(0.72) : Color.white.opacity(0.14), lineWidth: 1)
+            )
+            .opacity(dimmed ? 0.58 : 1)
+    }
+}
+
+private struct OverheadMapCanvas: View {
+    let snapshot: OverheadMapSnapshot
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            GeometryReader { geometry in
+                let drawingRect = CGRect(
+                    x: 12,
+                    y: 12,
+                    width: max(geometry.size.width - 24, 1),
+                    height: max(geometry.size.height - 24, 1)
+                )
+
+                ZStack {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(Color(red: 0.07, green: 0.10, blue: 0.12))
+
+                    Path { path in
+                        for index in 0...4 {
+                            let fraction = CGFloat(index) / 4
+                            let verticalX = drawingRect.minX + (drawingRect.width * fraction)
+                            path.move(to: CGPoint(x: verticalX, y: drawingRect.minY))
+                            path.addLine(to: CGPoint(x: verticalX, y: drawingRect.maxY))
+
+                            let horizontalY = drawingRect.minY + (drawingRect.height * fraction)
+                            path.move(to: CGPoint(x: drawingRect.minX, y: horizontalY))
+                            path.addLine(to: CGPoint(x: drawingRect.maxX, y: horizontalY))
+                        }
+                    }
+                    .stroke(Color.white.opacity(0.05), lineWidth: 1)
+
+                    ForEach(snapshot.configuration.sectors) { sector in
+                        let sectorRect = rect(for: sector, in: drawingRect)
+
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(sectorFill(for: sector))
+                            .frame(width: sectorRect.width, height: sectorRect.height)
+                            .position(x: sectorRect.midX, y: sectorRect.midY)
+
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .stroke(sectorStroke(for: sector), lineWidth: sector.displayName == snapshot.currentSectorName ? 1.6 : 1)
+                            .frame(width: sectorRect.width, height: sectorRect.height)
+                            .position(x: sectorRect.midX, y: sectorRect.midY)
+
+                        if sectorRect.width > 70, sectorRect.height > 24 {
+                            Text(sector.shortLabel)
+                                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                                .foregroundStyle(.white.opacity(0.72))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.75)
+                                .frame(width: sectorRect.width - 12)
+                                .position(x: sectorRect.midX, y: sectorRect.midY)
+                        }
+                    }
+
+                    Path { path in
+                        guard let first = snapshot.configuration.checkpoints.first else {
+                            return
+                        }
+
+                        path.move(to: point(forX: first.point.x, z: first.point.z, in: drawingRect))
+                        for checkpoint in snapshot.configuration.checkpoints.dropFirst() {
+                            path.addLine(to: point(forX: checkpoint.point.x, z: checkpoint.point.z, in: drawingRect))
+                        }
+                    }
+                    .stroke(
+                        Color(red: 0.94, green: 0.84, blue: 0.40).opacity(0.72),
+                        style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round, dash: [6, 4])
+                    )
+
+                    let spawnPoint = point(
+                        forX: snapshot.configuration.spawnPoint.x,
+                        z: snapshot.configuration.spawnPoint.z,
+                        in: drawingRect
+                    )
+
+                    RoundedRectangle(cornerRadius: 3, style: .continuous)
+                        .fill(Color.white.opacity(0.92))
+                        .frame(width: 10, height: 10)
+                        .position(spawnPoint)
+
+                    ForEach(Array(snapshot.configuration.checkpoints.enumerated()), id: \.element.id) { index, checkpoint in
+                        let checkpointPoint = point(
+                            forX: checkpoint.point.x,
+                            z: checkpoint.point.z,
+                            in: drawingRect
+                        )
+
+                        Circle()
+                            .fill(checkpointColor(for: checkpoint, index: index))
+                            .frame(width: checkpointSize(for: index), height: checkpointSize(for: index))
+                            .overlay(
+                                Circle()
+                                    .stroke(Color.black.opacity(0.28), lineWidth: 1)
+                            )
+                            .position(checkpointPoint)
+                    }
+
+                    let playerPoint = point(forX: snapshot.playerX, z: snapshot.playerZ, in: drawingRect)
+                    let headingLength: Float = 20
+                    let headingPoint = point(
+                        forX: snapshot.playerX + (snapshot.headingX * headingLength),
+                        z: snapshot.playerZ + (snapshot.headingZ * headingLength),
+                        in: drawingRect
+                    )
+
+                    Path { path in
+                        path.move(to: playerPoint)
+                        path.addLine(to: headingPoint)
+                    }
+                    .stroke(Color(red: 0.34, green: 0.82, blue: 0.98), style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+
+                    Circle()
+                        .fill(Color(red: 0.34, green: 0.82, blue: 0.98))
+                        .frame(width: 11, height: 11)
+                        .overlay(
+                            Circle()
+                                .stroke(Color.white.opacity(0.78), lineWidth: 1)
+                        )
+                        .position(playerPoint)
+
+                    Circle()
+                        .fill(Color(red: 0.34, green: 0.82, blue: 0.98).opacity(0.82))
+                        .frame(width: 7, height: 7)
+                        .position(headingPoint)
+
+                    Text("N")
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.82))
+                        .position(x: drawingRect.midX, y: drawingRect.minY + 8)
+                }
+            }
+            .frame(height: 258)
+
+            HStack(spacing: 12) {
+                legendItem(color: .white.opacity(0.92), label: "Spawn")
+                legendItem(color: Color(red: 0.94, green: 0.84, blue: 0.40), label: "Route")
+                legendItem(color: Color(red: 0.34, green: 0.82, blue: 0.98), label: "You")
+            }
+
+            Text("Route: \(snapshot.completedCheckpointCount) / \(snapshot.totalCheckpointCount) checkpoints\(snapshot.nextCheckpointLabel.map { " • next \($0)" } ?? " • route complete")")
+                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.72))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(String(format: "Position: %.0f east / %.0f south", snapshot.playerX, snapshot.playerZ))
+                .font(.system(size: 10, weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.58))
+        }
+    }
+
+    private func legendItem(color: Color, label: String) -> some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(color)
+                .frame(width: 8, height: 8)
+
+            Text(label)
+                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.74))
+        }
+    }
+
+    private func sectorFill(for sector: SceneMapSector) -> Color {
+        let base: Color
+        switch sector.residency {
+        case .always:
+            base = Color(red: 0.38, green: 0.68, blue: 0.92)
+        case .farField:
+            base = Color(red: 0.40, green: 0.58, blue: 0.80)
+        case .local:
+            base = Color(red: 0.28, green: 0.40, blue: 0.56)
+        }
+
+        return sector.displayName == snapshot.currentSectorName
+            ? base.opacity(0.46)
+            : base.opacity(0.22)
+    }
+
+    private func sectorStroke(for sector: SceneMapSector) -> Color {
+        sector.displayName == snapshot.currentSectorName
+            ? Color(red: 0.94, green: 0.86, blue: 0.44).opacity(0.92)
+            : Color.white.opacity(0.12)
+    }
+
+    private func checkpointColor(for checkpoint: SceneMapCheckpoint, index: Int) -> Color {
+        if index < snapshot.completedCheckpointCount {
+            return Color(red: 0.36, green: 0.86, blue: 0.58)
+        }
+
+        if index == snapshot.completedCheckpointCount {
+            return Color(red: 0.96, green: 0.84, blue: 0.42)
+        }
+
+        if checkpoint.isGoal {
+            return Color(red: 0.42, green: 0.86, blue: 0.70)
+        }
+
+        return Color(red: 0.40, green: 0.76, blue: 0.96)
+    }
+
+    private func checkpointSize(for index: Int) -> CGFloat {
+        index == snapshot.completedCheckpointCount ? 11 : 9
+    }
+
+    private func rect(for sector: SceneMapSector, in drawingRect: CGRect) -> CGRect {
+        let topLeft = point(forX: sector.minX, z: sector.minZ, in: drawingRect)
+        let bottomRight = point(forX: sector.maxX, z: sector.maxZ, in: drawingRect)
+        let minX = min(topLeft.x, bottomRight.x)
+        let maxX = max(topLeft.x, bottomRight.x)
+        let minY = min(topLeft.y, bottomRight.y)
+        let maxY = max(topLeft.y, bottomRight.y)
+
+        return CGRect(
+            x: minX,
+            y: minY,
+            width: max(maxX - minX, 8),
+            height: max(maxY - minY, 8)
+        )
+    }
+
+    private func point(forX x: Float, z: Float, in drawingRect: CGRect) -> CGPoint {
+        let normalizedX = CGFloat((x - snapshot.configuration.minX) / snapshot.configuration.width)
+        let normalizedY = CGFloat((snapshot.configuration.maxZ - z) / snapshot.configuration.depth)
+
+        return CGPoint(
+            x: drawingRect.minX + (drawingRect.width * normalizedX),
+            y: drawingRect.minY + (drawingRect.height * normalizedY)
+        )
     }
 }
 
