@@ -42,7 +42,7 @@ private struct StoredSessionSettings {
 final class GameSession: ObservableObject {
     @Published private(set) var statusLine = "Bootstrapping game session"
     @Published private(set) var overlayLines: [String] = []
-    @Published private(set) var overlayTitle = "Canberra Bootstrap Slice"
+    @Published private(set) var overlayTitle = "Canberra Basin Survey"
     @Published private(set) var demoFlowState: DemoFlowState = .title
     @Published private(set) var isSettingsPresented = false
     @Published private(set) var hudOpacity: Double
@@ -149,7 +149,7 @@ final class GameSession: ObservableObject {
     func menuTitle(for panel: GameMenuPanel) -> String {
         switch panel {
         case .title:
-            return sceneReady ? sceneLabel : "Loading Canberra Slice"
+            return sceneReady ? sceneLabel : "Loading Canberra Basin Survey"
         case .paused:
             return "Demo Paused"
         case .failed:
@@ -164,7 +164,7 @@ final class GameSession: ObservableObject {
     func menuSubtitle(for panel: GameMenuPanel) -> String {
         switch panel {
         case .title:
-            return sceneReady ? overlayTitle : "Loading Canberra slice"
+            return sceneReady ? overlayTitle : "Loading Canberra basin survey"
         case .paused:
             return routeSummary
         case .failed:

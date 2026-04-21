@@ -1,13 +1,13 @@
 {
-  "name": "Parliament Local Grid",
-  "anchorName": "New Parliament House forecourt anchor",
+  "name": "Canberra Basin Survey Grid",
+  "anchorName": "Canberra basin survey anchor",
   "axisX": "east meters",
   "axisY": "up meters",
   "axisZ": "south meters",
   "forwardHeadingDegrees": 0.0,
   "notes": [
-    "Negative Z looks north toward the city axis and the escape corridor.",
-    "All sector bounds and graybox positions are authored in local meters from the forecourt anchor.",
-    "This grid is the temporary Canberra blockout frame until terrain and road data arrive."
+    "Negative Z looks north through the lake basin toward the city and Belconnen side of the map.",
+    "All sector bounds and graybox positions are authored in local meters for the Woden-to-Belconnen basin blockout.",
+    "Each content pass should improve Canberra readability across Lake Burley Griffin, Woden, and Belconnen."
   ]
 }

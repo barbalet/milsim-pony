@@ -1,8 +1,8 @@
 {
-  "cycleLabel": "Cycle 10 Basin Preview",
+  "cycleLabel": "Cycle 10 Woden-Belconnen Survey",
   "sceneName": "Canberra Basin Survey",
   "spawn": {
-    "label": "East Basin Overlook",
+    "label": "Lake Burley Griffin East Lookout",
     "position": [102.0, 22.0, 18.0],
     "yawDegrees": 270.0,
     "pitchDegrees": -12.0
@@ -29,12 +29,12 @@
     "lookSensitivity": 0.082
   },
   "route": {
-    "name": "Canberra Basin Survey",
-    "summary": "Survey Lake Burley Griffin, confirm Woden to the south-west, and validate the Belconnen skyline from the eastern basin overlook.",
+    "name": "Woden To Belconnen Survey",
+    "summary": "Survey Lake Burley Griffin, confirm Parliament House on the basin axis, then verify Woden and Belconnen read as one Canberra model.",
     "checkpoints": [
       {
         "id": "lake_basin_marker",
-        "label": "Lake Basin Marker",
+        "label": "Lake Burley Griffin Marker",
         "position": [58.0, 21.0, -8.0],
         "triggerRadius": 10.0,
         "yawDegrees": 274.0,
@@ -45,7 +45,7 @@
       },
       {
         "id": "parliament_axis_marker",
-        "label": "Parliament Axis Marker",
+        "label": "Parliament House Axis",
         "position": [18.0, 20.0, 4.0],
         "triggerRadius": 9.5,
         "yawDegrees": 278.0,
@@ -56,7 +56,7 @@
       },
       {
         "id": "woden_south_marker",
-        "label": "Woden South Marker",
+        "label": "Woden Valley Marker",
         "position": [54.0, 22.0, 96.0],
         "triggerRadius": 11.0,
         "yawDegrees": 220.0,
@@ -67,7 +67,7 @@
       },
       {
         "id": "belconnen_horizon_marker",
-        "label": "Belconnen Horizon",
+        "label": "Belconnen Basin Horizon",
         "position": [-72.0, 24.0, -118.0],
         "triggerRadius": 11.5,
         "yawDegrees": 304.0,
@@ -107,7 +107,7 @@
     "signposts": [
       {
         "id": "lake_axis_sign",
-        "label": "Lake Axis",
+        "label": "Lake Burley Griffin Axis",
         "kind": "signpost",
         "position": [64.0, 21.0, -4.0],
         "yawDegrees": 276.0,
@@ -116,7 +116,7 @@
       },
       {
         "id": "parliament_axis_sign",
-        "label": "Parliament Line",
+        "label": "Parliament House Axis",
         "kind": "signpost",
         "position": [22.0, 20.0, 4.0],
         "yawDegrees": 280.0,
@@ -125,7 +125,7 @@
       },
       {
         "id": "woden_south_sign",
-        "label": "Woden South",
+        "label": "Woden Valley",
         "kind": "signpost",
         "position": [58.0, 22.0, 94.0],
         "yawDegrees": 220.0,
@@ -134,7 +134,7 @@
       },
       {
         "id": "belconnen_horizon_sign",
-        "label": "Belconnen Horizon",
+        "label": "Belconnen Basin",
         "kind": "signpost",
         "position": [-68.0, 24.0, -116.0],
         "yawDegrees": 304.0,
@@ -143,7 +143,7 @@
       },
       {
         "id": "scope_lane_sign",
-        "label": "4x Scope Planned",
+        "label": "4x Scope Review Lane",
         "kind": "signpost",
         "position": [122.0, 22.0, 28.0],
         "yawDegrees": 286.0,

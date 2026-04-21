@@ -198,7 +198,7 @@ final class BootstrapScene {
         let activeIndices = activeSectorIndices(for: cameraPosition)
         let activeSectors = activeIndices.map { sectors[$0] }
         let activeNames = activeSectors.map(\.displayName)
-        let currentSector = sectors.first(where: { $0.contains(cameraPosition) })?.displayName ?? "Outside district bounds"
+        let currentSector = sectors.first(where: { $0.contains(cameraPosition) })?.displayName ?? "Outside basin bounds"
         let streamedDrawableCount = activeSectors.reduce(0) { $0 + $1.drawableRange.count }
 
         return SceneStreamingState(
@@ -221,7 +221,7 @@ final class BootstrapScene {
             return SceneRouteState(
                 summary: "Route: \(routeInfo.name) complete",
                 details: [
-                    "Goal: \(routeInfo.checkpoints.last?.label ?? "Escape corridor exit")",
+                    "Goal: \(routeInfo.checkpoints.last?.label ?? "Final review marker")",
                     String(
                         format: "Run: %.1fs / %.0fm / %d restarts",
                         snapshot.elapsedSeconds,
@@ -298,20 +298,20 @@ final class BootstrapScene {
 
         if snapshot.routeComplete {
             return SceneBriefingState(
-                summary: "Briefing: corridor cleared",
+                summary: "Briefing: survey complete",
                 details: [
-                    "Outcome: the Deakin corridor is readable end to end without developer prompts",
-                    "Reset: press R for a fresh run from the initial spawn",
+                    "Outcome: the Woden-to-Belconnen basin line reads clearly without developer prompts",
+                    "Reset: press R for a fresh run from the primary survey lookout",
                 ]
             )
         }
 
         if snapshot.routeFailed {
             return SceneBriefingState(
-                summary: "Briefing: break contact and reset",
+                summary: "Briefing: recover the survey line",
                 details: [
-                    "Recovery: restart from the latest checkpoint and clear suspicion behind cover",
-                    "Priority: re-enter on the nearest signposted line instead of crossing open ground",
+                    "Recovery: restart from the latest review marker and re-establish the basin read",
+                    "Priority: return to the nearest signposted viewpoint instead of pushing into dead ground",
                 ]
             )
         }
@@ -319,19 +319,19 @@ final class BootstrapScene {
         let nextIndex = min(Int(snapshot.completedCheckpointCount), max(routeInfo.checkpoints.count - 1, 0))
         let nextCheckpoint = routeInfo.checkpoints[nextIndex]
         let originLabel = nextIndex == 0
-            ? (debugInfo.spawn.label ?? "State Circle South Verge")
+            ? (debugInfo.spawn.label ?? "Primary survey lookout")
             : routeInfo.checkpoints[nextIndex - 1].label
         let cameraPosition = SIMD3<Float>(snapshot.cameraX, snapshot.cameraY, snapshot.cameraZ)
         let paceLine: String
 
         if snapshot.suspicionLevel >= max(evasionInfo.failThreshold * 0.55, 0.45) {
-            paceLine = "Pace: break line of sight and let suspicion settle before the next push"
+            paceLine = "Pace: break line of sight, then resume the Woden-to-Belconnen review pass"
         } else if snapshot.activeObserverCount > 0 {
-            paceLine = "Pace: walk the exposed lane and sprint only between hard cover"
+            paceLine = "Pace: move between cover and keep the lake and district markers readable"
         } else if snapshot.distanceToNextCheckpointMeters > 18 {
-            paceLine = "Pace: sprint the open stretch, then reset before the next observer cone"
+            paceLine = "Pace: cross the open ground, then stop and confirm the next Canberra landmark"
         } else {
-            paceLine = "Pace: steady approach into the next checkpoint trigger"
+            paceLine = "Pace: steady approach into the next review marker"
         }
 
         var details = [
@@ -345,13 +345,13 @@ final class BootstrapScene {
         ]
 
         if let nearestSignpost = nearestGuidancePoint(from: evasionInfo.signposts, to: cameraPosition) {
-            details.append("Cue: follow \(nearestSignpost.point.label) to stay on the southbound line")
+            details.append("Cue: follow \(nearestSignpost.point.label) to stay on the basin survey line")
         } else if let nearestCover = nearestGuidancePoint(from: evasionInfo.coverPoints, to: cameraPosition) {
-            details.append("Cue: \(nearestCover.point.label) is the closest break-contact position")
+            details.append("Cue: \(nearestCover.point.label) is the closest reset point for this survey pass")
         }
 
         return SceneBriefingState(
-            summary: "Briefing: leg \(nextIndex + 1) / \(routeInfo.checkpoints.count) toward \(nextCheckpoint.label)",
+            summary: "Briefing: marker \(nextIndex + 1) / \(routeInfo.checkpoints.count) toward \(nextCheckpoint.label)",
             details: details
         )
     }
@@ -645,7 +645,7 @@ private final class ScenePackageBuilder {
         return SceneBuildResult(
             drawables: sceneDrawables,
             debugInfo: SceneDebugInfo(
-                cycleLabel: sceneConfiguration.cycleLabel ?? "Canberra Bootstrap Slice",
+                cycleLabel: sceneConfiguration.cycleLabel ?? "Canberra Basin Survey",
                 sceneName: sceneConfiguration.sceneName,
                 summary: summary,
                 details: detailLines,

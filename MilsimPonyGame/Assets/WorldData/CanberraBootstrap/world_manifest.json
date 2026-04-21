@@ -1,5 +1,5 @@
 {
-  "worldName": "Canberra Bootstrap",
+  "worldName": "Canberra Woden-Belconnen Basin",
   "sceneFile": "Scenes/canberra_basin_preview_scene.json",
   "coordinateSystemFile": "CoordinateSystems/parliament_local_grid.json",
   "sectorFiles": [

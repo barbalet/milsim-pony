@@ -87,10 +87,11 @@ struct LaunchConfiguration {
         let bundleIdentifier = Bundle.main.bundleIdentifier ?? "com.milsimpony.game"
         let marketingVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.0.0"
         let buildNumber = Bundle.main.object(forInfoDictionaryKey: kCFBundleVersionKey as String) as? String ?? "0"
+        let manifestWorldName = defaultWorldName(from: resolvedWorldManifestPath)
 
         return LaunchConfiguration(
             bootMode: environment["MILSIM_PONY_BOOT_MODE"] ?? "bootstrap",
-            worldName: environment["MILSIM_PONY_START_WORLD"] ?? WorldBootstrap.startingDistrict,
+            worldName: environment["MILSIM_PONY_START_WORLD"] ?? manifestWorldName ?? WorldBootstrap.startingDistrict,
             assetRoot: resolvedAssetRoot,
             assetSource: assetSource,
             worldDataRoot: resolvedWorldDataRoot,
@@ -152,5 +153,15 @@ struct LaunchConfiguration {
         }
 
         return overrideRequested ? "custom override" : "external"
+    }
+
+    private static func defaultWorldName(from manifestPath: String) -> String? {
+        let manifestURL = URL(fileURLWithPath: manifestPath)
+
+        guard let data = try? Data(contentsOf: manifestURL) else {
+            return nil
+        }
+
+        return try? JSONDecoder().decode(WorldManifest.self, from: data).worldName
     }
 }

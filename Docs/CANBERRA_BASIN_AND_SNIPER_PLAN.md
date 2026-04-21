@@ -2,7 +2,7 @@
 
 ## Review Correction
 
-The current demo proves the app shell, renderer, and a small Canberra-adjacent route, but it does not yet satisfy the project goal of showing Canberra itself at meaningful scale. The next five cycles must prioritize a basin-scale Canberra demo that visibly includes Lake Burley Griffin and the broader landscape from Woden to Belconnen.
+The current demo proves the app shell, renderer, and a small Canberra-adjacent route, but it does not yet satisfy the project goal of showing Canberra itself at meaningful scale. The next five calibrated cycles must prioritize a basin-scale Canberra demo that visibly includes Lake Burley Griffin and the broader landscape from Woden to Belconnen.
 
 ## Priority Outcomes
 
@@ -11,6 +11,13 @@ The current demo proves the app shell, renderer, and a small Canberra-adjacent r
 - Extend visible terrain and landmark coverage south to Woden and north-west to Belconnen.
 - Raise terrain, road, landmark, and collision resolution enough that distant observation is useful.
 - Make the first usable weapon a sniper rifle with 4x magnification.
+
+## Cycle Timing Reset
+
+- Treat cycles `10` to `14` as Canberra coverage gates, not one-week sprints.
+- Budget at least two weeks per cycle for reference gathering, world-data authoring, and in-engine review, with a third integration week available whenever new imports or tile rebuilds are required.
+- Do not mark a cycle complete unless the demo opens from a recognisable Canberra survey location and the build shows net-new Woden-to-Belconnen readability.
+- Engine, rendering, and gameplay work only count when they unlock or verify the Canberra model rather than distracting from it.
 
 ## World Coverage Target
 

@@ -10,18 +10,21 @@ Deliver a playable Mac demo that launches into a first-person Canberra experienc
 - `MilsimPonyGame.xcodeproj` exists and builds on macOS.
 - The current demo includes a functioning app shell, renderer, packaged world data, and a small Parliament-adjacent playable slice.
 - Reviewer feedback has established that the current slice is too narrow and does not yet show Canberra in part or whole.
-- The next five cycles must prioritize a basin-scale Canberra view including Lake Burley Griffin and the landscape from Woden to Belconnen.
+- The next five calibrated cycles must prioritize a basin-scale Canberra view including Lake Burley Griffin and the landscape from Woden to Belconnen.
 - The first usable weapon will be a sniper rifle with 4x magnification, which raises the required terrain, landmark, collision, and long-range rendering resolution.
 
 ## Planning Assumptions
 
-- One cycle equals one week.
+- A cycle is now a Canberra coverage gate rather than a fixed one-week sprint.
+- Basin-modeling cycles should budget two weeks minimum and keep a third week open for integration, reference cleanup, or data rework when the Woden-to-Belconnen model is still not readable enough.
+- A cycle does not count as complete unless the build materially improves the readable Canberra model between Woden, Lake Burley Griffin, and Belconnen.
 - The base plan assumes a four-lane team:
   - `Engine/Core`: C runtime, math, scene management, streaming, collision.
   - `Rendering/Platform`: Metal renderer, SwiftUI shell, input, build integration.
   - `World/Data`: Canberra layout, terrain, roads, landmarks, asset prep.
   - `Gameplay/QA`: first-person controller, demo flow, test coverage, tuning.
-- If this is a solo effort, keep the same order of work and expect the schedule to roughly double.
+- For a four-lane team, cycles `10` to `14` now imply roughly `10` to `15` weeks of work. For a solo effort, keep the same order of work and expect roughly `20` to `30` weeks.
+- Every lane must ship Canberra-model value each cycle. Engine, rendering, and gameplay tasks are support work unless they directly improve or validate basin coverage.
 - Basin-scale Canberra coverage now takes priority over adding more corridor-only scripting.
 - The world plan must support hierarchical resolution: macro Canberra coverage plus denser streamed data around long-range viewpoints and combat lanes.
 - The sniper rifle requires stable distant rendering, high-confidence collision queries, and authored long-sightline tests.
@@ -122,13 +125,11 @@ Exit criteria:
 | `13` | Sniper rifle usable pass | Add accurate long-range hit query support and firing validation hooks | Add scoped firing feedback, impact readability, and long-range target presentation | Raise collision and cover fidelity around firing lanes and target zones | Add the first usable sniper rifle: equip, zoom, fire, reload, and target confirmation | Sniper rifle works reliably against authored long-range targets across Canberra sightlines |
 | `14` | Basin demo integration | Tune streaming, memory, and large-world edge cases for the expanded map | Polish water, skyline, terrain, and long-range clarity for review captures | Close major gaps between Woden, the lake, and Belconnen while preserving landmark readability | Integrate traversal and sniper observation into one reviewable loop | Review build demonstrates Lake Burley Griffin plus Woden-to-Belconnen landscape with a usable 4x sniper rifle |
 
-## Standard Cycle Rhythm
+## Standard Cycle Cadence
 
-- `Day 1`: lock scope, acceptance criteria, and the demoable outcome for the week.
-- `Day 2`: complete the primary implementation tasks in each lane.
-- `Day 3`: integrate across lanes and cut anything that threatens the weekly exit gate.
-- `Day 4`: performance pass, bug fixing, and demo route cleanup.
-- `Day 5`: playtest, record findings, and rewrite the next cycle backlog from what was learned.
+- `Week 1`: lock Canberra references, extents, acceptance criteria, and the exact Woden-to-Belconnen coverage gain required for the cycle.
+- `Week 2`: integrate terrain, roads, landmarks, streaming, and review viewpoints until the demo reads as Canberra without developer narration.
+- `Week 3`: use only when needed for reference correction, world-data rebuilds, performance cleanup, and another review pass if the coverage gate is still not met.
 
 ## Recommended Sequencing Rules
 
@@ -137,6 +138,7 @@ Exit criteria:
 - Treat Lake Burley Griffin and basin ridgelines as the new world anchors for scale, orientation, and long-range validation.
 - Keep the SwiftUI layer minimal and avoid moving engine logic out of the C core unless there is a strong platform reason.
 - Do not prioritize another corridor-only cycle ahead of basin-scale readability from Woden to Belconnen.
+- Do not close a cycle that fails to add clear Canberra-model progress or still leaves the demo opening from an unconvincing survey location.
 - Do not ship the sniper rifle until the map supports stable distant observation and reliable long-range collision.
 - Add fidelity in layers: basin coverage first, then higher resolution around travel lanes, landmarks, and sniper perches.
 

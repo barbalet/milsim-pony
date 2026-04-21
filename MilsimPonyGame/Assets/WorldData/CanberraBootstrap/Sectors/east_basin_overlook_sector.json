@@ -1,6 +1,6 @@
 {
   "id": "east_basin_overlook_sector",
-  "displayName": "East Basin Overlook",
+  "displayName": "Lake Burley Griffin East Lookout",
   "bounds": {
     "min": [40.0, 0.0, -160.0],
     "max": [170.0, 44.0, 60.0]
