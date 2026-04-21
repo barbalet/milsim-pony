@@ -98,6 +98,7 @@ final class GameSession: ObservableObject {
     private var scopeFarPlaneMultiplierValue: Float = 1.35
     private var scopeReticleColorComponents = SIMD4<Float>(0.92, 0.86, 0.42, 0.94)
     private var mapConfiguration: SceneMapConfiguration?
+    private var freshRunHandler: (() -> Void)?
 
     init(configuration: LaunchConfiguration) {
         let storedSettings = Self.loadStoredSettings()
@@ -336,6 +337,10 @@ final class GameSession: ObservableObject {
         rebuildOverlay()
     }
 
+    func setFreshRunHandler(_ handler: @escaping () -> Void) {
+        freshRunHandler = handler
+    }
+
     func noteFrameTiming(milliseconds: Double, framesPerSecond: Double, drawableCount: Int) {
         frameTimingLine = String(
             format: "Frame: %.2f ms / %.1f fps / %d drawables",
@@ -418,10 +423,11 @@ final class GameSession: ObservableObject {
             return
         }
 
+        freshRunHandler?()
         isSettingsPresented = false
         demoFlowState = .playing
         resetMissionRuntime()
-        statusLine = "Demo restarted from the authored spawn"
+        statusLine = "Demo restarted from a fresh district start"
         rebuildOverlay()
     }
 
@@ -430,6 +436,7 @@ final class GameSession: ObservableObject {
             return
         }
 
+        freshRunHandler?()
         isSettingsPresented = false
         demoFlowState = .title
         resetMissionRuntime()
@@ -786,7 +793,7 @@ final class GameSession: ObservableObject {
         }
 
         var lines = [
-            "Objective: survey the expanded Canberra street atlas and move through the authored district review markers.",
+            "Objective: survey the expanded Canberra street atlas and move through the district review markers from the assigned start.",
             "Priority: validate Lake Burley Griffin, the Parliament axis, Civic, Barton-Russell, Woden Valley, Black Mountain, and the Belconnen skyline through the 4x optic.",
             riskLine,
             "Release: \(configuration.releaseDisplayName) / \(configuration.bundleIdentifier)",
@@ -823,7 +830,7 @@ final class GameSession: ObservableObject {
             routeDetails.first ?? "Route: continue through the current review markers.",
             evasionDetails.first ?? "Threats: preview pressure and world updates are frozen while paused.",
             String(format: "Scope: %.1fx optic %@.", scopeMagnification, isScopeActive ? "was active before the pause shell" : "can be raised again when live"),
-            "Resume keeps the current survey live. Restart returns to the authored basin spawn.",
+            "Resume keeps the current survey live. Restart rolls a fresh district start.",
         ]
     }
 
@@ -837,7 +844,7 @@ final class GameSession: ObservableObject {
                 snapshot?.seeingObserverCount ?? 0
             ),
             routeDetails.first ?? "Route: the latest checkpoint remains available for retry.",
-            "Retry restarts from the most recent checkpoint. Restart begins from the initial spawn.",
+            "Retry restarts from the most recent checkpoint. Restart rolls a fresh district start.",
             "Return to Briefing resets the run and leaves the demo at the title shell.",
         ]
     }
@@ -855,7 +862,7 @@ final class GameSession: ObservableObject {
             "Release: \(configuration.releaseDisplayName) / \(configuration.contentSourceSummary)",
             String(format: "Optic: %.1fx scoped review remained available across the full route.", scopeMagnification),
             "Script: title shell, live scope route, optional fail or retry loop, and completion summary all resolve in one session.",
-            "New Run restarts the survey immediately. Briefing returns to the title shell.",
+            "New Run restarts the survey immediately from a fresh district start. Briefing returns to the title shell.",
         ]
     }
 

@@ -2,6 +2,13 @@ import Foundation
 import MetalKit
 import simd
 
+enum SceneTextureKey: String, CaseIterable {
+    case terrain = "canberra_dry_grass_texture.png"
+    case road = "canberra_asphalt_texture.png"
+    case concrete = "canberra_concrete_texture.png"
+    case water = "canberra_lake_water_texture.png"
+}
+
 struct SceneDrawable {
     let name: String
     let vertexBuffer: MTLBuffer
@@ -11,6 +18,7 @@ struct SceneDrawable {
     let boundingRadius: Float
     let maxDrawDistance: Float
     let minimumViewDot: Float
+    let textureKey: SceneTextureKey?
 }
 
 struct SceneEnvironment {
@@ -170,10 +178,10 @@ struct SceneBriefingState {
 
 final class BootstrapScene {
     let drawables: [SceneDrawable]
-    let debugInfo: SceneDebugInfo
+    private(set) var debugInfo: SceneDebugInfo
     let environment: SceneEnvironment
     let scopeConfiguration: ScopeConfiguration
-    let mapConfiguration: SceneMapConfiguration
+    private(set) var mapConfiguration: SceneMapConfiguration
 
     private let sectors: [SceneSectorRuntime]
     private let runtimeWorld: SceneRuntimeWorld
@@ -181,6 +189,9 @@ final class BootstrapScene {
     private let routeInfo: SceneRouteInfo
     private let evasionInfo: SceneEvasionInfo
     private let traversalTuning: SceneTraversalTuning
+    private let debugInfoTemplate: SceneDebugInfo
+    private let mapConfigurationTemplate: SceneMapConfiguration
+    private let spawnOptions: [SpawnConfiguration]
 
     init(device: MTLDevice, assetRoot: String, worldDataRoot: String, worldManifestPath: String) {
         let manifestURL = URL(fileURLWithPath: worldManifestPath)
@@ -194,15 +205,18 @@ final class BootstrapScene {
 
             drawables = buildResult.drawables
             debugInfo = buildResult.debugInfo
+            debugInfoTemplate = buildResult.debugInfo
             environment = buildResult.environment
             scopeConfiguration = buildResult.scopeConfiguration
             mapConfiguration = buildResult.mapConfiguration
+            mapConfigurationTemplate = buildResult.mapConfiguration
             sectors = buildResult.sectors
             runtimeWorld = buildResult.runtimeWorld
             alwaysLoadedIndices = buildResult.alwaysLoadedIndices
             routeInfo = buildResult.routeInfo
             evasionInfo = buildResult.evasionInfo
             traversalTuning = buildResult.traversalTuning
+            spawnOptions = buildResult.spawnOptions
         } catch {
             let fallbackResult = FallbackSceneFactory.build(
                 device: device,
@@ -213,17 +227,22 @@ final class BootstrapScene {
 
             drawables = fallbackResult.drawables
             debugInfo = fallbackResult.debugInfo
+            debugInfoTemplate = fallbackResult.debugInfo
             environment = fallbackResult.environment
             scopeConfiguration = fallbackResult.scopeConfiguration
             mapConfiguration = fallbackResult.mapConfiguration
+            mapConfigurationTemplate = fallbackResult.mapConfiguration
             sectors = fallbackResult.sectors
             runtimeWorld = fallbackResult.runtimeWorld
             alwaysLoadedIndices = fallbackResult.alwaysLoadedIndices
             routeInfo = fallbackResult.routeInfo
             evasionInfo = fallbackResult.evasionInfo
             traversalTuning = fallbackResult.traversalTuning
+            spawnOptions = fallbackResult.spawnOptions
             print("[Scene] Falling back to procedural scene: \(error)")
         }
+
+        prepareFreshRun()
     }
 
     func configureGameCore() {
@@ -260,6 +279,12 @@ final class BootstrapScene {
             traversalTuning.sprintSpeed,
             traversalTuning.lookSensitivity
         )
+    }
+
+    func prepareFreshRun() {
+        let spawn = spawnOptions.randomElement() ?? debugInfoTemplate.spawn
+        debugInfo = sceneDebugInfo(applying: spawn)
+        mapConfiguration = sceneMapConfiguration(applying: spawn)
     }
 
     func visibilityState(
@@ -418,7 +443,7 @@ final class BootstrapScene {
                 summary: "Briefing: survey complete",
                 details: [
                     "Outcome: the Woden-to-Belconnen basin line reads clearly without developer prompts",
-                    "Reset: press R for a fresh run from the primary survey lookout",
+                    "Reset: use Restart for a fresh run from a new district start",
                 ]
             )
         }
@@ -436,7 +461,7 @@ final class BootstrapScene {
         let nextIndex = min(Int(snapshot.completedCheckpointCount), max(routeInfo.checkpoints.count - 1, 0))
         let nextCheckpoint = routeInfo.checkpoints[nextIndex]
         let originLabel = nextIndex == 0
-            ? (debugInfo.spawn.label ?? "Primary survey lookout")
+            ? (debugInfo.spawn.label ?? "Assigned district start")
             : routeInfo.checkpoints[nextIndex - 1].label
         let cameraPosition = SIMD3<Float>(snapshot.cameraX, snapshot.cameraY, snapshot.cameraZ)
         let paceLine: String
@@ -531,6 +556,35 @@ final class BootstrapScene {
         let directions = ["north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west"]
         return directions[sector]
     }
+
+    private func sceneDebugInfo(applying spawn: SpawnConfiguration) -> SceneDebugInfo {
+        let updatedDetails = debugInfoTemplate.details.map { detail in
+            detail.hasPrefix("Spawn:") ? "Spawn: \(spawn.label ?? "District start")" : detail
+        }
+
+        return SceneDebugInfo(
+            cycleLabel: debugInfoTemplate.cycleLabel,
+            sceneName: debugInfoTemplate.sceneName,
+            summary: debugInfoTemplate.summary,
+            details: updatedDetails,
+            spawn: spawn
+        )
+    }
+
+    private func sceneMapConfiguration(applying spawn: SpawnConfiguration) -> SceneMapConfiguration {
+        SceneMapConfiguration(
+            sceneName: mapConfigurationTemplate.sceneName,
+            minX: mapConfigurationTemplate.minX,
+            maxX: mapConfigurationTemplate.maxX,
+            minZ: mapConfigurationTemplate.minZ,
+            maxZ: mapConfigurationTemplate.maxZ,
+            spawnPoint: SceneMapPoint(x: spawn.positionVector.x, z: spawn.positionVector.z),
+            spawnYawDegrees: spawn.yawDegrees,
+            sectors: mapConfigurationTemplate.sectors,
+            roads: mapConfigurationTemplate.roads,
+            checkpoints: mapConfigurationTemplate.checkpoints
+        )
+    }
 }
 
 private struct SceneBuildResult {
@@ -545,6 +599,7 @@ private struct SceneBuildResult {
     let routeInfo: SceneRouteInfo
     let evasionInfo: SceneEvasionInfo
     let traversalTuning: SceneTraversalTuning
+    let spawnOptions: [SpawnConfiguration]
 }
 
 private struct SceneRuntimeWorld {
@@ -877,7 +932,10 @@ private final class ScenePackageBuilder {
                 coverPoints: guidanceConfiguration.coverPoints,
                 signposts: guidanceConfiguration.signposts
             ),
-            traversalTuning: traversalTuning
+            traversalTuning: traversalTuning,
+            spawnOptions: sceneConfiguration.randomSpawns?.isEmpty == false
+                ? (sceneConfiguration.randomSpawns ?? [sceneConfiguration.spawn])
+                : [sceneConfiguration.spawn]
         )
     }
 
@@ -1011,7 +1069,8 @@ private final class ScenePackageBuilder {
                     boundingRadius: max(Float(configuration.size ?? 16) * (configuration.tileSize ?? 1.2) * 0.75, 8),
                     multiplier: 2.6
                 ),
-                minimumViewDot: -1
+                minimumViewDot: -1,
+                textureKey: nil
             )
 
         case .box:
@@ -1037,7 +1096,8 @@ private final class ScenePackageBuilder {
                     boundingRadius: simd_length(configuration.halfExtentsVector),
                     multiplier: 3.2
                 ),
-                minimumViewDot: -0.65
+                minimumViewDot: -0.65,
+                textureKey: .terrain
             )
         }
     }
@@ -1069,7 +1129,8 @@ private final class ScenePackageBuilder {
                 boundingRadius: simd_length(configuration.halfExtentsVector),
                 multiplier: visibilityMultiplier(3.8, for: residency)
             ),
-            minimumViewDot: visibilityMinimumViewDot(-0.55, for: residency)
+            minimumViewDot: visibilityMinimumViewDot(-0.55, for: residency),
+            textureKey: textureKey(for: configuration.name)
         )
     }
 
@@ -1100,7 +1161,8 @@ private final class ScenePackageBuilder {
                 boundingRadius: max(configuration.halfExtentsVector.x, configuration.halfExtentsVector.z) * 1.2,
                 multiplier: 3.0
             ),
-            minimumViewDot: -0.7
+            minimumViewDot: -0.7,
+            textureKey: nil
         )
     }
 
@@ -1133,7 +1195,8 @@ private final class ScenePackageBuilder {
                 boundingRadius: simd_length(SIMD3<Float>(configuration.sizeVector.x * 0.5, 1.8, configuration.sizeVector.y * 0.5)),
                 multiplier: visibilityMultiplier(2.6, for: residency)
             ),
-            minimumViewDot: -1
+            minimumViewDot: -1,
+            textureKey: .terrain
         )
     }
 
@@ -1169,7 +1232,8 @@ private final class ScenePackageBuilder {
                 boundingRadius: simd_length(SIMD3<Float>(configuration.sizeVector.x * 0.5, 0.5, configuration.sizeVector.y * 0.5)),
                 multiplier: visibilityMultiplier(2.8, for: residency)
             ),
-            minimumViewDot: -1
+            minimumViewDot: -1,
+            textureKey: .road
         )
     }
 
@@ -1219,7 +1283,8 @@ private final class ScenePackageBuilder {
                 boundingRadius: simd_length(worldExtent) * 0.5,
                 multiplier: 3.2
             ),
-            minimumViewDot: -0.45
+            minimumViewDot: -0.45,
+            textureKey: nil
         )
     }
 
@@ -1244,7 +1309,8 @@ private final class ScenePackageBuilder {
                     worldCenter: markerPosition + SIMD3<Float>(0, beaconHeight * 0.5, 0),
                     boundingRadius: beaconHeight * 0.6,
                     maxDrawDistance: configuration.goal ?? false ? 240 : 170,
-                    minimumViewDot: -0.92
+                    minimumViewDot: -0.92,
+                    textureKey: nil
                 )
             )
         }
@@ -1264,7 +1330,8 @@ private final class ScenePackageBuilder {
                     worldCenter: markerPosition + SIMD3<Float>(0, beaconHeight, 0),
                     boundingRadius: configuration.goal ?? false ? 2.8 : 1.8,
                     maxDrawDistance: configuration.goal ?? false ? 240 : 170,
-                    minimumViewDot: -0.92
+                    minimumViewDot: -0.92,
+                    textureKey: nil
                 )
             )
         }
@@ -1284,7 +1351,8 @@ private final class ScenePackageBuilder {
                     worldCenter: markerPosition,
                     boundingRadius: configuration.goal ?? false ? 2.6 : 1.6,
                     maxDrawDistance: configuration.goal ?? false ? 140 : 100,
-                    minimumViewDot: -0.85
+                    minimumViewDot: -0.85,
+                    textureKey: nil
                 )
             )
         }
@@ -1313,7 +1381,8 @@ private final class ScenePackageBuilder {
                     worldCenter: markerPosition + SIMD3<Float>(0, 0.95, 0),
                     boundingRadius: 1.4,
                     maxDrawDistance: 150,
-                    minimumViewDot: -0.85
+                    minimumViewDot: -0.85,
+                    textureKey: nil
                 )
             )
         }
@@ -1333,7 +1402,8 @@ private final class ScenePackageBuilder {
                     worldCenter: markerPosition + SIMD3<Float>(0, 1.72, 0.56),
                     boundingRadius: 1.0,
                     maxDrawDistance: 150,
-                    minimumViewDot: -0.88
+                    minimumViewDot: -0.88,
+                    textureKey: nil
                 )
             )
         }
@@ -1353,7 +1423,8 @@ private final class ScenePackageBuilder {
                     worldCenter: markerPosition,
                     boundingRadius: 0.9,
                     maxDrawDistance: 110,
-                    minimumViewDot: -0.86
+                    minimumViewDot: -0.86,
+                    textureKey: nil
                 )
             )
         }
@@ -1386,7 +1457,8 @@ private final class ScenePackageBuilder {
                         worldCenter: markerPosition + SIMD3<Float>(0, height * 0.5, 0),
                         boundingRadius: 1.2,
                         maxDrawDistance: 135,
-                        minimumViewDot: -0.82
+                        minimumViewDot: -0.82,
+                        textureKey: nil
                     )
                 )
             }
@@ -1408,7 +1480,8 @@ private final class ScenePackageBuilder {
                         worldCenter: markerPosition + SIMD3<Float>(0, height * 0.5, 0),
                         boundingRadius: 1.6,
                         maxDrawDistance: 165,
-                        minimumViewDot: -0.9
+                        minimumViewDot: -0.9,
+                        textureKey: nil
                     )
                 )
             }
@@ -1428,7 +1501,8 @@ private final class ScenePackageBuilder {
                         worldCenter: markerPosition + SIMD3<Float>(0, height - 0.28, 0.48),
                         boundingRadius: 1.2,
                         maxDrawDistance: 165,
-                        minimumViewDot: -0.9
+                        minimumViewDot: -0.9,
+                        textureKey: nil
                     )
                 )
             }
@@ -1449,7 +1523,8 @@ private final class ScenePackageBuilder {
                     worldCenter: markerPosition,
                     boundingRadius: 0.95,
                     maxDrawDistance: 110,
-                    minimumViewDot: -0.82
+                    minimumViewDot: -0.82,
+                    textureKey: nil
                 )
             )
         }
@@ -1466,6 +1541,11 @@ private final class ScenePackageBuilder {
 
     private func adaptiveDrawDistance(defaultValue: Float, boundingRadius: Float, multiplier: Float) -> Float {
         max(defaultValue, boundingRadius * multiplier)
+    }
+
+    private func textureKey(for structureName: String) -> SceneTextureKey {
+        let normalizedName = structureName.lowercased()
+        return normalizedName.contains("lake") ? .water : .concrete
     }
 
     private func visibilityDefault(_ baseValue: Float, for residency: SectorResidency) -> Float {
@@ -1618,7 +1698,8 @@ private enum FallbackSceneFactory {
                     worldCenter: .zero,
                     boundingRadius: 20,
                     maxDrawDistance: 120,
-                    minimumViewDot: -1
+                    minimumViewDot: -1,
+                    textureKey: nil
                 )
             ]
         } ?? []
@@ -1692,7 +1773,15 @@ private enum FallbackSceneFactory {
                 walkSpeed: 4.2,
                 sprintSpeed: 6.8,
                 lookSensitivity: 0.08
-            )
+            ),
+            spawnOptions: [
+                SpawnConfiguration(
+                    label: "Fallback start",
+                    position: [0, 1.65, 6],
+                    yawDegrees: 0,
+                    pitchDegrees: -10
+                )
+            ]
         )
     }
 }
@@ -1736,6 +1825,10 @@ private enum GeometryBuilder {
                     p1: SIMD3<Float>(x1, 0, z0),
                     p2: SIMD3<Float>(x1, 0, z1),
                     p3: SIMD3<Float>(x0, 0, z1),
+                    uv0: SIMD2<Float>(0, 0),
+                    uv1: SIMD2<Float>(1, 0),
+                    uv2: SIMD2<Float>(1, 1),
+                    uv3: SIMD2<Float>(0, 1),
                     color: color
                 )
             }
@@ -1757,13 +1850,82 @@ private enum GeometryBuilder {
         let backTopRight = SIMD3<Float>(maxCorner.x, maxCorner.y, minCorner.z)
         let backBottomLeft = SIMD3<Float>(minCorner.x, minCorner.y, minCorner.z)
         let backBottomRight = SIMD3<Float>(maxCorner.x, minCorner.y, minCorner.z)
+        let widthRepeat = textureRepeat(for: halfExtents.x * 2, metersPerTile: 4.5)
+        let heightRepeat = textureRepeat(for: halfExtents.y * 2, metersPerTile: 4.5)
+        let depthRepeat = textureRepeat(for: halfExtents.z * 2, metersPerTile: 4.5)
 
-        appendQuad(to: &vertices, p0: frontBottomLeft, p1: frontBottomRight, p2: frontTopRight, p3: frontTopLeft, color: color)
-        appendQuad(to: &vertices, p0: backBottomRight, p1: backBottomLeft, p2: backTopLeft, p3: backTopRight, color: color)
-        appendQuad(to: &vertices, p0: backBottomLeft, p1: frontBottomLeft, p2: frontTopLeft, p3: backTopLeft, color: color)
-        appendQuad(to: &vertices, p0: frontBottomRight, p1: backBottomRight, p2: backTopRight, p3: frontTopRight, color: color)
-        appendQuad(to: &vertices, p0: frontTopLeft, p1: frontTopRight, p2: backTopRight, p3: backTopLeft, color: color)
-        appendQuad(to: &vertices, p0: backBottomLeft, p1: backBottomRight, p2: frontBottomRight, p3: frontBottomLeft, color: color)
+        appendQuad(
+            to: &vertices,
+            p0: frontBottomLeft,
+            p1: frontBottomRight,
+            p2: frontTopRight,
+            p3: frontTopLeft,
+            uv0: SIMD2<Float>(0, heightRepeat),
+            uv1: SIMD2<Float>(widthRepeat, heightRepeat),
+            uv2: SIMD2<Float>(widthRepeat, 0),
+            uv3: SIMD2<Float>(0, 0),
+            color: color
+        )
+        appendQuad(
+            to: &vertices,
+            p0: backBottomRight,
+            p1: backBottomLeft,
+            p2: backTopLeft,
+            p3: backTopRight,
+            uv0: SIMD2<Float>(0, heightRepeat),
+            uv1: SIMD2<Float>(widthRepeat, heightRepeat),
+            uv2: SIMD2<Float>(widthRepeat, 0),
+            uv3: SIMD2<Float>(0, 0),
+            color: color
+        )
+        appendQuad(
+            to: &vertices,
+            p0: backBottomLeft,
+            p1: frontBottomLeft,
+            p2: frontTopLeft,
+            p3: backTopLeft,
+            uv0: SIMD2<Float>(0, heightRepeat),
+            uv1: SIMD2<Float>(depthRepeat, heightRepeat),
+            uv2: SIMD2<Float>(depthRepeat, 0),
+            uv3: SIMD2<Float>(0, 0),
+            color: color
+        )
+        appendQuad(
+            to: &vertices,
+            p0: frontBottomRight,
+            p1: backBottomRight,
+            p2: backTopRight,
+            p3: frontTopRight,
+            uv0: SIMD2<Float>(0, heightRepeat),
+            uv1: SIMD2<Float>(depthRepeat, heightRepeat),
+            uv2: SIMD2<Float>(depthRepeat, 0),
+            uv3: SIMD2<Float>(0, 0),
+            color: color
+        )
+        appendQuad(
+            to: &vertices,
+            p0: frontTopLeft,
+            p1: frontTopRight,
+            p2: backTopRight,
+            p3: backTopLeft,
+            uv0: SIMD2<Float>(0, 0),
+            uv1: SIMD2<Float>(widthRepeat, 0),
+            uv2: SIMD2<Float>(widthRepeat, depthRepeat),
+            uv3: SIMD2<Float>(0, depthRepeat),
+            color: color
+        )
+        appendQuad(
+            to: &vertices,
+            p0: backBottomLeft,
+            p1: backBottomRight,
+            p2: frontBottomRight,
+            p3: frontBottomLeft,
+            uv0: SIMD2<Float>(0, 0),
+            uv1: SIMD2<Float>(widthRepeat, 0),
+            uv2: SIMD2<Float>(widthRepeat, depthRepeat),
+            uv3: SIMD2<Float>(0, depthRepeat),
+            color: color
+        )
 
         return vertices
     }
@@ -1777,6 +1939,8 @@ private enum GeometryBuilder {
         let width = max(size.x, 0.5)
         let depth = max(size.y, 0.5)
         let segmentCount = max(subdivisions, 1)
+        let widthRepeat = textureRepeat(for: width, metersPerTile: 10.0)
+        let depthRepeat = textureRepeat(for: depth, metersPerTile: 10.0)
         var vertices: [SceneVertex] = []
 
         for row in 0..<segmentCount {
@@ -1797,6 +1961,10 @@ private enum GeometryBuilder {
                     p1: SIMD3<Float>(x1, bilinearHeight(u: u1, v: v0, cornerHeights: cornerHeights), z0),
                     p2: SIMD3<Float>(x1, bilinearHeight(u: u1, v: v1, cornerHeights: cornerHeights), z1),
                     p3: SIMD3<Float>(x0, bilinearHeight(u: u0, v: v1, cornerHeights: cornerHeights), z1),
+                    uv0: SIMD2<Float>(u0 * widthRepeat, v0 * depthRepeat),
+                    uv1: SIMD2<Float>(u1 * widthRepeat, v0 * depthRepeat),
+                    uv2: SIMD2<Float>(u1 * widthRepeat, v1 * depthRepeat),
+                    uv3: SIMD2<Float>(u0 * widthRepeat, v1 * depthRepeat),
                     color: color
                 )
             }
@@ -1818,6 +1986,8 @@ private enum GeometryBuilder {
         let halfDepth = max(size.y * 0.5, 0.5)
         let clampedShoulderWidth = min(max(shoulderWidth, 0.1), halfWidth * 0.45)
         let clampedCenterLine = min(max(centerLineWidth, 0.05), halfWidth * 0.2)
+        let widthRepeat = textureRepeat(for: size.x, metersPerTile: 2.2)
+        let lengthRepeat = textureRepeat(for: size.y, metersPerTile: 9.0)
         var vertices: [SceneVertex] = []
 
         let strips: [(Float, Float, SIMD4<Float>)] = [
@@ -1829,12 +1999,18 @@ private enum GeometryBuilder {
         ]
 
         for (x0, x1, color) in strips where x1 > x0 {
+            let u0 = ((x0 + halfWidth) / (halfWidth * 2.0)) * widthRepeat
+            let u1 = ((x1 + halfWidth) / (halfWidth * 2.0)) * widthRepeat
             appendQuad(
                 to: &vertices,
                 p0: SIMD3<Float>(x0, roadCrownHeight(x: x0, halfWidth: halfWidth, crownHeight: crownHeight), -halfDepth),
                 p1: SIMD3<Float>(x1, roadCrownHeight(x: x1, halfWidth: halfWidth, crownHeight: crownHeight), -halfDepth),
                 p2: SIMD3<Float>(x1, roadCrownHeight(x: x1, halfWidth: halfWidth, crownHeight: crownHeight), halfDepth),
                 p3: SIMD3<Float>(x0, roadCrownHeight(x: x0, halfWidth: halfWidth, crownHeight: crownHeight), halfDepth),
+                uv0: SIMD2<Float>(u0, 0),
+                uv1: SIMD2<Float>(u1, 0),
+                uv2: SIMD2<Float>(u1, lengthRepeat),
+                uv3: SIMD2<Float>(u0, lengthRepeat),
                 color: color
             )
         }
@@ -1850,6 +2026,10 @@ private enum GeometryBuilder {
             p1: SIMD3<Float>(halfExtents.x, 0, -halfExtents.y),
             p2: SIMD3<Float>(halfExtents.x, 0, halfExtents.y),
             p3: SIMD3<Float>(-halfExtents.x, 0, halfExtents.y),
+            uv0: SIMD2<Float>(0, 0),
+            uv1: SIMD2<Float>(1, 0),
+            uv2: SIMD2<Float>(1, 1),
+            uv3: SIMD2<Float>(0, 1),
             color: color
         )
         return vertices
@@ -1869,21 +2049,29 @@ private enum GeometryBuilder {
         return crownHeight * (1 - normalizedDistance)
     }
 
+    private static func textureRepeat(for length: Float, metersPerTile: Float) -> Float {
+        max(length / max(metersPerTile, 0.25), 1)
+    }
+
     private static func appendQuad(
         to vertices: inout [SceneVertex],
         p0: SIMD3<Float>,
         p1: SIMD3<Float>,
         p2: SIMD3<Float>,
         p3: SIMD3<Float>,
+        uv0: SIMD2<Float>,
+        uv1: SIMD2<Float>,
+        uv2: SIMD2<Float>,
+        uv3: SIMD2<Float>,
         color: SIMD4<Float>
     ) {
         let normal = simd_normalize(simd_cross(p1 - p0, p2 - p0))
-        vertices.append(SceneVertex(position: p0, normal: normal, color: color))
-        vertices.append(SceneVertex(position: p1, normal: normal, color: color))
-        vertices.append(SceneVertex(position: p2, normal: normal, color: color))
-        vertices.append(SceneVertex(position: p0, normal: normal, color: color))
-        vertices.append(SceneVertex(position: p2, normal: normal, color: color))
-        vertices.append(SceneVertex(position: p3, normal: normal, color: color))
+        vertices.append(SceneVertex(position: p0, normal: normal, uv: uv0, color: color))
+        vertices.append(SceneVertex(position: p1, normal: normal, uv: uv1, color: color))
+        vertices.append(SceneVertex(position: p2, normal: normal, uv: uv2, color: color))
+        vertices.append(SceneVertex(position: p0, normal: normal, uv: uv0, color: color))
+        vertices.append(SceneVertex(position: p2, normal: normal, uv: uv2, color: color))
+        vertices.append(SceneVertex(position: p3, normal: normal, uv: uv3, color: color))
     }
 }
 
@@ -2009,7 +2197,7 @@ private enum OBJAssetLoader {
             for corner in triangle {
                 let normal = corner.normalIndex.flatMap { normals[safe: $0] } ?? faceNormal
                 if let position = positions[safe: corner.positionIndex] {
-                    target.append(SceneVertex(position: position, normal: normal, color: color))
+                    target.append(SceneVertex(position: position, normal: normal, uv: .zero, color: color))
                 }
             }
         }

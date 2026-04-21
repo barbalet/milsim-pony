@@ -12,6 +12,50 @@
     "yawDegrees": 268.0,
     "pitchDegrees": -8.0
   },
+  "randomSpawns": [
+    {
+      "label": "East Basin Scope Terrace",
+      "position": [96.0, 22.0, 14.0],
+      "yawDegrees": 268.0,
+      "pitchDegrees": -8.0
+    },
+    {
+      "label": "Russell Causeway Start",
+      "position": [127.0, 4.2, -50.0],
+      "yawDegrees": 246.0,
+      "pitchDegrees": -5.0
+    },
+    {
+      "label": "Parliament Axis Start",
+      "position": [0.0, 1.2, 9.0],
+      "yawDegrees": 358.0,
+      "pitchDegrees": -4.0
+    },
+    {
+      "label": "City Hill Median Start",
+      "position": [38.0, 3.0, -110.0],
+      "yawDegrees": 214.0,
+      "pitchDegrees": -6.0
+    },
+    {
+      "label": "Woden Interchange Start",
+      "position": [18.0, 1.0, 168.0],
+      "yawDegrees": 184.0,
+      "pitchDegrees": -5.0
+    },
+    {
+      "label": "Black Mountain Saddle Start",
+      "position": [-34.0, 8.0, -148.0],
+      "yawDegrees": 300.0,
+      "pitchDegrees": -7.0
+    },
+    {
+      "label": "Belconnen Street Frame Start",
+      "position": [-148.0, 7.0, -186.0],
+      "yawDegrees": 116.0,
+      "pitchDegrees": -6.0
+    }
+  ],
   "sky": {
     "horizonColor": [0.71, 0.78, 0.86, 1.0],
     "zenithColor": [0.22, 0.34, 0.52, 1.0]
@@ -71,7 +115,7 @@
       {
         "id": "parliament_axis_scope_test",
         "label": "Parliament Axis Scope Test",
-        "position": [0.0, 1.2, -1.0],
+        "position": [0.0, 1.2, 2.0],
         "triggerRadius": 10.5,
         "yawDegrees": 358.0,
         "pitchDegrees": -4.0,
@@ -82,7 +126,7 @@
       {
         "id": "city_hill_arterial_review",
         "label": "City Hill Arterial Review",
-        "position": [44.0, 3.0, -118.0],
+        "position": [47.0, 3.0, -118.0],
         "triggerRadius": 11.0,
         "yawDegrees": 214.0,
         "pitchDegrees": -6.0,
@@ -93,7 +137,7 @@
       {
         "id": "woden_town_centre_review",
         "label": "Woden Town Centre Review",
-        "position": [10.0, 1.0, 164.0],
+        "position": [21.0, 1.0, 164.0],
         "triggerRadius": 11.5,
         "yawDegrees": 184.0,
         "pitchDegrees": -5.0,
@@ -104,7 +148,7 @@
       {
         "id": "black_mountain_scope_test",
         "label": "Black Mountain Scope Test",
-        "position": [-42.0, 10.0, -154.0],
+        "position": [-38.9, 10.0, -145.5],
         "triggerRadius": 11.5,
         "yawDegrees": 300.0,
         "pitchDegrees": -7.0,
@@ -115,7 +159,7 @@
       {
         "id": "belconnen_town_centre_review",
         "label": "Belconnen Town Centre Review",
-        "position": [-144.0, 7.0, -194.0],
+        "position": [-141.4, 7.0, -179.2],
         "triggerRadius": 12.0,
         "yawDegrees": 116.0,
         "pitchDegrees": -6.0,

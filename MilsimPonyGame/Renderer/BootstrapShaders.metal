@@ -4,6 +4,7 @@ using namespace metal;
 struct SceneVertex {
     float3 position;
     float3 normal;
+    float2 uv;
     float4 color;
 };
 
@@ -30,6 +31,7 @@ struct BootstrapVertexOut {
     float4 color;
     float3 normal;
     float3 worldPosition;
+    float2 uv;
 };
 
 struct SkyVertexOut {
@@ -63,6 +65,7 @@ vertex BootstrapVertexOut bootstrapVertexMain(
     out.color = inVertex.color;
     out.normal = normalize((uniforms.modelMatrix * float4(inVertex.normal, 0.0)).xyz);
     out.worldPosition = worldPosition.xyz;
+    out.uv = inVertex.uv;
     return out;
 }
 
@@ -80,8 +83,12 @@ fragment float4 skyFragmentMain(
 
 fragment float4 bootstrapFragmentMain(
     BootstrapVertexOut in [[stage_in]],
-    constant SceneUniforms &uniforms [[buffer(1)]]
+    constant SceneUniforms &uniforms [[buffer(1)]],
+    texture2d<float> surfaceTexture [[texture(0)]],
+    sampler surfaceSampler [[sampler(0)]]
 ) {
+    float4 sampledTexture = surfaceTexture.sample(surfaceSampler, in.uv);
+    float3 baseColor = in.color.rgb * sampledTexture.rgb;
     float3 lightDirection = normalize(-uniforms.lightDirection.xyz);
     float3 normal = normalize(in.normal);
     float diffuse = pow(clamp(dot(normal, lightDirection) * 0.5 + 0.5, 0.0, 1.0), 1.2);
@@ -90,8 +97,8 @@ fragment float4 bootstrapFragmentMain(
     float fogNear = uniforms.lightingParameters.z;
     float fogFar = uniforms.lightingParameters.w;
     float hazeStrength = max(uniforms.atmosphereParameters.x, 0.0);
-    float3 ambient = in.color.rgb * ambientIntensity;
-    float3 sunContribution = in.color.rgb * diffuse * diffuseIntensity * uniforms.sunColor.rgb;
+    float3 ambient = baseColor * ambientIntensity;
+    float3 sunContribution = baseColor * diffuse * diffuseIntensity * uniforms.sunColor.rgb;
     float3 litColor = ambient + sunContribution;
 
     float fogDistance = distance(in.worldPosition, uniforms.cameraPosition.xyz);
@@ -99,5 +106,5 @@ fragment float4 bootstrapFragmentMain(
     float heightFog = clamp((uniforms.cameraPosition.y - in.worldPosition.y) * 0.035, 0.0, 0.35);
     fogFactor = clamp(fogFactor + (heightFog * hazeStrength), 0.0, 1.0);
 
-    return float4(mix(litColor, uniforms.fogColor.rgb, fogFactor), in.color.a);
+    return float4(mix(litColor, uniforms.fogColor.rgb, fogFactor), in.color.a * sampledTexture.a);
 }

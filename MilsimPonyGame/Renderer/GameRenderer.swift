@@ -10,6 +10,9 @@ final class GameRenderer: NSObject, MTKViewDelegate {
     private let skyPipelineState: MTLRenderPipelineState
     private let renderPipelineState: MTLRenderPipelineState
     private let depthStencilState: MTLDepthStencilState
+    private let surfaceSamplerState: MTLSamplerState
+    private let fallbackTexture: MTLTexture
+    private let sceneTextures: [SceneTextureKey: MTLTexture]
     private let scene: BootstrapScene
     private weak var session: GameSession?
     private var lastFrameTimestamp: CFTimeInterval?
@@ -30,6 +33,7 @@ final class GameRenderer: NSObject, MTKViewDelegate {
         self.deviceName = device.name
         self.commandQueue = commandQueue
         self.session = session
+        let textureLoader = MTKTextureLoader(device: device)
         self.scene = BootstrapScene(
             device: device,
             assetRoot: session.assetRootPath,
@@ -76,26 +80,28 @@ final class GameRenderer: NSObject, MTKViewDelegate {
             return nil
         }
         self.depthStencilState = depthStencilState
+        guard
+            let surfaceSamplerState = Self.makeSurfaceSamplerState(device: device),
+            let fallbackTexture = Self.makeFallbackTexture(device: device)
+        else {
+            return nil
+        }
+        self.surfaceSamplerState = surfaceSamplerState
+        self.fallbackTexture = fallbackTexture
+        self.sceneTextures = Self.loadSceneTextures(
+            with: textureLoader,
+            assetRoot: URL(fileURLWithPath: session.assetRootPath, isDirectory: true)
+        )
 
         super.init()
 
+        session.setFreshRunHandler { [weak self] in
+            self?.prepareFreshRun()
+        }
+
         scene.configureGameCore()
-        let spawn = scene.debugInfo.spawn.positionVector
-        GameCoreConfigureSpawn(
-            spawn.x,
-            spawn.y,
-            spawn.z,
-            scene.debugInfo.spawn.yawDegrees,
-            scene.debugInfo.spawn.pitchDegrees
-        )
-        session.noteSceneReady(
-            label: scene.debugInfo.sceneName,
-            summary: scene.debugInfo.summary,
-            details: scene.debugInfo.details
-        )
-        session.noteOverlayTitle(scene.debugInfo.cycleLabel)
-        session.noteScopeConfiguration(scene.scopeConfiguration)
-        session.noteMapConfiguration(scene.mapConfiguration)
+        configureSpawnFromScene()
+        publishSceneMetadata()
         print("[Renderer] Metal bootstrap ready on \(device.name) with \(scene.debugInfo.summary)")
     }
 
@@ -214,6 +220,7 @@ final class GameRenderer: NSObject, MTKViewDelegate {
         encoder.setDepthStencilState(depthStencilState)
         encoder.setCullMode(.back)
         encoder.setFrontFacing(.counterClockwise)
+        encoder.setFragmentSamplerState(surfaceSamplerState, index: 0)
 
         let aspectRatio = max(Float(view.drawableSize.width / max(view.drawableSize.height, 1)), 0.1)
         let unscopedFieldOfViewY: Float = 60.0 * (.pi / 180.0)
@@ -261,6 +268,10 @@ final class GameRenderer: NSObject, MTKViewDelegate {
             encoder.setVertexBuffer(drawableItem.vertexBuffer, offset: 0, index: 0)
             encoder.setVertexBytes(&uniforms, length: MemoryLayout<SceneUniforms>.stride, index: 1)
             encoder.setFragmentBytes(&uniforms, length: MemoryLayout<SceneUniforms>.stride, index: 1)
+            encoder.setFragmentTexture(
+                drawableItem.textureKey.flatMap { sceneTextures[$0] } ?? fallbackTexture,
+                index: 0
+            )
             encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: drawableItem.vertexCount)
         }
 
@@ -268,5 +279,104 @@ final class GameRenderer: NSObject, MTKViewDelegate {
 
         commandBuffer.present(drawable)
         commandBuffer.commit()
+    }
+
+    private func prepareFreshRun() {
+        scene.prepareFreshRun()
+        configureSpawnFromScene()
+        publishSceneMetadata()
+    }
+
+    private func configureSpawnFromScene() {
+        let spawn = scene.debugInfo.spawn.positionVector
+        GameCoreConfigureSpawn(
+            spawn.x,
+            spawn.y,
+            spawn.z,
+            scene.debugInfo.spawn.yawDegrees,
+            scene.debugInfo.spawn.pitchDegrees
+        )
+    }
+
+    private func publishSceneMetadata() {
+        guard let session else {
+            return
+        }
+
+        session.noteSceneReady(
+            label: scene.debugInfo.sceneName,
+            summary: scene.debugInfo.summary,
+            details: scene.debugInfo.details
+        )
+        session.noteOverlayTitle(scene.debugInfo.cycleLabel)
+        session.noteScopeConfiguration(scene.scopeConfiguration)
+        session.noteMapConfiguration(scene.mapConfiguration)
+    }
+
+    private static func makeSurfaceSamplerState(device: MTLDevice) -> MTLSamplerState? {
+        let samplerDescriptor = MTLSamplerDescriptor()
+        samplerDescriptor.minFilter = .linear
+        samplerDescriptor.magFilter = .linear
+        samplerDescriptor.mipFilter = .linear
+        samplerDescriptor.sAddressMode = .repeat
+        samplerDescriptor.tAddressMode = .repeat
+        samplerDescriptor.maxAnisotropy = 8
+        return device.makeSamplerState(descriptor: samplerDescriptor)
+    }
+
+    private static func makeFallbackTexture(device: MTLDevice) -> MTLTexture? {
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .rgba8Unorm,
+            width: 1,
+            height: 1,
+            mipmapped: false
+        )
+        descriptor.usage = .shaderRead
+
+        guard let texture = device.makeTexture(descriptor: descriptor) else {
+            return nil
+        }
+
+        var pixel: [UInt8] = [255, 255, 255, 255]
+        texture.replace(
+            region: MTLRegionMake2D(0, 0, 1, 1),
+            mipmapLevel: 0,
+            withBytes: &pixel,
+            bytesPerRow: 4
+        )
+        texture.label = "Fallback White Texture"
+        return texture
+    }
+
+    private static func loadSceneTextures(
+        with loader: MTKTextureLoader,
+        assetRoot: URL
+    ) -> [SceneTextureKey: MTLTexture] {
+        let textureDirectory = assetRoot.appendingPathComponent("Textures/Final", isDirectory: true)
+        var textures: [SceneTextureKey: MTLTexture] = [:]
+
+        for textureKey in SceneTextureKey.allCases {
+            let textureURL = textureDirectory.appendingPathComponent(textureKey.rawValue)
+            guard FileManager.default.fileExists(atPath: textureURL.path) else {
+                print("[Renderer] Missing scene texture at \(textureURL.path)")
+                continue
+            }
+
+            do {
+                let texture = try loader.newTexture(
+                    URL: textureURL,
+                    options: [
+                        MTKTextureLoader.Option.SRGB: false,
+                        MTKTextureLoader.Option.generateMipmaps: true
+                    ]
+                )
+                texture.label = textureKey.rawValue
+                textures[textureKey] = texture
+            } catch {
+                print("[Renderer] Failed to load texture \(textureURL.lastPathComponent): \(error)")
+            }
+        }
+
+        return textures
     }
 }

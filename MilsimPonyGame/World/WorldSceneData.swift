@@ -23,6 +23,7 @@ struct SceneConfiguration: Decodable {
     let sceneName: String
     let planningNotes: [String]?
     let spawn: SpawnConfiguration
+    let randomSpawns: [SpawnConfiguration]?
     let sky: SkyConfiguration
     let sun: SunConfiguration
     let atmosphere: AtmosphereConfiguration?
