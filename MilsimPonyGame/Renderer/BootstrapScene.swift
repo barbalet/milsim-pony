@@ -256,6 +256,7 @@ final class BootstrapScene {
     private let traversalTuning: SceneTraversalTuning
     private let debugInfoTemplate: SceneDebugInfo
     private let mapConfigurationTemplate: SceneMapConfiguration
+    private let groundSampler: WorldGroundSurfaceSampler
     private let spawnOptions: [SpawnConfiguration]
 
     init(device: MTLDevice, assetRoot: String, worldDataRoot: String, worldManifestPath: String) {
@@ -281,6 +282,7 @@ final class BootstrapScene {
             routeInfo = buildResult.routeInfo
             evasionInfo = buildResult.evasionInfo
             traversalTuning = buildResult.traversalTuning
+            groundSampler = buildResult.groundModel.sampler
             spawnOptions = buildResult.spawnOptions
         } catch {
             let fallbackResult = FallbackSceneFactory.build(
@@ -303,6 +305,7 @@ final class BootstrapScene {
             routeInfo = fallbackResult.routeInfo
             evasionInfo = fallbackResult.evasionInfo
             traversalTuning = fallbackResult.traversalTuning
+            groundSampler = fallbackResult.groundModel.sampler
             spawnOptions = fallbackResult.spawnOptions
             print("[Scene] Falling back to procedural scene: \(error)")
         }
@@ -623,8 +626,12 @@ final class BootstrapScene {
     }
 
     private func sceneDebugInfo(applying spawn: SpawnConfiguration) -> SceneDebugInfo {
+        let groundedSpawn = WorldRuntimeConversions.groundedSpawn(
+            from: spawn,
+            groundSampler: groundSampler
+        )
         let updatedDetails = debugInfoTemplate.details.map { detail in
-            detail.hasPrefix("Spawn:") ? "Spawn: \(spawn.label ?? "District start")" : detail
+            detail.hasPrefix("Spawn:") ? "Spawn: \(groundedSpawn.label ?? "District start")" : detail
         }
 
         return SceneDebugInfo(
@@ -632,7 +639,7 @@ final class BootstrapScene {
             sceneName: debugInfoTemplate.sceneName,
             summary: debugInfoTemplate.summary,
             details: updatedDetails,
-            spawn: spawn
+            spawn: groundedSpawn
         )
     }
 
@@ -659,6 +666,7 @@ private struct SceneBuildResult {
     let scopeConfiguration: ScopeConfiguration
     let mapConfiguration: SceneMapConfiguration
     let sectors: [SceneSectorRuntime]
+    let groundModel: WorldGroundModel
     let runtimeWorld: SceneRuntimeWorld
     let alwaysLoadedIndices: [Int]
     let routeInfo: SceneRouteInfo
@@ -772,22 +780,37 @@ private final class ScenePackageBuilder {
         var sceneDrawables: [SceneDrawable] = []
         var alwaysLoadedIndices: [Int] = []
         var sceneSectors: [SceneSectorRuntime] = []
-        var worldSectors: [GameSectorBounds] = []
-        var worldCollisionVolumes: [GameCollisionVolume] = []
-        var worldGroundSurfaces: [GameGroundSurface] = []
-        var worldRouteCheckpoints: [GameRouteCheckpoint] = []
-        var worldThreatObservers: [GameThreatObserver] = []
         var proceduralCount = 0
         var assetCount = 0
         var terrainCount = 0
         var roadCount = 0
         var grayboxCount = 0
-        var collisionCount = 0
         var routeMarkerCount = 0
         var guidanceMarkerCount = 0
         var observerMarkerCount = 0
         var texturedWorldDrawableCount = 0
         var flatColorWorldDrawableCount = 0
+        var continuityGroundDrawableCount = 0
+
+        let includedSectorIDs = sceneConfiguration.includedSectors.isEmpty
+            ? Array(sectorLookup.keys).sorted()
+            : sceneConfiguration.includedSectors
+        let loadedSectors = includedSectorIDs.compactMap { sectorLookup[$0] }
+        let groundModel = WorldRuntimeConversions.groundModel(from: loadedSectors)
+        let worldSectors = WorldRuntimeConversions.sectorBounds(from: loadedSectors)
+        let worldGroundSurfaces = groundModel.allSurfaces
+        let groundSampler = groundModel.sampler
+        let worldCollisionVolumes = WorldRuntimeConversions.collisionVolumes(from: loadedSectors)
+        let worldRouteCheckpoints = WorldRuntimeConversions.routeCheckpoints(
+            from: sceneConfiguration.route.checkpoints,
+            groundSampler: groundSampler
+        )
+        let worldThreatObservers = WorldRuntimeConversions.threatObservers(from: detectionConfiguration.observers)
+        let collisionCount = worldCollisionVolumes.count
+        let worldBounds = combinedBounds(
+            for: loadedSectors,
+            fallback: sceneConfiguration.spawn.positionVector
+        )
 
         for element in sceneConfiguration.proceduralElements {
             if let drawable = proceduralDrawable(from: element) {
@@ -797,8 +820,18 @@ private final class ScenePackageBuilder {
             }
         }
 
+        if let drawable = continuityGroundDrawable(
+            from: groundModel.continuitySurfaces,
+            bounds: worldBounds
+        ) {
+            alwaysLoadedIndices.append(sceneDrawables.count)
+            sceneDrawables.append(drawable)
+            continuityGroundDrawableCount += 1
+            texturedWorldDrawableCount += 1
+        }
+
         for assetInstance in sceneConfiguration.assetInstances {
-            if let drawable = assetDrawable(from: assetInstance) {
+            if let drawable = assetDrawable(from: assetInstance, groundSampler: groundSampler) {
                 alwaysLoadedIndices.append(sceneDrawables.count)
                 sceneDrawables.append(drawable)
                 assetCount += 1
@@ -806,8 +839,7 @@ private final class ScenePackageBuilder {
         }
 
         for checkpoint in sceneConfiguration.route.checkpoints {
-            worldRouteCheckpoints.append(routeCheckpoint(from: checkpoint))
-            for markerDrawable in routeMarkerDrawables(from: checkpoint) {
+            for markerDrawable in routeMarkerDrawables(from: checkpoint, groundSampler: groundSampler) {
                 alwaysLoadedIndices.append(sceneDrawables.count)
                 sceneDrawables.append(markerDrawable)
                 routeMarkerCount += 1
@@ -815,7 +847,6 @@ private final class ScenePackageBuilder {
         }
 
         for observer in detectionConfiguration.observers {
-            worldThreatObservers.append(threatObserver(from: observer))
             for markerDrawable in observerMarkerDrawables(from: observer) {
                 alwaysLoadedIndices.append(sceneDrawables.count)
                 sceneDrawables.append(markerDrawable)
@@ -825,18 +856,12 @@ private final class ScenePackageBuilder {
 
         let guidancePoints = guidanceConfiguration.coverPoints + guidanceConfiguration.signposts
         for guidancePoint in guidancePoints {
-            for markerDrawable in guidanceDrawables(from: guidancePoint) {
+            for markerDrawable in guidanceDrawables(from: guidancePoint, groundSampler: groundSampler) {
                 alwaysLoadedIndices.append(sceneDrawables.count)
                 sceneDrawables.append(markerDrawable)
                 guidanceMarkerCount += 1
             }
         }
-
-        let includedSectorIDs = sceneConfiguration.includedSectors.isEmpty
-            ? Array(sectorLookup.keys).sorted()
-            : sceneConfiguration.includedSectors
-
-        let loadedSectors = includedSectorIDs.compactMap { sectorLookup[$0] }
         let residencyCounts = loadedSectors.reduce(into: (local: 0, farField: 0, always: 0)) { counts, sector in
             switch sector.residency ?? .local {
             case .local:
@@ -855,16 +880,6 @@ private final class ScenePackageBuilder {
             let farFieldPadding = sector.farFieldPadding ?? max(activationPadding * 2.0, activationPadding + 140)
             let drawStart = sceneDrawables.count
 
-            worldSectors.append(
-                GameSectorBounds(
-                    minX: minimum.x,
-                    minZ: minimum.z,
-                    maxX: maximum.x,
-                    maxZ: maximum.z,
-                    activationPadding: activationPadding
-                )
-            )
-
             for terrainPatch in sector.terrainPatches {
                 if let drawable = terrainDrawable(
                     from: terrainPatch,
@@ -879,7 +894,6 @@ private final class ScenePackageBuilder {
                         texturedWorldDrawableCount += 1
                     }
                 }
-                worldGroundSurfaces.append(groundSurface(from: terrainPatch))
             }
 
             for roadStrip in sector.roadStrips {
@@ -896,7 +910,6 @@ private final class ScenePackageBuilder {
                         texturedWorldDrawableCount += 1
                     }
                 }
-                worldGroundSurfaces.append(groundSurface(from: roadStrip))
             }
 
             for block in sector.grayboxBlocks {
@@ -916,15 +929,6 @@ private final class ScenePackageBuilder {
                 if let shadowDrawable = grayboxShadowDrawable(from: block, sectorID: sector.id) {
                     sceneDrawables.append(shadowDrawable)
                 }
-                if block.collisionEnabled ?? true {
-                    worldCollisionVolumes.append(collisionVolume(from: block))
-                    collisionCount += 1
-                }
-            }
-
-            for volume in sector.collisionVolumes {
-                worldCollisionVolumes.append(collisionVolume(from: volume))
-                collisionCount += 1
             }
 
             sceneSectors.append(
@@ -948,6 +952,7 @@ private final class ScenePackageBuilder {
             "Sectors: \(loadedSectors.map(\.displayName).joined(separator: ", "))",
             "Residency: \(residencyCounts.always) always / \(residencyCounts.farField) far-field / \(residencyCounts.local) local",
             "World: \(terrainCount) terrain / \(roadCount) roads / \(collisionCount) blockers",
+            "Ground: \(groundModel.localSurfaces.count) local / \(groundModel.continuitySurfaces.count) continuity surfaces / \(continuityGroundDrawableCount) global drawable",
             "Texture Coverage: \(texturedWorldDrawableCount) textured world drawables / \(flatColorWorldDrawableCount) flat-color world drawables",
             String(
                 format: "Scope: %.1fx / %.1f deg / x%.1f draw stabilization",
@@ -1000,6 +1005,7 @@ private final class ScenePackageBuilder {
                 checkpoints: sceneConfiguration.route.checkpoints
             ),
             sectors: sceneSectors,
+            groundModel: groundModel,
             runtimeWorld: SceneRuntimeWorld(
                 sectorBounds: worldSectors,
                 collisionVolumes: worldCollisionVolumes,
@@ -1115,6 +1121,17 @@ private final class ScenePackageBuilder {
             roads: mapRoads,
             checkpoints: mapCheckpoints
         )
+    }
+
+    private func combinedBounds(
+        for loadedSectors: [SectorConfiguration],
+        fallback: SIMD3<Float>
+    ) -> (minX: Float, maxX: Float, minZ: Float, maxZ: Float) {
+        let minX = loadedSectors.map { $0.bounds.minimum.x }.min() ?? (fallback.x - 80)
+        let maxX = loadedSectors.map { $0.bounds.maximum.x }.max() ?? (fallback.x + 80)
+        let minZ = loadedSectors.map { $0.bounds.minimum.z }.min() ?? (fallback.z - 80)
+        let maxZ = loadedSectors.map { $0.bounds.maximum.z }.max() ?? (fallback.z + 80)
+        return (minX, maxX, minZ, maxZ)
     }
 
     private func buildSectorLookup(
@@ -1325,7 +1342,54 @@ private final class ScenePackageBuilder {
         )
     }
 
-    private func assetDrawable(from configuration: AssetInstanceConfiguration) -> SceneDrawable? {
+    private func continuityGroundDrawable(
+        from surfaces: [GameGroundSurface],
+        bounds: (minX: Float, maxX: Float, minZ: Float, maxZ: Float)
+    ) -> SceneDrawable? {
+        guard !surfaces.isEmpty else {
+            return nil
+        }
+
+        let vertices = GeometryBuilder.makeGroundContinuity(
+            from: surfaces,
+            verticalBias: -0.12,
+            color: SIMD4<Float>(0.37, 0.44, 0.32, 1.0)
+        )
+
+        guard let buffer = makeBuffer(from: vertices) else {
+            return nil
+        }
+
+        let center = SIMD3<Float>(
+            (bounds.minX + bounds.maxX) * 0.5,
+            0,
+            (bounds.minZ + bounds.maxZ) * 0.5
+        )
+        let radius = simd_length(
+            SIMD3<Float>(
+                (bounds.maxX - bounds.minX) * 0.5,
+                24,
+                (bounds.maxZ - bounds.minZ) * 0.5
+            )
+        )
+
+        return SceneDrawable(
+            name: "GlobalGroundContinuity",
+            vertexBuffer: buffer,
+            vertexCount: vertices.count,
+            modelMatrix: .identity(),
+            worldCenter: center,
+            boundingRadius: radius,
+            maxDrawDistance: max(bounds.maxX - bounds.minX, bounds.maxZ - bounds.minZ) * 2.4,
+            minimumViewDot: -1,
+            textureKey: .terrain
+        )
+    }
+
+    private func assetDrawable(
+        from configuration: AssetInstanceConfiguration,
+        groundSampler: WorldGroundSurfaceSampler
+    ) -> SceneDrawable? {
         let cacheKey = "\(configuration.category)/\(configuration.name)"
         let loadedAsset: LoadedAsset
 
@@ -1357,13 +1421,17 @@ private final class ScenePackageBuilder {
         )
         let rotation = simd_float4x4.rotation(y: (configuration.yawDegrees ?? 0) * (.pi / 180.0))
         let worldExtent = loadedAsset.extent * scale
-        let worldCenter = configuration.positionVector + SIMD3<Float>(0, worldExtent.y * 0.5, 0)
+        let groundedPosition = WorldRuntimeConversions.groundedPosition(
+            for: configuration.positionVector,
+            groundSampler: groundSampler
+        )
+        let worldCenter = groundedPosition + SIMD3<Float>(0, worldExtent.y * 0.5, 0)
 
         return SceneDrawable(
             name: configuration.name,
             vertexBuffer: buffer,
             vertexCount: loadedAsset.vertices.count,
-            modelMatrix: simd_float4x4.translation(configuration.positionVector) * rotation * normalization,
+            modelMatrix: simd_float4x4.translation(groundedPosition) * rotation * normalization,
             worldCenter: worldCenter,
             boundingRadius: simd_length(worldExtent) * 0.5,
             maxDrawDistance: adaptiveDrawDistance(
@@ -1376,10 +1444,16 @@ private final class ScenePackageBuilder {
         )
     }
 
-    private func routeMarkerDrawables(from configuration: RouteCheckpointConfiguration) -> [SceneDrawable] {
+    private func routeMarkerDrawables(
+        from configuration: RouteCheckpointConfiguration,
+        groundSampler: WorldGroundSurfaceSampler
+    ) -> [SceneDrawable] {
         let beaconHeight = configuration.beaconHeight ?? ((configuration.goal ?? false) ? 6.0 : 4.8)
         let beaconColor = configuration.beaconColorVector
-        let markerPosition = configuration.positionVector
+        let markerPosition = WorldRuntimeConversions.groundedPosition(
+            for: configuration.positionVector,
+            groundSampler: groundSampler
+        )
         var drawables: [SceneDrawable] = []
 
         let columnVertices = GeometryBuilder.makeBox(
@@ -1520,8 +1594,14 @@ private final class ScenePackageBuilder {
         return drawables
     }
 
-    private func guidanceDrawables(from configuration: GuidancePointConfiguration) -> [SceneDrawable] {
-        let markerPosition = configuration.positionVector
+    private func guidanceDrawables(
+        from configuration: GuidancePointConfiguration,
+        groundSampler: WorldGroundSurfaceSampler
+    ) -> [SceneDrawable] {
+        let markerPosition = WorldRuntimeConversions.groundedPosition(
+            for: configuration.positionVector,
+            groundSampler: groundSampler
+        )
         let markerColor = configuration.colorVector
         let yawRadians = (configuration.yawDegrees ?? 0) * (.pi / 180.0)
         let heading = simd_float4x4.rotation(y: yawRadians)
@@ -1673,85 +1753,6 @@ private final class ScenePackageBuilder {
         }
     }
 
-    private func groundSurface(from configuration: TerrainPatchConfiguration) -> GameGroundSurface {
-        let cornerHeights = configuration.cornerHeightVector
-        return GameGroundSurface(
-            centerX: configuration.positionVector.x,
-            centerZ: configuration.positionVector.z,
-            halfWidth: configuration.sizeVector.x * 0.5,
-            halfDepth: configuration.sizeVector.y * 0.5,
-            yawDegrees: configuration.yawDegrees ?? 0,
-            northWestHeight: configuration.positionVector.y + cornerHeights.x,
-            northEastHeight: configuration.positionVector.y + cornerHeights.y,
-            southEastHeight: configuration.positionVector.y + cornerHeights.z,
-            southWestHeight: configuration.positionVector.y + cornerHeights.w
-        )
-    }
-
-    private func groundSurface(from configuration: RoadStripConfiguration) -> GameGroundSurface {
-        let elevation = configuration.positionVector.y
-        return GameGroundSurface(
-            centerX: configuration.positionVector.x,
-            centerZ: configuration.positionVector.z,
-            halfWidth: configuration.sizeVector.x * 0.5,
-            halfDepth: configuration.sizeVector.y * 0.5,
-            yawDegrees: configuration.yawDegrees ?? 0,
-            northWestHeight: elevation,
-            northEastHeight: elevation,
-            southEastHeight: elevation,
-            southWestHeight: elevation
-        )
-    }
-
-    private func collisionVolume(from configuration: GrayboxBlockConfiguration) -> GameCollisionVolume {
-        GameCollisionVolume(
-            centerX: configuration.positionVector.x,
-            centerY: configuration.positionVector.y,
-            centerZ: configuration.positionVector.z,
-            halfWidth: configuration.halfExtentsVector.x,
-            halfHeight: configuration.halfExtentsVector.y,
-            halfDepth: configuration.halfExtentsVector.z,
-            yawDegrees: configuration.yawDegrees ?? 0
-        )
-    }
-
-    private func collisionVolume(from configuration: CollisionVolumeConfiguration) -> GameCollisionVolume {
-        GameCollisionVolume(
-            centerX: configuration.positionVector.x,
-            centerY: configuration.positionVector.y,
-            centerZ: configuration.positionVector.z,
-            halfWidth: configuration.halfExtentsVector.x,
-            halfHeight: configuration.halfExtentsVector.y,
-            halfDepth: configuration.halfExtentsVector.z,
-            yawDegrees: configuration.yawDegrees ?? 0
-        )
-    }
-
-    private func routeCheckpoint(from configuration: RouteCheckpointConfiguration) -> GameRouteCheckpoint {
-        GameRouteCheckpoint(
-            positionX: configuration.positionVector.x,
-            positionY: configuration.positionVector.y + 1.65,
-            positionZ: configuration.positionVector.z,
-            triggerRadius: configuration.triggerRadius,
-            yawDegrees: configuration.yawDegrees ?? 0,
-            pitchDegrees: configuration.pitchDegrees ?? -12,
-            isGoal: configuration.goal ?? false
-        )
-    }
-
-    private func threatObserver(from configuration: ThreatObserverConfiguration) -> GameThreatObserver {
-        GameThreatObserver(
-            positionX: configuration.positionVector.x,
-            positionY: configuration.positionVector.y,
-            positionZ: configuration.positionVector.z,
-            yawDegrees: configuration.yawDegrees,
-            pitchDegrees: configuration.pitchDegrees ?? 0,
-            range: configuration.range,
-            fieldOfViewDegrees: configuration.fieldOfViewDegrees,
-            suspicionPerSecond: configuration.suspicionPerSecond
-        )
-    }
-
     private func loadJSON<T: Decodable>(_ type: T.Type, at url: URL) throws -> T {
         let data = try Data(contentsOf: url)
         return try JSONDecoder().decode(T.self, from: data)
@@ -1837,6 +1838,12 @@ private enum FallbackSceneFactory {
                 checkpoints: []
             ),
             sectors: [],
+            groundModel: WorldGroundModel(
+                localSurfaces: [],
+                continuitySurfaces: [],
+                allSurfaces: [],
+                sampler: WorldGroundSurfaceSampler(surfaces: [])
+            ),
             runtimeWorld: SceneRuntimeWorld(
                 sectorBounds: [],
                 collisionVolumes: [],
@@ -2099,6 +2106,49 @@ private enum GeometryBuilder {
                 uv1: SIMD2<Float>(u1, 0),
                 uv2: SIMD2<Float>(u1, lengthRepeat),
                 uv3: SIMD2<Float>(u0, lengthRepeat),
+                color: color
+            )
+        }
+
+        return vertices
+    }
+
+    static func makeGroundContinuity(
+        from surfaces: [GameGroundSurface],
+        verticalBias: Float,
+        color: SIMD4<Float>
+    ) -> [SceneVertex] {
+        var vertices: [SceneVertex] = []
+        vertices.reserveCapacity(surfaces.count * 6)
+
+        for surface in surfaces {
+            let halfWidth = surface.halfWidth
+            let halfDepth = surface.halfDepth
+            let corners = [
+                SIMD3<Float>(-halfWidth, surface.northWestHeight + verticalBias, -halfDepth),
+                SIMD3<Float>(halfWidth, surface.northEastHeight + verticalBias, -halfDepth),
+                SIMD3<Float>(halfWidth, surface.southEastHeight + verticalBias, halfDepth),
+                SIMD3<Float>(-halfWidth, surface.southWestHeight + verticalBias, halfDepth),
+            ]
+            let rotation = simd_float4x4.rotation(y: surface.yawDegrees * (.pi / 180.0))
+            let translation = simd_float4x4.translation(SIMD3<Float>(surface.centerX, 0, surface.centerZ))
+
+            let worldCorners = corners.map { corner in
+                let rotated = rotation * SIMD4<Float>(corner.x, corner.y, corner.z, 1)
+                let positioned = translation * rotated
+                return SIMD3<Float>(positioned.x, positioned.y, positioned.z)
+            }
+
+            appendQuad(
+                to: &vertices,
+                p0: worldCorners[0],
+                p1: worldCorners[1],
+                p2: worldCorners[2],
+                p3: worldCorners[3],
+                uv0: SIMD2<Float>(0, 0),
+                uv1: SIMD2<Float>(1, 0),
+                uv2: SIMD2<Float>(1, 1),
+                uv3: SIMD2<Float>(0, 1),
                 color: color
             )
         }

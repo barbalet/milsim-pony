@@ -455,60 +455,6 @@ private func loadJSON<T: Decodable>(_ type: T.Type, at url: URL) throws -> T {
     return try JSONDecoder().decode(T.self, from: data)
 }
 
-private func groundSurface(from configuration: TerrainPatchConfiguration) -> GameGroundSurface {
-    let cornerHeights = configuration.cornerHeightVector
-    return GameGroundSurface(
-        centerX: configuration.positionVector.x,
-        centerZ: configuration.positionVector.z,
-        halfWidth: configuration.sizeVector.x * 0.5,
-        halfDepth: configuration.sizeVector.y * 0.5,
-        yawDegrees: configuration.yawDegrees ?? 0,
-        northWestHeight: configuration.positionVector.y + cornerHeights.x,
-        northEastHeight: configuration.positionVector.y + cornerHeights.y,
-        southEastHeight: configuration.positionVector.y + cornerHeights.z,
-        southWestHeight: configuration.positionVector.y + cornerHeights.w
-    )
-}
-
-private func groundSurface(from configuration: RoadStripConfiguration) -> GameGroundSurface {
-    let elevation = configuration.positionVector.y
-    return GameGroundSurface(
-        centerX: configuration.positionVector.x,
-        centerZ: configuration.positionVector.z,
-        halfWidth: configuration.sizeVector.x * 0.5,
-        halfDepth: configuration.sizeVector.y * 0.5,
-        yawDegrees: configuration.yawDegrees ?? 0,
-        northWestHeight: elevation,
-        northEastHeight: elevation,
-        southEastHeight: elevation,
-        southWestHeight: elevation
-    )
-}
-
-private func collisionVolume(from configuration: GrayboxBlockConfiguration) -> GameCollisionVolume {
-    GameCollisionVolume(
-        centerX: configuration.positionVector.x,
-        centerY: configuration.positionVector.y,
-        centerZ: configuration.positionVector.z,
-        halfWidth: configuration.halfExtentsVector.x,
-        halfHeight: configuration.halfExtentsVector.y,
-        halfDepth: configuration.halfExtentsVector.z,
-        yawDegrees: configuration.yawDegrees ?? 0
-    )
-}
-
-private func collisionVolume(from configuration: CollisionVolumeConfiguration) -> GameCollisionVolume {
-    GameCollisionVolume(
-        centerX: configuration.positionVector.x,
-        centerY: configuration.positionVector.y,
-        centerZ: configuration.positionVector.z,
-        halfWidth: configuration.halfExtentsVector.x,
-        halfHeight: configuration.halfExtentsVector.y,
-        halfDepth: configuration.halfExtentsVector.z,
-        yawDegrees: configuration.yawDegrees ?? 0
-    )
-}
-
 private func loadAuditWorld(manifestPath: String) throws -> AuditWorldRuntime {
     let fileManager = FileManager.default
     let repoRoot = URL(fileURLWithPath: fileManager.currentDirectoryPath, isDirectory: true)
@@ -528,32 +474,9 @@ private func loadAuditWorld(manifestPath: String) throws -> AuditWorldRuntime {
         }
         : scene.includedSectors.compactMap { sectorLookup[$0] }
 
-    var sectorBounds: [GameSectorBounds] = []
-    var collisionVolumes: [GameCollisionVolume] = []
-    var groundSurfaces: [GameGroundSurface] = []
-
-    for sector in loadedSectors {
-        let minimum = sector.bounds.minimum
-        let maximum = sector.bounds.maximum
-        let activationPadding = sector.streamingPadding ?? 10
-        sectorBounds.append(
-            GameSectorBounds(
-                minX: minimum.x,
-                minZ: minimum.z,
-                maxX: maximum.x,
-                maxZ: maximum.z,
-                activationPadding: activationPadding
-            )
-        )
-
-        groundSurfaces.append(contentsOf: sector.terrainPatches.map(groundSurface(from:)))
-        groundSurfaces.append(contentsOf: sector.roadStrips.map(groundSurface(from:)))
-
-        for block in sector.grayboxBlocks where block.collisionEnabled ?? true {
-            collisionVolumes.append(collisionVolume(from: block))
-        }
-        collisionVolumes.append(contentsOf: sector.collisionVolumes.map(collisionVolume(from:)))
-    }
+    let sectorBounds = WorldRuntimeConversions.sectorBounds(from: loadedSectors)
+    let collisionVolumes = WorldRuntimeConversions.collisionVolumes(from: loadedSectors)
+    let groundSurfaces = WorldRuntimeConversions.groundSurfaces(from: loadedSectors)
 
     let detection = scene.detection ?? DetectionConfiguration()
     var anchors: [AuditAnchor] = []

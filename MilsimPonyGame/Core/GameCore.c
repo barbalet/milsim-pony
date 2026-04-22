@@ -6,7 +6,7 @@
 
 #define GAME_CORE_MAX_SECTORS 32
 #define GAME_CORE_MAX_COLLISION_VOLUMES 256
-#define GAME_CORE_MAX_GROUND_SURFACES 128
+#define GAME_CORE_MAX_GROUND_SURFACES 2048
 #define GAME_CORE_MAX_ROUTE_CHECKPOINTS 16
 #define GAME_CORE_MAX_THREAT_OBSERVERS 16
 #define GAME_CORE_MAX_TICK_DELTA_SECONDS 0.25f
@@ -673,6 +673,10 @@ void GameCoreConfigureWorld(
         GameCoreBootstrap("implicit");
     }
 
+    const int requestedSectorCount = sectorCount;
+    const int requestedCollisionVolumeCount = collisionVolumeCount;
+    const int requestedGroundSurfaceCount = groundSurfaceCount;
+
     gameState.sectorCount = sectorCount > GAME_CORE_MAX_SECTORS ? GAME_CORE_MAX_SECTORS : sectorCount;
     gameState.collisionVolumeCount = collisionVolumeCount > GAME_CORE_MAX_COLLISION_VOLUMES
         ? GAME_CORE_MAX_COLLISION_VOLUMES
@@ -702,6 +706,16 @@ void GameCoreConfigureWorld(
     GameCoreRefreshGrounding();
     GameCoreUpdateRouteProgress();
     GameCoreUpdateDetection(0);
+    if (requestedSectorCount > gameState.sectorCount ||
+        requestedCollisionVolumeCount > gameState.collisionVolumeCount ||
+        requestedGroundSurfaceCount > gameState.groundSurfaceCount) {
+        printf(
+            "[GameCore] World data truncated to %d sectors, %d blockers, %d ground surfaces\n",
+            gameState.sectorCount,
+            gameState.collisionVolumeCount,
+            gameState.groundSurfaceCount
+        );
+    }
     printf(
         "[GameCore] World configured with %d sectors, %d blockers, %d ground surfaces\n",
         gameState.sectorCount,

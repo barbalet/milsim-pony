@@ -73,7 +73,8 @@
       "halfExtents": [3.6, 0.4, 3.0],
       "color": [0.55, 0.57, 0.61, 1.0],
       "yawDegrees": -8.0,
-      "collisionEnabled": false
+      "collisionEnabled": false,
+      "contributesToGround": true
     }
   ],
   "collisionVolumes": [

@@ -199,7 +199,8 @@
       "halfExtents": [12.0, 0.45, 14.0],
       "color": [0.50, 0.53, 0.56, 1.0],
       "yawDegrees": 0.0,
-      "collisionEnabled": false
+      "collisionEnabled": false,
+      "contributesToGround": true
     },
     {
       "name": "CivicClusterA",
@@ -269,7 +270,8 @@
       "halfExtents": [16.0, 0.4, 8.0],
       "color": [0.50, 0.53, 0.56, 1.0],
       "yawDegrees": 12.0,
-      "collisionEnabled": false
+      "collisionEnabled": false,
+      "contributesToGround": true
     },
     {
       "name": "LakeEdgePromenadeEast",
@@ -277,7 +279,8 @@
       "halfExtents": [16.0, 0.25, 4.0],
       "color": [0.49, 0.52, 0.55, 1.0],
       "yawDegrees": 8.0,
-      "collisionEnabled": false
+      "collisionEnabled": false,
+      "contributesToGround": true
     },
     {
       "name": "LakeEdgePromenadeWest",
@@ -285,7 +288,8 @@
       "halfExtents": [18.0, 0.25, 4.0],
       "color": [0.49, 0.52, 0.55, 1.0],
       "yawDegrees": 0.0,
-      "collisionEnabled": false
+      "collisionEnabled": false,
+      "contributesToGround": true
     },
     {
       "name": "BasinBridgePylonEast",
