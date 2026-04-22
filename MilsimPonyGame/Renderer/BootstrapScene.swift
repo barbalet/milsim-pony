@@ -19,6 +19,7 @@ struct SceneDrawable {
     let maxDrawDistance: Float
     let minimumViewDot: Float
     let textureKey: SceneTextureKey?
+    let retainedInJungleRenderer: Bool
 }
 
 struct SceneEnvironment {
@@ -367,6 +368,9 @@ final class BootstrapScene {
 
         for drawIndex in drawIndices {
             let drawable = drawables[drawIndex]
+            guard drawable.retainedInJungleRenderer else {
+                continue
+            }
             let offset = drawable.worldCenter - cameraPosition
             let distance = simd_length(offset)
             let maximumDrawDistance = drawable.maxDrawDistance * scopeDrawDistanceMultiplier
@@ -389,6 +393,105 @@ final class BootstrapScene {
         }
 
         return SceneVisibilityState(drawables: visibleDrawables, culledCount: culledCount)
+    }
+
+    func makeJungleTerrainFrame(
+        snapshot: GameFrameSnapshot,
+        cameraPosition: SIMD3<Float>,
+        cameraForward: SIMD3<Float>,
+        cameraRight: SIMD3<Float>,
+        viewProjectionMatrix: simd_float4x4
+    ) -> JungleTerrainFrame {
+        let currentSector = currentMapSector(for: cameraPosition)
+        let profile = terrainProfile(for: currentSector)
+        let sampleSide = 25
+        let spacing: Float = 2.0
+        let halfExtent = (Float(sampleSide - 1) * spacing) * 0.5
+        var samples: [JungleTerrainSample] = []
+        samples.reserveCapacity(sampleSide * sampleSide)
+
+        for row in 0..<sampleSide {
+            let worldZ = cameraPosition.z - halfExtent + (Float(row) * spacing)
+
+            for column in 0..<sampleSide {
+                let worldX = cameraPosition.x - halfExtent + (Float(column) * spacing)
+                let roadFactor = roadInfluence(at: SIMD2<Float>(worldX, worldZ))
+                let foliageNoise = terrainNoise(x: worldX, z: worldZ, frequency: 0.034, phase: 0.9)
+                let canopyNoise = terrainNoise(x: worldX, z: worldZ, frequency: 0.017, phase: 2.1)
+                let microNoise = terrainNoise(x: worldX, z: worldZ, frequency: 0.081, phase: 1.7)
+                let height = resolvedTerrainHeight(x: worldX, z: worldZ)
+                let wetnessLift = max(0, (profile.ambientWetness - 0.18) * 0.28)
+                let groundCover = clamp(
+                    profile.groundCoverDensity * (0.68 + foliageNoise * 0.32) * (1.0 - roadFactor * 0.88),
+                    min: 0,
+                    max: 1
+                )
+                let waist = clamp(
+                    profile.waistDensity * (0.48 + foliageNoise * 0.52) * (1.0 - roadFactor * 0.92),
+                    min: 0,
+                    max: 1
+                )
+                let head = clamp(
+                    profile.headDensity * (0.44 + canopyNoise * 0.56) * (1.0 - roadFactor * 0.95),
+                    min: 0,
+                    max: 1
+                )
+                let canopy = clamp(
+                    profile.canopyDensity * (0.42 + canopyNoise * 0.58) * (1.0 - roadFactor * 0.97),
+                    min: 0,
+                    max: 1
+                )
+                let wetness = clamp(
+                    profile.ambientWetness * (0.72 + microNoise * 0.16) +
+                        wetnessLift +
+                        (profile.shorelineSpace * 0.18) -
+                        (roadFactor * 0.10),
+                    min: 0,
+                    max: 1
+                )
+
+                samples.append(
+                    JungleTerrainSample(
+                        position: SIMD3<Float>(worldX, height, worldZ),
+                        groundCover: groundCover,
+                        waist: waist,
+                        head: head,
+                        canopy: canopy,
+                        wetness: wetness
+                    )
+                )
+            }
+        }
+
+        return JungleTerrainFrame(
+            cameraPosition: cameraPosition,
+            cameraForward: cameraForward,
+            cameraRight: cameraRight,
+            cameraFloorHeight: snapshot.groundHeight,
+            simulatedTimeSeconds: snapshot.elapsedSeconds,
+            currentBiome: profile.biome,
+            currentWeather: profile.weather,
+            biomeBlend: profile.biomeBlend,
+            groundCoverHeight: 0.35,
+            waistHeight: 1.10,
+            headHeight: 1.80,
+            canopyHeight: 4.80,
+            visibilityDistance: profile.visibilityDistance,
+            ambientWetness: profile.ambientWetness,
+            shorelineSpace: profile.shorelineSpace,
+            terrainPatch: JungleTerrainPatch(
+                sampleSide: sampleSide,
+                spacing: spacing,
+                center: cameraPosition,
+                samples: samples
+            ),
+            groundMaterial: profile.groundMaterial,
+            groundCoverMaterial: profile.groundCoverMaterial,
+            waistMaterial: profile.waistMaterial,
+            headMaterial: profile.headMaterial,
+            canopyMaterial: profile.canopyMaterial,
+            viewProjectionMatrix: viewProjectionMatrix
+        )
     }
 
     func streamingState(
@@ -657,6 +760,250 @@ final class BootstrapScene {
             checkpoints: mapConfigurationTemplate.checkpoints
         )
     }
+
+    private func currentMapSector(for position: SIMD3<Float>) -> SceneMapSector? {
+        mapConfiguration.sectors.first { sector in
+            sector.contains(x: position.x, z: position.z)
+        }
+    }
+
+    private func terrainProfile(for sector: SceneMapSector?) -> JungleTerrainProfile {
+        let label = sector?.displayName.lowercased() ?? ""
+
+        if label.contains("basin") || label.contains("lake") || label.contains("yarralumla") {
+            return JungleTerrainProfile(
+                biome: .beach,
+                weather: .coastalHaze,
+                biomeBlend: 0.86,
+                visibilityDistance: 132,
+                ambientWetness: 0.54,
+                shorelineSpace: 0.82,
+                groundMaterial: JungleMaterialChannel(
+                    red: 0.64,
+                    green: 0.58,
+                    blue: 0.43,
+                    alpha: 1.0,
+                    motion: 0.04,
+                    wetnessResponse: 0.34
+                ),
+                groundCoverMaterial: JungleMaterialChannel(
+                    red: 0.60,
+                    green: 0.67,
+                    blue: 0.45,
+                    alpha: 0.26,
+                    motion: 0.30,
+                    wetnessResponse: 0.24
+                ),
+                waistMaterial: JungleMaterialChannel(
+                    red: 0.53,
+                    green: 0.61,
+                    blue: 0.42,
+                    alpha: 0.14,
+                    motion: 0.28,
+                    wetnessResponse: 0.18
+                ),
+                headMaterial: JungleMaterialChannel(
+                    red: 0.43,
+                    green: 0.53,
+                    blue: 0.35,
+                    alpha: 0.08,
+                    motion: 0.24,
+                    wetnessResponse: 0.16
+                ),
+                canopyMaterial: JungleMaterialChannel(
+                    red: 0.34,
+                    green: 0.44,
+                    blue: 0.30,
+                    alpha: 0.05,
+                    motion: 0.20,
+                    wetnessResponse: 0.14
+                ),
+                groundCoverDensity: 0.28,
+                waistDensity: 0.12,
+                headDensity: 0.06,
+                canopyDensity: 0.03
+            )
+        }
+
+        if label.contains("mountain")
+            || label.contains("ainslie")
+            || label.contains("campbell")
+            || label.contains("deakin")
+            || label.contains("escape")
+        {
+            return JungleTerrainProfile(
+                biome: .jungle,
+                weather: .humidCanopy,
+                biomeBlend: 0.78,
+                visibilityDistance: 88,
+                ambientWetness: 0.42,
+                shorelineSpace: 0.10,
+                groundMaterial: JungleMaterialChannel(
+                    red: 0.33,
+                    green: 0.37,
+                    blue: 0.27,
+                    alpha: 1.0,
+                    motion: 0.05,
+                    wetnessResponse: 0.32
+                ),
+                groundCoverMaterial: JungleMaterialChannel(
+                    red: 0.40,
+                    green: 0.51,
+                    blue: 0.31,
+                    alpha: 0.62,
+                    motion: 0.70,
+                    wetnessResponse: 0.30
+                ),
+                waistMaterial: JungleMaterialChannel(
+                    red: 0.29,
+                    green: 0.43,
+                    blue: 0.24,
+                    alpha: 0.42,
+                    motion: 0.62,
+                    wetnessResponse: 0.28
+                ),
+                headMaterial: JungleMaterialChannel(
+                    red: 0.23,
+                    green: 0.34,
+                    blue: 0.20,
+                    alpha: 0.28,
+                    motion: 0.56,
+                    wetnessResponse: 0.24
+                ),
+                canopyMaterial: JungleMaterialChannel(
+                    red: 0.18,
+                    green: 0.28,
+                    blue: 0.17,
+                    alpha: 0.24,
+                    motion: 0.66,
+                    wetnessResponse: 0.20
+                ),
+                groundCoverDensity: 0.56,
+                waistDensity: 0.42,
+                headDensity: 0.24,
+                canopyDensity: 0.18
+            )
+        }
+
+        return JungleTerrainProfile(
+            biome: .grassland,
+            weather: .clearBreeze,
+            biomeBlend: 0.34,
+            visibilityDistance: 112,
+            ambientWetness: 0.22,
+            shorelineSpace: 0.06,
+            groundMaterial: JungleMaterialChannel(
+                red: 0.48,
+                green: 0.47,
+                blue: 0.41,
+                alpha: 1.0,
+                motion: 0.03,
+                wetnessResponse: 0.20
+            ),
+            groundCoverMaterial: JungleMaterialChannel(
+                red: 0.49,
+                green: 0.58,
+                blue: 0.35,
+                alpha: 0.32,
+                motion: 0.38,
+                wetnessResponse: 0.18
+            ),
+            waistMaterial: JungleMaterialChannel(
+                red: 0.38,
+                green: 0.48,
+                blue: 0.30,
+                alpha: 0.12,
+                motion: 0.32,
+                wetnessResponse: 0.16
+            ),
+            headMaterial: JungleMaterialChannel(
+                red: 0.30,
+                green: 0.39,
+                blue: 0.26,
+                alpha: 0.06,
+                motion: 0.24,
+                wetnessResponse: 0.15
+            ),
+            canopyMaterial: JungleMaterialChannel(
+                red: 0.25,
+                green: 0.34,
+                blue: 0.24,
+                alpha: 0.04,
+                motion: 0.22,
+                wetnessResponse: 0.14
+            ),
+            groundCoverDensity: 0.24,
+            waistDensity: 0.10,
+            headDensity: 0.04,
+            canopyDensity: 0.02
+        )
+    }
+
+    private func resolvedTerrainHeight(x: Float, z: Float) -> Float {
+        if let height = groundSampler.sampleHeight(x: x, z: z) {
+            return height
+        }
+
+        let nearestSamples = groundSampler.surfaces
+            .map { groundSampler.projectedSample(x: x, z: z, surface: $0) }
+            .sorted { lhs, rhs in
+                lhs.distanceSquared < rhs.distanceSquared
+            }
+            .prefix(4)
+
+        guard !nearestSamples.isEmpty else {
+            return 0
+        }
+
+        var weightedHeight: Float = 0
+        var totalWeight: Float = 0
+
+        for sample in nearestSamples {
+            let weight = 1 / max(sample.distanceSquared, 1)
+            weightedHeight += sample.height * weight
+            totalWeight += weight
+        }
+
+        return totalWeight > 0 ? (weightedHeight / totalWeight) : nearestSamples.first?.height ?? 0
+    }
+
+    private func roadInfluence(at position: SIMD2<Float>) -> Float {
+        mapConfiguration.roads.reduce(0) { maximumInfluence, road in
+            max(maximumInfluence, roadInfluence(for: road, at: position))
+        }
+    }
+
+    private func roadInfluence(for road: SceneMapRoad, at position: SIMD2<Float>) -> Float {
+        let yawRadians = (-road.yawDegrees) * (.pi / 180.0)
+        let cosine = cosf(yawRadians)
+        let sine = sinf(yawRadians)
+        let offsetX = position.x - road.centerPoint.x
+        let offsetZ = position.y - road.centerPoint.z
+        let localX = (offsetX * cosine) - (offsetZ * sine)
+        let localZ = (offsetX * sine) + (offsetZ * cosine)
+        let halfWidth = max(road.width * 0.5, 0.8)
+        let halfLength = max(road.length * 0.5, 1.2)
+        let edgeDistance = max(abs(localX) - halfWidth, abs(localZ) - halfLength)
+
+        if edgeDistance <= 0 {
+            return 1
+        }
+
+        let falloff = max(road.width * 0.65, 4.0)
+        return clamp(1.0 - (edgeDistance / falloff), min: 0, max: 1)
+    }
+
+    private func terrainNoise(x: Float, z: Float, frequency: Float, phase: Float) -> Float {
+        let value =
+            sinf((x * frequency) + phase) +
+            sinf((z * frequency * 1.27) + (phase * 0.7)) +
+            sinf(((x + z) * frequency * 0.61) + (phase * 1.3))
+        return clamp((value * 0.1667) + 0.5, min: 0, max: 1)
+    }
+
+    private func clamp(_ value: Float, min minimum: Float, max maximum: Float) -> Float {
+        Swift.min(Swift.max(value, minimum), maximum)
+    }
 }
 
 private struct SceneBuildResult {
@@ -688,6 +1035,24 @@ private struct SceneTraversalTuning {
     let walkSpeed: Float
     let sprintSpeed: Float
     let lookSensitivity: Float
+}
+
+private struct JungleTerrainProfile {
+    let biome: JungleBiomeKind
+    let weather: JungleWeatherKind
+    let biomeBlend: Float
+    let visibilityDistance: Float
+    let ambientWetness: Float
+    let shorelineSpace: Float
+    let groundMaterial: JungleMaterialChannel
+    let groundCoverMaterial: JungleMaterialChannel
+    let waistMaterial: JungleMaterialChannel
+    let headMaterial: JungleMaterialChannel
+    let canopyMaterial: JungleMaterialChannel
+    let groundCoverDensity: Float
+    let waistDensity: Float
+    let headDensity: Float
+    let canopyDensity: Float
 }
 
 private struct SceneSectorRuntime {
@@ -1175,7 +1540,8 @@ private final class ScenePackageBuilder {
                     multiplier: 2.6
                 ),
                 minimumViewDot: -1,
-                textureKey: nil
+                textureKey: nil,
+                retainedInJungleRenderer: false
             )
 
         case .box:
@@ -1202,7 +1568,8 @@ private final class ScenePackageBuilder {
                     multiplier: 3.2
                 ),
                 minimumViewDot: -0.65,
-                textureKey: .terrain
+                textureKey: .terrain,
+                retainedInJungleRenderer: true
             )
         }
     }
@@ -1235,7 +1602,8 @@ private final class ScenePackageBuilder {
                 multiplier: visibilityMultiplier(3.8, for: residency)
             ),
             minimumViewDot: visibilityMinimumViewDot(-0.55, for: residency),
-            textureKey: textureKey(for: configuration.name)
+            textureKey: textureKey(for: configuration.name),
+            retainedInJungleRenderer: true
         )
     }
 
@@ -1267,7 +1635,8 @@ private final class ScenePackageBuilder {
                 multiplier: 3.0
             ),
             minimumViewDot: -0.7,
-            textureKey: nil
+            textureKey: nil,
+            retainedInJungleRenderer: false
         )
     }
 
@@ -1301,7 +1670,8 @@ private final class ScenePackageBuilder {
                 multiplier: visibilityMultiplier(2.6, for: residency)
             ),
             minimumViewDot: -1,
-            textureKey: .terrain
+            textureKey: .terrain,
+            retainedInJungleRenderer: false
         )
     }
 
@@ -1338,7 +1708,8 @@ private final class ScenePackageBuilder {
                 multiplier: visibilityMultiplier(2.8, for: residency)
             ),
             minimumViewDot: -1,
-            textureKey: .road
+            textureKey: .road,
+            retainedInJungleRenderer: false
         )
     }
 
@@ -1382,7 +1753,8 @@ private final class ScenePackageBuilder {
             boundingRadius: radius,
             maxDrawDistance: max(bounds.maxX - bounds.minX, bounds.maxZ - bounds.minZ) * 2.4,
             minimumViewDot: -1,
-            textureKey: .terrain
+            textureKey: .terrain,
+            retainedInJungleRenderer: false
         )
     }
 
@@ -1440,7 +1812,8 @@ private final class ScenePackageBuilder {
                 multiplier: 3.2
             ),
             minimumViewDot: -0.45,
-            textureKey: nil
+            textureKey: nil,
+            retainedInJungleRenderer: true
         )
     }
 
@@ -1472,7 +1845,8 @@ private final class ScenePackageBuilder {
                     boundingRadius: beaconHeight * 0.6,
                     maxDrawDistance: configuration.goal ?? false ? 240 : 170,
                     minimumViewDot: -0.92,
-                    textureKey: nil
+                    textureKey: nil,
+                    retainedInJungleRenderer: true
                 )
             )
         }
@@ -1493,7 +1867,8 @@ private final class ScenePackageBuilder {
                     boundingRadius: configuration.goal ?? false ? 2.8 : 1.8,
                     maxDrawDistance: configuration.goal ?? false ? 240 : 170,
                     minimumViewDot: -0.92,
-                    textureKey: nil
+                    textureKey: nil,
+                    retainedInJungleRenderer: true
                 )
             )
         }
@@ -1514,7 +1889,8 @@ private final class ScenePackageBuilder {
                     boundingRadius: configuration.goal ?? false ? 2.6 : 1.6,
                     maxDrawDistance: configuration.goal ?? false ? 140 : 100,
                     minimumViewDot: -0.85,
-                    textureKey: nil
+                    textureKey: nil,
+                    retainedInJungleRenderer: false
                 )
             )
         }
@@ -1544,7 +1920,8 @@ private final class ScenePackageBuilder {
                     boundingRadius: 1.4,
                     maxDrawDistance: 150,
                     minimumViewDot: -0.85,
-                    textureKey: nil
+                    textureKey: nil,
+                    retainedInJungleRenderer: true
                 )
             )
         }
@@ -1565,7 +1942,8 @@ private final class ScenePackageBuilder {
                     boundingRadius: 1.0,
                     maxDrawDistance: 150,
                     minimumViewDot: -0.88,
-                    textureKey: nil
+                    textureKey: nil,
+                    retainedInJungleRenderer: true
                 )
             )
         }
@@ -1586,7 +1964,8 @@ private final class ScenePackageBuilder {
                     boundingRadius: 0.9,
                     maxDrawDistance: 110,
                     minimumViewDot: -0.86,
-                    textureKey: nil
+                    textureKey: nil,
+                    retainedInJungleRenderer: false
                 )
             )
         }
@@ -1626,7 +2005,8 @@ private final class ScenePackageBuilder {
                         boundingRadius: 1.2,
                         maxDrawDistance: 135,
                         minimumViewDot: -0.82,
-                        textureKey: nil
+                        textureKey: nil,
+                        retainedInJungleRenderer: true
                     )
                 )
             }
@@ -1649,7 +2029,8 @@ private final class ScenePackageBuilder {
                         boundingRadius: 1.6,
                         maxDrawDistance: 165,
                         minimumViewDot: -0.9,
-                        textureKey: nil
+                        textureKey: nil,
+                        retainedInJungleRenderer: true
                     )
                 )
             }
@@ -1670,7 +2051,8 @@ private final class ScenePackageBuilder {
                         boundingRadius: 1.2,
                         maxDrawDistance: 165,
                         minimumViewDot: -0.9,
-                        textureKey: nil
+                        textureKey: nil,
+                        retainedInJungleRenderer: true
                     )
                 )
             }
@@ -1692,7 +2074,8 @@ private final class ScenePackageBuilder {
                     boundingRadius: 0.95,
                     maxDrawDistance: 110,
                     minimumViewDot: -0.82,
-                    textureKey: nil
+                    textureKey: nil,
+                    retainedInJungleRenderer: false
                 )
             )
         }
@@ -1788,7 +2171,8 @@ private enum FallbackSceneFactory {
                     boundingRadius: 20,
                     maxDrawDistance: 120,
                     minimumViewDot: -1,
-                    textureKey: nil
+                    textureKey: nil,
+                    retainedInJungleRenderer: false
                 )
             ]
         } ?? []

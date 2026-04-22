@@ -1,6 +1,68 @@
 import Foundation
 import simd
 
+enum JungleBiomeKind {
+    case grassland
+    case jungle
+    case beach
+}
+
+enum JungleWeatherKind {
+    case clearBreeze
+    case humidCanopy
+    case coastalHaze
+}
+
+struct JungleMaterialChannel {
+    let red: Float
+    let green: Float
+    let blue: Float
+    let alpha: Float
+    let motion: Float
+    let wetnessResponse: Float
+}
+
+struct JungleTerrainSample {
+    let position: SIMD3<Float>
+    let groundCover: Float
+    let waist: Float
+    let head: Float
+    let canopy: Float
+    let wetness: Float
+}
+
+struct JungleTerrainPatch {
+    let sampleSide: Int
+    let spacing: Float
+    let center: SIMD3<Float>
+    let samples: [JungleTerrainSample]
+}
+
+struct JungleTerrainFrame {
+    let cameraPosition: SIMD3<Float>
+    let cameraForward: SIMD3<Float>
+    let cameraRight: SIMD3<Float>
+    let cameraFloorHeight: Float
+    let simulatedTimeSeconds: Double
+    let currentBiome: JungleBiomeKind
+    let currentWeather: JungleWeatherKind
+    let biomeBlend: Float
+    let groundCoverHeight: Float
+    let waistHeight: Float
+    let headHeight: Float
+    let canopyHeight: Float
+    let visibilityDistance: Float
+    let ambientWetness: Float
+    let shorelineSpace: Float
+    let terrainPatch: JungleTerrainPatch
+    let groundMaterial: JungleMaterialChannel
+    let groundCoverMaterial: JungleMaterialChannel
+    let waistMaterial: JungleMaterialChannel
+    let headMaterial: JungleMaterialChannel
+    let canopyMaterial: JungleMaterialChannel
+    let viewProjectionMatrix: simd_float4x4
+}
+
 struct SceneVertex {
     var position: SIMD3<Float>
     var normal: SIMD3<Float>
