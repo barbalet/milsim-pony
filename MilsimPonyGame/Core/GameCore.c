@@ -14,6 +14,8 @@
 #define GAME_CORE_MAX_MOVEMENT_STEP_DISTANCE 0.05f
 #define GAME_CORE_LOS_SAMPLE_SPACING_METERS 0.10f
 #define GAME_CORE_MAX_LOS_SAMPLES 256
+#define GAME_CORE_NPC_PROGRESS_EPSILON_METERS 0.05f
+#define GAME_CORE_NPC_STUCK_TIMEOUT_SECONDS 6.0f
 
 typedef struct GameCoreState {
     double elapsedSeconds;
@@ -104,6 +106,16 @@ static float GameCoreDegreesToRadians(float degrees) {
     return degrees * (float)M_PI / 180.0f;
 }
 
+static float GameCoreNormalizeDegrees(float degrees) {
+    while (degrees > 180.0f) {
+        degrees -= 360.0f;
+    }
+    while (degrees < -180.0f) {
+        degrees += 360.0f;
+    }
+    return degrees;
+}
+
 static void GameCoreUpdateDetection(double deltaTime);
 
 static void GameCoreRotateIntoLocalFrame(float x, float z, float yawDegrees, float *localX, float *localZ) {
@@ -156,8 +168,8 @@ static float GameCoreSampleGroundHeight(float x, float z, float fallbackHeight, 
     return highestHeight;
 }
 
-static bool GameCoreWouldCollide(float x, float z, float groundHeight) {
-    const float eyeHeight = groundHeight + gameState.eyeHeight;
+static bool GameCoreWouldCollideWithRadius(float x, float z, float groundHeight, float radius, float eyeHeightOffset) {
+    const float eyeHeight = groundHeight + eyeHeightOffset;
 
     for (int index = 0; index < gameState.collisionVolumeCount; index++) {
         const GameCollisionVolume *volume = &gameState.collisionVolumes[index];
@@ -178,13 +190,76 @@ static bool GameCoreWouldCollide(float x, float z, float groundHeight) {
             &localZ
         );
 
-        if (fabsf(localX) <= (volume->halfWidth + gameState.playerRadius) &&
-            fabsf(localZ) <= (volume->halfDepth + gameState.playerRadius)) {
+        if (fabsf(localX) <= (volume->halfWidth + radius) &&
+            fabsf(localZ) <= (volume->halfDepth + radius)) {
             return true;
         }
     }
 
     return false;
+}
+
+static float GameCoreMoveBodyAlongVector(
+    float *positionX,
+    float *positionZ,
+    float *groundHeight,
+    float worldMoveX,
+    float worldMoveZ,
+    float travelDistance,
+    float radius,
+    float eyeHeightOffset
+) {
+    float movedDistance = 0;
+    const float magnitude = sqrtf((worldMoveX * worldMoveX) + (worldMoveZ * worldMoveZ));
+
+    if (!(travelDistance > 0.0f) || !(magnitude > 0.0001f)) {
+        return 0;
+    }
+
+    {
+        float normalizedMoveX = worldMoveX / magnitude;
+        float normalizedMoveZ = worldMoveZ / magnitude;
+        int movementSteps = (int)ceilf(travelDistance / GAME_CORE_MAX_MOVEMENT_STEP_DISTANCE);
+
+        if (movementSteps < 1) {
+            movementSteps = 1;
+        }
+
+        {
+            const float stepMoveX = (normalizedMoveX * travelDistance) / (float)movementSteps;
+            const float stepMoveZ = (normalizedMoveZ * travelDistance) / (float)movementSteps;
+
+            for (int movementStep = 0; movementStep < movementSteps; movementStep++) {
+                float nextX = *positionX + stepMoveX;
+                float nextZ = *positionZ;
+                float candidateGroundHeight = GameCoreSampleGroundHeight(nextX, nextZ, *groundHeight, NULL);
+                const float beforeX = *positionX;
+                const float beforeZ = *positionZ;
+
+                if (!GameCoreWouldCollideWithRadius(nextX, nextZ, candidateGroundHeight, radius, eyeHeightOffset)) {
+                    *positionX = nextX;
+                    *groundHeight = candidateGroundHeight;
+                }
+
+                nextX = *positionX;
+                nextZ = *positionZ + stepMoveZ;
+                candidateGroundHeight = GameCoreSampleGroundHeight(nextX, nextZ, *groundHeight, NULL);
+
+                if (!GameCoreWouldCollideWithRadius(nextX, nextZ, candidateGroundHeight, radius, eyeHeightOffset)) {
+                    *positionZ = nextZ;
+                    *groundHeight = candidateGroundHeight;
+                }
+
+                {
+                    const float deltaX = *positionX - beforeX;
+                    const float deltaZ = *positionZ - beforeZ;
+                    movedDistance += sqrtf((deltaX * deltaX) + (deltaZ * deltaZ));
+                }
+            }
+        }
+    }
+
+    return movedDistance;
 }
 
 static int GameCoreCountActiveSectors(float x, float z) {
@@ -215,6 +290,23 @@ static void GameCoreRefreshGrounding(void) {
     gameState.grounded = foundSurface;
     gameState.cameraY = gameState.groundHeight + gameState.eyeHeight;
     gameState.activeSectorCount = GameCoreCountActiveSectors(gameState.cameraX, gameState.cameraZ);
+}
+
+static void GameCoreRefreshNPCGrounding(GameNPCState *npc, float fallbackHeight) {
+    bool foundSurface = false;
+
+    if (npc == NULL) {
+        return;
+    }
+
+    npc->groundHeight = GameCoreSampleGroundHeight(
+        npc->positionX,
+        npc->positionZ,
+        fallbackHeight,
+        &foundSurface
+    );
+    npc->grounded = foundSurface;
+    npc->positionY = npc->groundHeight + npc->eyeHeight;
 }
 
 static void GameCoreUpdateRespawnAnchorForProgress(void) {
@@ -423,37 +515,16 @@ static void GameCoreAdvanceSimulationStep(float deltaTime) {
             const float forwardZ = -cosf(yawRadians);
             const float worldMoveX = (rightX * moveX) + (forwardX * moveZ);
             const float worldMoveZ = (rightZ * moveX) + (forwardZ * moveZ);
-            const float fullStepDistance = baseMoveSpeed * magnitude * deltaTime;
-            int movementSteps = (int)ceilf(fullStepDistance / GAME_CORE_MAX_MOVEMENT_STEP_DISTANCE);
-
-            if (movementSteps < 1) {
-                movementSteps = 1;
-            }
-
-            {
-                const float stepMoveX = (worldMoveX * baseMoveSpeed * deltaTime) / (float)movementSteps;
-                const float stepMoveZ = (worldMoveZ * baseMoveSpeed * deltaTime) / (float)movementSteps;
-
-                for (int movementStep = 0; movementStep < movementSteps; movementStep++) {
-                    float nextX = gameState.cameraX + stepMoveX;
-                    float nextZ = gameState.cameraZ;
-                    float candidateGroundHeight = GameCoreSampleGroundHeight(nextX, nextZ, gameState.groundHeight, NULL);
-
-                    if (!GameCoreWouldCollide(nextX, nextZ, candidateGroundHeight)) {
-                        gameState.cameraX = nextX;
-                        gameState.groundHeight = candidateGroundHeight;
-                    }
-
-                    nextX = gameState.cameraX;
-                    nextZ = gameState.cameraZ + stepMoveZ;
-                    candidateGroundHeight = GameCoreSampleGroundHeight(nextX, nextZ, gameState.groundHeight, NULL);
-
-                    if (!GameCoreWouldCollide(nextX, nextZ, candidateGroundHeight)) {
-                        gameState.cameraZ = nextZ;
-                        gameState.groundHeight = candidateGroundHeight;
-                    }
-                }
-            }
+            GameCoreMoveBodyAlongVector(
+                &gameState.cameraX,
+                &gameState.cameraZ,
+                &gameState.groundHeight,
+                worldMoveX,
+                worldMoveZ,
+                baseMoveSpeed * magnitude * deltaTime,
+                gameState.playerRadius,
+                gameState.eyeHeight
+            );
         }
     }
 
@@ -691,6 +762,35 @@ void GameCoreConfigureDetection(
     printf("[GameCore] Detection configured with %d observers\n", gameState.threatObserverCount);
 }
 
+bool GameCoreSampleGroundHeightAt(float x, float z, float fallbackHeight, float *groundHeight) {
+    if (!gameState.bootstrapped) {
+        GameCoreBootstrap("implicit");
+    }
+
+    bool foundSurface = false;
+    const float sampledHeight = GameCoreSampleGroundHeight(x, z, fallbackHeight, &foundSurface);
+
+    if (groundHeight != NULL) {
+        *groundHeight = sampledHeight;
+    }
+
+    return foundSurface;
+}
+
+bool GameCoreCanOccupyPosition(float x, float z, float groundHeight, float radius) {
+    if (!gameState.bootstrapped) {
+        GameCoreBootstrap("implicit");
+    }
+
+    return !GameCoreWouldCollideWithRadius(
+        x,
+        z,
+        groundHeight,
+        radius > 0 ? radius : gameState.playerRadius,
+        gameState.eyeHeight
+    );
+}
+
 void GameCoreSetMoveIntent(float strafeIntent, float forwardIntent) {
     gameState.strafeIntent = strafeIntent;
     gameState.forwardIntent = forwardIntent;
@@ -749,6 +849,243 @@ void GameCoreTick(double deltaTime) {
                 gameState.routeDistanceMeters += sqrtf((deltaX * deltaX) + (deltaZ * deltaZ));
             }
 
+            remainingTime -= stepTime;
+        }
+    }
+}
+
+static void GameCoreAdvanceNPCSimulationStep(GameNPCState *npc, float deltaTime) {
+    static const float clockwiseOffsets[] = {0.0f, 22.5f, -22.5f, 45.0f, -45.0f, 67.5f, -67.5f, 90.0f, -90.0f, 135.0f, -135.0f, 180.0f};
+    static const float counterOffsets[] = {0.0f, -22.5f, 22.5f, -45.0f, 45.0f, -67.5f, 67.5f, -90.0f, 90.0f, -135.0f, 135.0f, 180.0f};
+    const float *offsets = npc->preferClockwise ? clockwiseOffsets : counterOffsets;
+    const int offsetCount = (int)(sizeof(clockwiseOffsets) / sizeof(clockwiseOffsets[0]));
+    const float deltaX = npc->targetX - npc->positionX;
+    const float deltaZ = npc->targetZ - npc->positionZ;
+    const float currentDistance = sqrtf((deltaX * deltaX) + (deltaZ * deltaZ));
+    const float baseMoveSpeed = npc->sprinting ? npc->sprintSpeed : npc->walkSpeed;
+    const float desiredYawDegrees = atan2f(deltaX, -deltaZ) * 180.0f / (float)M_PI;
+    const float desiredTravelDistance = baseMoveSpeed * deltaTime;
+    bool foundCandidate = false;
+    float bestCandidateX = npc->positionX;
+    float bestCandidateZ = npc->positionZ;
+    float bestCandidateGroundHeight = npc->groundHeight;
+    float bestCandidateDistance = currentDistance;
+    float bestCandidateMovedDistance = 0;
+    float bestOffset = 0;
+
+    npc->elapsedSeconds += deltaTime;
+    npc->distanceToTargetMeters = currentDistance;
+
+    if (currentDistance <= npc->acceptanceRadius) {
+        npc->targetReached = true;
+        npc->hasTarget = false;
+        npc->stuck = false;
+        npc->moveSpeed = 0;
+        npc->distanceToTargetMeters = 0;
+        return;
+    }
+
+    if (!(desiredTravelDistance > 0.0f)) {
+        npc->moveSpeed = 0;
+        return;
+    }
+
+    for (int offsetIndex = 0; offsetIndex < offsetCount; offsetIndex++) {
+        const float candidateYawDegrees = desiredYawDegrees + offsets[offsetIndex];
+        const float candidateYawRadians = GameCoreDegreesToRadians(candidateYawDegrees);
+        float candidateX = npc->positionX;
+        float candidateZ = npc->positionZ;
+        float candidateGroundHeight = npc->groundHeight;
+        const float movedDistance = GameCoreMoveBodyAlongVector(
+            &candidateX,
+            &candidateZ,
+            &candidateGroundHeight,
+            sinf(candidateYawRadians),
+            -cosf(candidateYawRadians),
+            desiredTravelDistance,
+            npc->radius,
+            npc->eyeHeight
+        );
+
+        if (!(movedDistance > 0.001f)) {
+            continue;
+        }
+
+        {
+            const float candidateDeltaX = npc->targetX - candidateX;
+            const float candidateDeltaZ = npc->targetZ - candidateZ;
+            const float candidateDistance = sqrtf(
+                (candidateDeltaX * candidateDeltaX) + (candidateDeltaZ * candidateDeltaZ)
+            );
+            const float candidateDistanceScore = candidateDistance + (fabsf(offsets[offsetIndex]) * 0.005f);
+            const float bestDistanceScore = bestCandidateDistance + (fabsf(bestOffset) * 0.005f);
+
+            if (!foundCandidate || candidateDistanceScore < bestDistanceScore) {
+                foundCandidate = true;
+                bestCandidateX = candidateX;
+                bestCandidateZ = candidateZ;
+                bestCandidateGroundHeight = candidateGroundHeight;
+                bestCandidateDistance = candidateDistance;
+                bestCandidateMovedDistance = movedDistance;
+                bestOffset = offsets[offsetIndex];
+            }
+        }
+    }
+
+    if (!foundCandidate) {
+        npc->moveSpeed = 0;
+        npc->blockedStepCount += 1;
+        npc->stuckSeconds += deltaTime;
+        if ((npc->blockedStepCount % 12) == 0) {
+            npc->preferClockwise = !npc->preferClockwise;
+        }
+    } else {
+        npc->positionX = bestCandidateX;
+        npc->positionZ = bestCandidateZ;
+        npc->groundHeight = bestCandidateGroundHeight;
+        npc->positionY = npc->groundHeight + npc->eyeHeight;
+        npc->yawDegrees = GameCoreNormalizeDegrees(desiredYawDegrees + bestOffset);
+        npc->moveSpeed = bestCandidateMovedDistance / deltaTime;
+        npc->travelledDistanceMeters += bestCandidateMovedDistance;
+        npc->distanceToTargetMeters = bestCandidateDistance;
+
+        if (bestOffset > 1.0f) {
+            npc->preferClockwise = true;
+            npc->avoidanceTurnCount += 1;
+        } else if (bestOffset < -1.0f) {
+            npc->preferClockwise = false;
+            npc->avoidanceTurnCount += 1;
+        }
+
+        if (bestCandidateDistance + GAME_CORE_NPC_PROGRESS_EPSILON_METERS < npc->bestDistanceToTargetMeters) {
+            npc->bestDistanceToTargetMeters = bestCandidateDistance;
+            npc->stuckSeconds = 0;
+            npc->blockedStepCount = 0;
+        } else if (bestCandidateDistance + GAME_CORE_NPC_PROGRESS_EPSILON_METERS < currentDistance) {
+            npc->stuckSeconds = GameCoreClamp(npc->stuckSeconds - (deltaTime * 0.5f), 0, GAME_CORE_NPC_STUCK_TIMEOUT_SECONDS);
+            if (npc->blockedStepCount > 0) {
+                npc->blockedStepCount -= 1;
+            }
+        } else {
+            npc->stuckSeconds += deltaTime * (fabsf(bestOffset) >= 89.0f ? 0.5f : 0.25f);
+        }
+
+        if (bestCandidateDistance <= npc->acceptanceRadius) {
+            npc->targetReached = true;
+            npc->hasTarget = false;
+            npc->stuck = false;
+            npc->moveSpeed = 0;
+            npc->distanceToTargetMeters = 0;
+            return;
+        }
+    }
+
+    if (npc->stuckSeconds >= GAME_CORE_NPC_STUCK_TIMEOUT_SECONDS) {
+        npc->stuck = true;
+        npc->hasTarget = false;
+        npc->moveSpeed = 0;
+    }
+}
+
+void GameCoreInitializeNPC(GameNPCState *npc, float x, float y, float z, float yawDegrees, float pitchDegrees) {
+    if (!gameState.bootstrapped) {
+        GameCoreBootstrap("implicit");
+    }
+
+    if (npc == NULL) {
+        return;
+    }
+
+    memset(npc, 0, sizeof(*npc));
+    npc->positionX = x;
+    npc->positionY = y;
+    npc->positionZ = z;
+    npc->yawDegrees = yawDegrees;
+    npc->pitchDegrees = pitchDegrees;
+    npc->walkSpeed = gameState.walkSpeed > 0 ? gameState.walkSpeed : 4.2f;
+    npc->sprintSpeed = gameState.sprintSpeed > npc->walkSpeed ? gameState.sprintSpeed : npc->walkSpeed + 1.8f;
+    npc->radius = gameState.playerRadius > 0 ? gameState.playerRadius : 0.36f;
+    npc->eyeHeight = gameState.eyeHeight > 0 ? gameState.eyeHeight : 1.65f;
+    npc->acceptanceRadius = 1.0f;
+    npc->distanceToTargetMeters = -1.0f;
+    npc->bestDistanceToTargetMeters = INFINITY;
+    npc->preferClockwise = true;
+
+    GameCoreRefreshNPCGrounding(npc, y - npc->eyeHeight);
+    if (!npc->grounded || GameCoreWouldCollideWithRadius(npc->positionX, npc->positionZ, npc->groundHeight, npc->radius, npc->eyeHeight)) {
+        npc->stuck = true;
+        npc->blockedStepCount = 1;
+    }
+}
+
+void GameCoreConfigureNPCTraversal(GameNPCState *npc, float walkSpeed, float sprintSpeed, float radius) {
+    if (npc == NULL) {
+        return;
+    }
+
+    npc->walkSpeed = walkSpeed > 0 ? walkSpeed : (gameState.walkSpeed > 0 ? gameState.walkSpeed : 4.2f);
+    npc->sprintSpeed = sprintSpeed >= npc->walkSpeed ? sprintSpeed : npc->walkSpeed + 1.8f;
+    npc->radius = radius > 0 ? radius : (gameState.playerRadius > 0 ? gameState.playerRadius : 0.36f);
+}
+
+void GameCoreSetNPCTarget(GameNPCState *npc, float x, float y, float z, float acceptanceRadius, bool sprinting) {
+    if (npc == NULL) {
+        return;
+    }
+
+    npc->targetX = x;
+    npc->targetY = y;
+    npc->targetZ = z;
+    npc->acceptanceRadius = acceptanceRadius > 0 ? acceptanceRadius : 1.0f;
+    npc->distanceToTargetMeters = sqrtf(
+        ((x - npc->positionX) * (x - npc->positionX)) +
+        ((z - npc->positionZ) * (z - npc->positionZ))
+    );
+    npc->bestDistanceToTargetMeters = npc->distanceToTargetMeters;
+    npc->sprinting = sprinting;
+    npc->hasTarget = true;
+    npc->targetReached = npc->distanceToTargetMeters <= npc->acceptanceRadius;
+    npc->stuck = !npc->grounded || GameCoreWouldCollideWithRadius(
+        npc->positionX,
+        npc->positionZ,
+        npc->groundHeight,
+        npc->radius,
+        npc->eyeHeight
+    );
+    npc->stuckSeconds = 0;
+    npc->blockedStepCount = 0;
+    npc->moveSpeed = 0;
+}
+
+void GameCoreClearNPCTarget(GameNPCState *npc) {
+    if (npc == NULL) {
+        return;
+    }
+
+    npc->hasTarget = false;
+    npc->targetReached = false;
+    npc->moveSpeed = 0;
+    npc->distanceToTargetMeters = -1.0f;
+    npc->bestDistanceToTargetMeters = INFINITY;
+}
+
+void GameCoreTickNPC(GameNPCState *npc, double deltaTime) {
+    if (!gameState.bootstrapped) {
+        GameCoreBootstrap("implicit");
+    }
+
+    if (npc == NULL || !npc->hasTarget || npc->targetReached || npc->stuck || !(deltaTime > 0.0)) {
+        return;
+    }
+
+    {
+        float remainingTime = GameCoreClamp((float)deltaTime, 0, GAME_CORE_MAX_TICK_DELTA_SECONDS);
+
+        while (remainingTime > 0.0f && npc->hasTarget && !npc->targetReached && !npc->stuck) {
+            const float stepTime = remainingTime > GAME_CORE_MAX_SIMULATION_STEP_SECONDS
+                ? GAME_CORE_MAX_SIMULATION_STEP_SECONDS
+                : remainingTime;
+            GameCoreAdvanceNPCSimulationStep(npc, stepTime);
             remainingTime -= stepTime;
         }
     }

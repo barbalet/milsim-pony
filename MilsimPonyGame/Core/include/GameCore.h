@@ -58,6 +58,37 @@ typedef struct GameThreatObserver {
     float suspicionPerSecond;
 } GameThreatObserver;
 
+typedef struct GameNPCState {
+    double elapsedSeconds;
+    float positionX;
+    float positionY;
+    float positionZ;
+    float yawDegrees;
+    float pitchDegrees;
+    float groundHeight;
+    float walkSpeed;
+    float sprintSpeed;
+    float moveSpeed;
+    float radius;
+    float eyeHeight;
+    float targetX;
+    float targetY;
+    float targetZ;
+    float acceptanceRadius;
+    float distanceToTargetMeters;
+    float travelledDistanceMeters;
+    float stuckSeconds;
+    float bestDistanceToTargetMeters;
+    int blockedStepCount;
+    int avoidanceTurnCount;
+    bool grounded;
+    bool sprinting;
+    bool hasTarget;
+    bool targetReached;
+    bool stuck;
+    bool preferClockwise;
+} GameNPCState;
+
 typedef struct GameFrameSnapshot {
     double elapsedSeconds;
     float strafeIntent;
@@ -105,11 +136,18 @@ void GameCoreConfigureDetection(
     float suspicionDecayPerSecond,
     float failThreshold
 );
+bool GameCoreSampleGroundHeightAt(float x, float z, float fallbackHeight, float *groundHeight);
+bool GameCoreCanOccupyPosition(float x, float z, float groundHeight, float radius);
 void GameCoreConfigureTraversal(float walkSpeed, float sprintSpeed, float lookSensitivity);
 void GameCoreSetMoveIntent(float strafeIntent, float forwardIntent);
 void GameCoreSetSprint(bool sprinting);
 void GameCoreAddLookDelta(float deltaX, float deltaY);
 void GameCoreTick(double deltaTime);
+void GameCoreInitializeNPC(GameNPCState *npc, float x, float y, float z, float yawDegrees, float pitchDegrees);
+void GameCoreConfigureNPCTraversal(GameNPCState *npc, float walkSpeed, float sprintSpeed, float radius);
+void GameCoreSetNPCTarget(GameNPCState *npc, float x, float y, float z, float acceptanceRadius, bool sprinting);
+void GameCoreClearNPCTarget(GameNPCState *npc);
+void GameCoreTickNPC(GameNPCState *npc, double deltaTime);
 GameFrameSnapshot GameCoreGetSnapshot(void);
 void GameCoreRestartRoute(void);
 void GameCoreClearFailure(void);
