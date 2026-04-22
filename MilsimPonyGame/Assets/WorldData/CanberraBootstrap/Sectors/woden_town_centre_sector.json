@@ -87,6 +87,42 @@
       "centerLineWidth": 0.10,
       "crownHeight": 0.02,
       "yawDegrees": 92.0
+    },
+    {
+      "name": "AthllonDriveNorth",
+      "position": [-10.0, 1.00, 172.0],
+      "size": [7.6, 108.0],
+      "roadColor": [0.19, 0.19, 0.21, 1.0],
+      "shoulderColor": [0.38, 0.41, 0.35, 1.0],
+      "lineColor": [0.88, 0.83, 0.48, 1.0],
+      "shoulderWidth": 0.74,
+      "centerLineWidth": 0.12,
+      "crownHeight": 0.03,
+      "yawDegrees": 4.0
+    },
+    {
+      "name": "BowesStreet",
+      "position": [4.0, 1.00, 176.0],
+      "size": [5.8, 54.0],
+      "roadColor": [0.19, 0.19, 0.21, 1.0],
+      "shoulderColor": [0.38, 0.41, 0.35, 1.0],
+      "lineColor": [0.88, 0.83, 0.48, 1.0],
+      "shoulderWidth": 0.58,
+      "centerLineWidth": 0.10,
+      "crownHeight": 0.02,
+      "yawDegrees": 90.0
+    },
+    {
+      "name": "CorinnaStreet",
+      "position": [30.0, 1.00, 166.0],
+      "size": [5.8, 50.0],
+      "roadColor": [0.19, 0.19, 0.21, 1.0],
+      "shoulderColor": [0.38, 0.41, 0.35, 1.0],
+      "lineColor": [0.88, 0.83, 0.48, 1.0],
+      "shoulderWidth": 0.58,
+      "centerLineWidth": 0.10,
+      "crownHeight": 0.02,
+      "yawDegrees": 90.0
     }
   ],
   "grayboxBlocks": [
@@ -120,13 +156,29 @@
       "color": [0.44, 0.47, 0.50, 1.0],
       "yawDegrees": 6.0,
       "collisionEnabled": false
+    },
+    {
+      "name": "SouthWodenOfficeBand",
+      "position": [34.0, 8.0, 158.0],
+      "halfExtents": [18.0, 8.0, 8.0],
+      "color": [0.45, 0.48, 0.52, 1.0],
+      "yawDegrees": 4.0,
+      "collisionEnabled": false
+    },
+    {
+      "name": "AthllonCivicFrame",
+      "position": [-8.0, 4.5, 176.0],
+      "halfExtents": [14.0, 4.5, 8.0],
+      "color": [0.44, 0.47, 0.50, 1.0],
+      "yawDegrees": 4.0,
+      "collisionEnabled": false
     }
   ],
   "collisionVolumes": [
     {
       "name": "InterchangeMedian",
       "position": [12.0, 1.2, 166.0],
-      "halfExtents": [1.0, 0.9, 10.0],
+      "halfExtents": [0.7, 0.8, 8.0],
       "yawDegrees": 88.0
     }
   ]

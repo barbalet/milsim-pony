@@ -96,6 +96,18 @@
       "centerLineWidth": 0.14,
       "crownHeight": 0.03,
       "yawDegrees": 58.0
+    },
+    {
+      "name": "NovarStreet",
+      "position": [-112.0, 0.88, -42.0],
+      "size": [6.6, 62.0],
+      "roadColor": [0.19, 0.19, 0.21, 1.0],
+      "shoulderColor": [0.38, 0.41, 0.35, 1.0],
+      "lineColor": [0.88, 0.83, 0.48, 1.0],
+      "shoulderWidth": 0.66,
+      "centerLineWidth": 0.12,
+      "crownHeight": 0.02,
+      "yawDegrees": 36.0
     }
   ],
   "grayboxBlocks": [

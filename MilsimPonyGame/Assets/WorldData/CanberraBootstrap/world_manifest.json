@@ -1,5 +1,5 @@
 {
-  "worldName": "Canberra Basin Street Atlas",
+  "worldName": "Canberra Central District Atlas",
   "sceneFile": "Scenes/canberra_basin_preview_scene.json",
   "coordinateSystemFile": "CoordinateSystems/parliament_local_grid.json",
   "sectorFiles": [

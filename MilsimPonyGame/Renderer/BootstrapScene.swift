@@ -62,15 +62,49 @@ struct SceneMapRoad: Identifiable {
     let length: Float
     let yawDegrees: Float
 
+    private var readableLabel: String {
+        Self.humanReadableLabel(from: displayName)
+    }
+
     var shortLabel: String {
-        let trimmed = displayName
+        let trimmed = readableLabel
             .replacingOccurrences(of: "Avenue", with: "Ave")
             .replacingOccurrences(of: "Drive", with: "Dr")
             .replacingOccurrences(of: "Street", with: "St")
             .replacingOccurrences(of: "Road", with: "Rd")
             .replacingOccurrences(of: "Parade", with: "Pde")
             .replacingOccurrences(of: "Circuit", with: "Cct")
-        return trimmed.count <= 18 ? trimmed : String(trimmed.prefix(18))
+            .replacingOccurrences(of: "Circle", with: "Cir")
+            .replacingOccurrences(of: "Boulevard", with: "Blvd")
+            .replacingOccurrences(of: "Northbound", with: "NB")
+            .replacingOccurrences(of: "Southbound", with: "SB")
+            .replacingOccurrences(of: "Eastbound", with: "EB")
+            .replacingOccurrences(of: "Westbound", with: "WB")
+            .replacingOccurrences(of: " North", with: " N")
+            .replacingOccurrences(of: " South", with: " S")
+            .replacingOccurrences(of: " East", with: " E")
+            .replacingOccurrences(of: " West", with: " W")
+            .replacingOccurrences(of: " Approach", with: "")
+            .replacingOccurrences(of: " Link", with: "")
+        guard trimmed.count > 18 else {
+            return trimmed
+        }
+
+        let words = trimmed.split(separator: " ")
+        guard let firstWord = words.first else {
+            return String(trimmed.prefix(18))
+        }
+
+        if words.count >= 2 {
+            let first = String(firstWord)
+            let second = String(words[1])
+            let condensed = "\(first) \(second)"
+            if condensed.count <= 18 {
+                return condensed
+            }
+        }
+
+        return String(trimmed.prefix(18))
     }
 
     var startPoint: SceneMapPoint {
@@ -88,6 +122,33 @@ struct SceneMapRoad: Identifiable {
         let deltaZ = cosf(yawRadians) * halfLength
         return SceneMapPoint(x: centerPoint.x + deltaX, z: centerPoint.z + deltaZ)
     }
+
+    private static func humanReadableLabel(from value: String) -> String {
+        guard !value.isEmpty else {
+            return value
+        }
+
+        var result = ""
+        var previous: Character?
+
+        for character in value {
+            let shouldInsertSpace =
+                previous != nil &&
+                character.isUppercase &&
+                (previous?.isLowercase == true || previous?.isNumber == true)
+
+            if shouldInsertSpace {
+                result.append(" ")
+            }
+
+            result.append(character)
+            previous = character
+        }
+
+        return result
+            .replacingOccurrences(of: "  ", with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 }
 
 struct SceneMapSector: Identifiable {
@@ -98,6 +159,10 @@ struct SceneMapSector: Identifiable {
     let maxX: Float
     let minZ: Float
     let maxZ: Float
+
+    var area: Float {
+        max(maxX - minX, 1) * max(maxZ - minZ, 1)
+    }
 
     var shortLabel: String {
         let trimmed = displayName
@@ -442,7 +507,7 @@ final class BootstrapScene {
             return SceneBriefingState(
                 summary: "Briefing: survey complete",
                 details: [
-                    "Outcome: the Woden-to-Belconnen basin line reads clearly without developer prompts",
+                    "Outcome: the central Canberra atlas line reads clearly without developer prompts",
                     "Reset: use Restart for a fresh run from a new district start",
                 ]
             )
@@ -452,7 +517,7 @@ final class BootstrapScene {
             return SceneBriefingState(
                 summary: "Briefing: recover the survey line",
                 details: [
-                    "Recovery: restart from the latest review marker and re-establish the basin read",
+                    "Recovery: restart from the latest review marker and re-establish the central district read",
                     "Priority: return to the nearest signposted viewpoint instead of pushing into dead ground",
                 ]
             )
@@ -467,7 +532,7 @@ final class BootstrapScene {
         let paceLine: String
 
         if snapshot.suspicionLevel >= max(evasionInfo.failThreshold * 0.55, 0.45) {
-            paceLine = "Pace: break line of sight, then resume the Woden-to-Belconnen review pass"
+            paceLine = "Pace: break line of sight, then resume the central-district review pass"
         } else if snapshot.activeObserverCount > 0 {
             paceLine = "Pace: move between cover and keep the lake and district markers readable"
         } else if snapshot.distanceToNextCheckpointMeters > 18 {
@@ -487,7 +552,7 @@ final class BootstrapScene {
         ]
 
         if let nearestSignpost = nearestGuidancePoint(from: evasionInfo.signposts, to: cameraPosition) {
-            details.append("Cue: follow \(nearestSignpost.point.label) to stay on the basin survey line")
+            details.append("Cue: follow \(nearestSignpost.point.label) to stay on the central atlas line")
         } else if let nearestCover = nearestGuidancePoint(from: evasionInfo.coverPoints, to: cameraPosition) {
             details.append("Cue: \(nearestCover.point.label) is the closest reset point for this survey pass")
         }
@@ -648,7 +713,11 @@ private struct SceneSectorRuntime {
                 point.z >= (minimum.z - farFieldPadding) &&
                 point.z <= (maximum.z + farFieldPadding)
         case .local:
-            return isNearFieldActive(for: point)
+            let residentPadding = max(activationPadding * 1.35, min(farFieldPadding * 0.45, activationPadding + 48))
+            return point.x >= (minimum.x - residentPadding) &&
+                point.x <= (maximum.x + residentPadding) &&
+                point.z >= (minimum.z - residentPadding) &&
+                point.z <= (maximum.z + residentPadding)
         }
     }
 
@@ -717,6 +786,8 @@ private final class ScenePackageBuilder {
         var routeMarkerCount = 0
         var guidanceMarkerCount = 0
         var observerMarkerCount = 0
+        var texturedWorldDrawableCount = 0
+        var flatColorWorldDrawableCount = 0
 
         for element in sceneConfiguration.proceduralElements {
             if let drawable = proceduralDrawable(from: element) {
@@ -802,6 +873,11 @@ private final class ScenePackageBuilder {
                 ) {
                     sceneDrawables.append(drawable)
                     terrainCount += 1
+                    if drawable.textureKey == nil {
+                        flatColorWorldDrawableCount += 1
+                    } else {
+                        texturedWorldDrawableCount += 1
+                    }
                 }
                 worldGroundSurfaces.append(groundSurface(from: terrainPatch))
             }
@@ -814,6 +890,11 @@ private final class ScenePackageBuilder {
                 ) {
                     sceneDrawables.append(drawable)
                     roadCount += 1
+                    if drawable.textureKey == nil {
+                        flatColorWorldDrawableCount += 1
+                    } else {
+                        texturedWorldDrawableCount += 1
+                    }
                 }
                 worldGroundSurfaces.append(groundSurface(from: roadStrip))
             }
@@ -826,6 +907,11 @@ private final class ScenePackageBuilder {
                 ) {
                     sceneDrawables.append(drawable)
                     grayboxCount += 1
+                    if drawable.textureKey == nil {
+                        flatColorWorldDrawableCount += 1
+                    } else {
+                        texturedWorldDrawableCount += 1
+                    }
                 }
                 if let shadowDrawable = grayboxShadowDrawable(from: block, sectorID: sector.id) {
                     sceneDrawables.append(shadowDrawable)
@@ -862,6 +948,7 @@ private final class ScenePackageBuilder {
             "Sectors: \(loadedSectors.map(\.displayName).joined(separator: ", "))",
             "Residency: \(residencyCounts.always) always / \(residencyCounts.farField) far-field / \(residencyCounts.local) local",
             "World: \(terrainCount) terrain / \(roadCount) roads / \(collisionCount) blockers",
+            "Texture Coverage: \(texturedWorldDrawableCount) textured world drawables / \(flatColorWorldDrawableCount) flat-color world drawables",
             String(
                 format: "Scope: %.1fx / %.1f deg / x%.1f draw stabilization",
                 scopeConfiguration.magnification,
@@ -869,6 +956,7 @@ private final class ScenePackageBuilder {
                 scopeConfiguration.drawDistanceMultiplier ?? 2.4
             ),
             "Route: \(sceneConfiguration.route.name) / \(sceneConfiguration.route.checkpoints.count) checkpoints",
+            "Telemetry: \((sceneConfiguration.randomSpawns?.count ?? 1)) starts / \(sceneConfiguration.route.checkpoints.count) route markers / \(guidanceConfiguration.signposts.count) signposts",
             "Threats: \(detectionConfiguration.observers.count) observers / \(guidanceConfiguration.coverPoints.count) cover / \(guidanceConfiguration.signposts.count) signs",
             String(
                 format: "Traversal: %.1f walk / %.1f sprint / %.3f look",

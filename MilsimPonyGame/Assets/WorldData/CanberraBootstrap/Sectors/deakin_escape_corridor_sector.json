@@ -37,7 +37,7 @@
   ],
   "roadStrips": [
     {
-      "name": "CorridorSouthbound",
+      "name": "AdelaideAvenueSouth",
       "position": [0.0, 0.22, 60.0],
       "size": [12.5, 46.0],
       "roadColor": [0.20, 0.20, 0.22, 1.0],
@@ -49,7 +49,7 @@
       "yawDegrees": 0.0
     },
     {
-      "name": "WestServiceLane",
+      "name": "HopetounCircuitLink",
       "position": [-8.8, 0.18, 70.0],
       "size": [4.8, 20.0],
       "roadColor": [0.19, 0.19, 0.21, 1.0],
@@ -61,7 +61,7 @@
       "yawDegrees": 0.0
     },
     {
-      "name": "SouthernCrossStreet",
+      "name": "KentStreet",
       "position": [0.0, 0.16, 73.0],
       "size": [7.0, 28.0],
       "roadColor": [0.18, 0.18, 0.20, 1.0],
@@ -71,6 +71,18 @@
       "centerLineWidth": 0.18,
       "crownHeight": 0.04,
       "yawDegrees": 90.0
+    },
+    {
+      "name": "MelbourneAvenueSouth",
+      "position": [10.0, 0.18, 66.0],
+      "size": [7.4, 42.0],
+      "roadColor": [0.19, 0.19, 0.21, 1.0],
+      "shoulderColor": [0.37, 0.40, 0.34, 1.0],
+      "lineColor": [0.88, 0.83, 0.48, 1.0],
+      "shoulderWidth": 0.74,
+      "centerLineWidth": 0.14,
+      "crownHeight": 0.03,
+      "yawDegrees": 24.0
     }
   ],
   "grayboxBlocks": [
@@ -172,6 +184,22 @@
       "halfExtents": [0.65, 0.82, 3.2],
       "color": [0.46, 0.49, 0.52, 1.0],
       "yawDegrees": 0.0
+    },
+    {
+      "name": "DeakinSouthOfficeBand",
+      "position": [10.0, 4.0, 60.0],
+      "halfExtents": [8.0, 4.0, 10.0],
+      "color": [0.44, 0.47, 0.50, 1.0],
+      "yawDegrees": 10.0,
+      "collisionEnabled": false
+    },
+    {
+      "name": "DeakinEmbassyFrame",
+      "position": [-15.0, 3.8, 72.0],
+      "halfExtents": [6.0, 3.8, 8.0],
+      "color": [0.43, 0.46, 0.49, 1.0],
+      "yawDegrees": 0.0,
+      "collisionEnabled": false
     }
   ],
   "collisionVolumes": [

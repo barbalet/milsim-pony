@@ -55,7 +55,7 @@ struct OverheadMapSnapshot {
 final class GameSession: ObservableObject {
     @Published private(set) var statusLine = "Bootstrapping game session"
     @Published private(set) var overlayLines: [String] = []
-    @Published private(set) var overlayTitle = "Cycle 15 Canberra Street Atlas Expansion"
+    @Published private(set) var overlayTitle = "Cycle 17 Civic, Barton, Russell, And East-Basin Pass"
     @Published private(set) var demoFlowState: DemoFlowState = .title
     @Published private(set) var isSettingsPresented = false
     @Published private(set) var isScopeActive = false
@@ -224,9 +224,11 @@ final class GameSession: ObservableObject {
         let nextCheckpointLabel = completedCheckpointCount < mapConfiguration.checkpoints.count
             ? mapConfiguration.checkpoints[completedCheckpointCount].label
             : nil
-        let currentSectorName = mapConfiguration.sectors.first(where: { sector in
-            sector.contains(x: playerX, z: playerZ)
-        })?.displayName ?? "Outside basin bounds"
+        let currentSectorName = preferredSectorName(
+            for: mapConfiguration.sectors,
+            playerX: playerX,
+            playerZ: playerZ
+        )
 
         return OverheadMapSnapshot(
             configuration: mapConfiguration,
@@ -244,7 +246,7 @@ final class GameSession: ObservableObject {
     func menuTitle(for panel: GameMenuPanel) -> String {
         switch panel {
         case .title:
-            return sceneReady ? sceneLabel : "Loading Canberra Street Atlas Review"
+            return sceneReady ? sceneLabel : WorldBootstrap.sceneLabel
         case .paused:
             return "Demo Paused"
         case .failed:
@@ -793,8 +795,8 @@ final class GameSession: ObservableObject {
         }
 
         var lines = [
-            "Objective: survey the expanded Canberra street atlas and move through the district review markers from the assigned start.",
-            "Priority: validate Lake Burley Griffin, the Parliament axis, Civic, Barton-Russell, Woden Valley, Black Mountain, and the Belconnen skyline through the 4x optic.",
+            "Objective: survey the central-district atlas pass and move through the connected review markers from the assigned start.",
+            "Priority: validate Lake Burley Griffin, Kings Avenue bridge, Russell, Barton, City Hill, Civic, Anzac Parade, and Mount Ainslie through the 4x optic.",
             riskLine,
             "Release: \(configuration.releaseDisplayName) / \(configuration.bundleIdentifier)",
             "Content: \(configuration.contentSourceSummary)",
@@ -858,7 +860,7 @@ final class GameSession: ObservableObject {
                 snapshot?.routeDistanceMeters ?? 0,
                 snapshot?.restartCount ?? 0
             ),
-            "Outcome: the current Canberra atlas survey is complete and ready for the next district densification pass.",
+            "Outcome: the central Canberra districts now read as one connected atlas pass and are ready for the Belconnen-heavy follow-up.",
             "Release: \(configuration.releaseDisplayName) / \(configuration.contentSourceSummary)",
             String(format: "Optic: %.1fx scoped review remained available across the full route.", scopeMagnification),
             "Script: title shell, live scope route, optional fail or retry loop, and completion summary all resolve in one session.",
@@ -944,7 +946,13 @@ final class GameSession: ObservableObject {
             String(format: "Optic: %@ / %.1fx", isScopeActive ? "raised" : "lowered", scopeMagnification),
             String(format: "Settings: look x%.2f / %@ / HUD %.0f%%", lookSensitivityScale, invertLookY ? "invert Y" : "standard Y", hudOpacity * 100),
             String(format: "Ground: %.2f m / %@ / %d active sectors", snapshot?.groundHeight ?? 0, (snapshot?.grounded ?? false) ? "grounded" : "fallback", snapshot?.activeSectorCount ?? 0),
-            String(format: "Route Metrics: %.0fm / %d restarts", snapshot?.routeDistanceMeters ?? 0, snapshot?.restartCount ?? 0),
+            String(
+                format: "Route Metrics: %d / %d checkpoints / %.0fm / %d restarts",
+                snapshot?.completedCheckpointCount ?? 0,
+                snapshot?.totalCheckpointCount ?? 0,
+                snapshot?.routeDistanceMeters ?? 0,
+                snapshot?.restartCount ?? 0
+            ),
             String(format: "Threat: %.2f / %d watching / %d in range / %d fails", snapshot?.suspicionLevel ?? 0, snapshot?.seeingObserverCount ?? 0, snapshot?.activeObserverCount ?? 0, snapshot?.failCount ?? 0),
             String(format: "Look: yaw %.1f pitch %.1f", snapshot?.yawDegrees ?? 0, snapshot?.pitchDegrees ?? 0),
             String(format: "Camera: %.2f %.2f %.2f", snapshot?.cameraX ?? 0, snapshot?.cameraY ?? 0, snapshot?.cameraZ ?? 0),
@@ -969,6 +977,43 @@ final class GameSession: ObservableObject {
         }
 
         return components.suffix(3).joined(separator: "/")
+    }
+
+    private func preferredSectorName(
+        for sectors: [SceneMapSector],
+        playerX: Float,
+        playerZ: Float
+    ) -> String {
+        let containingSectors = sectors.filter { sector in
+            sector.contains(x: playerX, z: playerZ)
+        }
+
+        guard let sector = containingSectors.sorted(by: { lhs, rhs in
+            let leftPriority = residencyPriority(lhs.residency)
+            let rightPriority = residencyPriority(rhs.residency)
+            if leftPriority != rightPriority {
+                return leftPriority < rightPriority
+            }
+            if lhs.area != rhs.area {
+                return lhs.area < rhs.area
+            }
+            return lhs.displayName < rhs.displayName
+        }).first else {
+            return "Outside basin bounds"
+        }
+
+        return sector.displayName
+    }
+
+    private func residencyPriority(_ residency: SectorResidency) -> Int {
+        switch residency {
+        case .local:
+            return 0
+        case .farField:
+            return 1
+        case .always:
+            return 2
+        }
     }
 
     private static func loadStoredSettings() -> StoredSessionSettings {

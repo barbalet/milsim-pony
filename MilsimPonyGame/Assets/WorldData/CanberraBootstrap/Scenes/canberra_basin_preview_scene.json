@@ -1,10 +1,10 @@
 {
-  "cycleLabel": "Cycle 15 Canberra Street Atlas Expansion",
-  "sceneName": "Canberra Street Atlas Review",
+  "cycleLabel": "Cycle 17 Civic, Barton, Russell, And East-Basin Pass",
+  "sceneName": "Canberra Civic, Barton, And Russell Atlas Review",
   "planningNotes": [
-    "Plan: cycle 15 starts a six-cycle Canberra atlas expansion running through cycle 20.",
-    "Breakdown: 15 atlas reset, 16 Woden and inner-south streets, 17 Civic-Barton-Russell, 18 Belconnen and Black Mountain, 19 route integration, 20 review-pack polish.",
-    "Reference: Google Maps road captures plus Transport Canberra region maps define the district street targets for each pass."
+    "Plan: cycle 17 densifies Civic, Barton, Russell, the east basin, and Mount Ainslie before the Belconnen-heavy pass.",
+    "Breakdown: keep the central districts resident with stronger telemetry while the atlas route proves separate readouts for the lake edge, City Hill, Civic, and the inner north-east.",
+    "Reference: Google Maps central-district captures plus ACT transport maps define the Civic, Barton, Russell, and Mount Ainslie street pass."
   ],
   "spawn": {
     "label": "East Basin Scope Terrace",
@@ -32,28 +32,28 @@
       "pitchDegrees": -4.0
     },
     {
-      "label": "City Hill Median Start",
-      "position": [38.0, 3.0, -110.0],
-      "yawDegrees": 214.0,
+      "label": "City Hill Civic Start",
+      "position": [54.0, 2.8, -116.0],
+      "yawDegrees": 206.0,
       "pitchDegrees": -6.0
     },
     {
-      "label": "Woden Interchange Start",
-      "position": [18.0, 1.0, 168.0],
-      "yawDegrees": 184.0,
+      "label": "Barton Foreshore Start",
+      "position": [76.0, 1.2, -8.0],
+      "yawDegrees": 334.0,
+      "pitchDegrees": -4.0
+    },
+    {
+      "label": "Civic Grid Start",
+      "position": [72.0, 1.2, -136.0],
+      "yawDegrees": 4.0,
       "pitchDegrees": -5.0
     },
     {
-      "label": "Black Mountain Saddle Start",
-      "position": [-34.0, 8.0, -148.0],
-      "yawDegrees": 300.0,
-      "pitchDegrees": -7.0
-    },
-    {
-      "label": "Belconnen Street Frame Start",
-      "position": [-148.0, 7.0, -186.0],
-      "yawDegrees": 116.0,
-      "pitchDegrees": -6.0
+      "label": "Anzac Parade Start",
+      "position": [94.0, 1.0, -92.0],
+      "yawDegrees": 12.0,
+      "pitchDegrees": -5.0
     }
   ],
   "sky": {
@@ -87,8 +87,8 @@
     "reticleColor": [0.94, 0.86, 0.44, 0.96]
   },
   "route": {
-    "name": "Canberra District Atlas Survey",
-    "summary": "Move through authored district review markers that prove the expanded Canberra street atlas reads from the east basin through Civic, Woden, Black Mountain, and Belconnen.",
+    "name": "Canberra Central District Survey",
+    "summary": "Move through authored review markers that prove the Canberra atlas now resolves the east basin, Kings Avenue bridge, Russell, Barton, Parliament, City Hill, Civic, Anzac Parade, and Mount Ainslie as separate connected districts.",
     "checkpoints": [
       {
         "id": "east_basin_scope_perch",
@@ -102,6 +102,17 @@
         "beaconHeight": 5.4
       },
       {
+        "id": "kings_avenue_bridge_review",
+        "label": "Kings Avenue Bridge Review",
+        "position": [56.0, 1.0, -18.0],
+        "triggerRadius": 9.2,
+        "yawDegrees": 350.0,
+        "pitchDegrees": -5.0,
+        "goal": false,
+        "beaconColor": [0.36, 0.80, 0.96, 0.84],
+        "beaconHeight": 5.5
+      },
+      {
         "id": "russell_causeway_review",
         "label": "Russell Causeway Review",
         "position": [118.0, 4.2, -46.0],
@@ -111,6 +122,17 @@
         "goal": false,
         "beaconColor": [0.38, 0.80, 0.96, 0.84],
         "beaconHeight": 5.5
+      },
+      {
+        "id": "barton_foreshore_review",
+        "label": "Barton Foreshore Review",
+        "position": [92.0, 1.2, 4.0],
+        "triggerRadius": 9.8,
+        "yawDegrees": 336.0,
+        "pitchDegrees": -4.0,
+        "goal": false,
+        "beaconColor": [0.40, 0.84, 0.88, 0.84],
+        "beaconHeight": 5.6
       },
       {
         "id": "parliament_axis_scope_test",
@@ -135,36 +157,36 @@
         "beaconHeight": 5.8
       },
       {
-        "id": "woden_town_centre_review",
-        "label": "Woden Town Centre Review",
-        "position": [21.0, 1.0, 164.0],
-        "triggerRadius": 11.5,
-        "yawDegrees": 184.0,
+        "id": "civic_centre_grid_review",
+        "label": "Civic Centre Grid Review",
+        "position": [70.0, 1.2, -140.0],
+        "triggerRadius": 10.8,
+        "yawDegrees": 10.0,
         "pitchDegrees": -5.0,
         "goal": false,
-        "beaconColor": [0.36, 0.84, 0.60, 0.84],
+        "beaconColor": [0.86, 0.82, 0.42, 0.84],
         "beaconHeight": 5.8
       },
       {
-        "id": "black_mountain_scope_test",
-        "label": "Black Mountain Scope Test",
-        "position": [-38.9, 10.0, -145.5],
-        "triggerRadius": 11.5,
-        "yawDegrees": 300.0,
-        "pitchDegrees": -7.0,
+        "id": "anzac_parade_north_review",
+        "label": "Anzac Parade North Review",
+        "position": [92.0, 1.0, -88.0],
+        "triggerRadius": 11.0,
+        "yawDegrees": 14.0,
+        "pitchDegrees": -5.0,
         "goal": false,
-        "beaconColor": [0.40, 0.80, 0.94, 0.86],
-        "beaconHeight": 5.8
+        "beaconColor": [0.38, 0.84, 0.62, 0.84],
+        "beaconHeight": 5.9
       },
       {
-        "id": "belconnen_town_centre_review",
-        "label": "Belconnen Town Centre Review",
-        "position": [-141.4, 7.0, -179.2],
-        "triggerRadius": 12.0,
-        "yawDegrees": 116.0,
+        "id": "mount_ainslie_rise_review",
+        "label": "Mount Ainslie Rise Review",
+        "position": [128.0, 6.5, -144.0],
+        "triggerRadius": 11.6,
+        "yawDegrees": 214.0,
         "pitchDegrees": -6.0,
         "goal": true,
-        "beaconColor": [0.38, 0.88, 0.58, 0.88],
+        "beaconColor": [0.40, 0.88, 0.60, 0.88],
         "beaconHeight": 6.2
       }
     ]
@@ -186,11 +208,11 @@
         "height": 1.10
       },
       {
-        "id": "central_lane_cover",
-        "label": "Central Basin Screen",
+        "id": "kings_bridge_cover",
+        "label": "Kings Bridge Screen",
         "kind": "cover",
-        "position": [20.0, 0.7, -12.0],
-        "yawDegrees": 8.0,
+        "position": [54.0, 1.0, -22.0],
+        "yawDegrees": 16.0,
         "color": [0.32, 0.80, 0.60, 0.92],
         "height": 1.00
       },
@@ -204,39 +226,48 @@
         "height": 1.02
       },
       {
-        "id": "civic_median_cover",
-        "label": "City Hill Median",
+        "id": "barton_foreshore_cover",
+        "label": "Barton Foreshore Screen",
         "kind": "cover",
-        "position": [38.0, 3.0, -110.0],
-        "yawDegrees": 90.0,
+        "position": [98.0, 1.2, 0.0],
+        "yawDegrees": 344.0,
         "color": [0.34, 0.80, 0.62, 0.92],
         "height": 1.04
       },
       {
-        "id": "woden_perch_cover",
-        "label": "Woden Interchange Wall",
+        "id": "civic_median_cover",
+        "label": "City Hill Civic Screen",
         "kind": "cover",
-        "position": [18.0, 1.0, 168.0],
-        "yawDegrees": 8.0,
+        "position": [52.0, 2.6, -116.0],
+        "yawDegrees": 90.0,
         "color": [0.33, 0.80, 0.62, 0.92],
         "height": 1.08
       },
       {
-        "id": "bruce_scope_cover",
-        "label": "Bruce Scope Saddle",
+        "id": "civic_grid_cover",
+        "label": "Civic Grid Screen",
         "kind": "cover",
-        "position": [-34.0, 8.0, -148.0],
-        "yawDegrees": 24.0,
+        "position": [64.0, 1.2, -144.0],
+        "yawDegrees": 90.0,
         "color": [0.34, 0.82, 0.64, 0.92],
-        "height": 1.14
+        "height": 1.06
       },
       {
-        "id": "belconnen_mall_cover",
-        "label": "Belconnen Interchange Screen",
+        "id": "anzac_parade_cover",
+        "label": "Anzac Parade Screen",
         "kind": "cover",
-        "position": [-150.0, 7.4, -202.0],
-        "yawDegrees": 88.0,
+        "position": [96.0, 1.0, -96.0],
+        "yawDegrees": 12.0,
         "color": [0.34, 0.82, 0.66, 0.92],
+        "height": 1.10
+      },
+      {
+        "id": "mount_ainslie_cover",
+        "label": "Mount Ainslie Rise Screen",
+        "kind": "cover",
+        "position": [132.0, 6.2, -148.0],
+        "yawDegrees": 24.0,
+        "color": [0.36, 0.82, 0.66, 0.92],
         "height": 1.12
       }
     ],
@@ -251,6 +282,15 @@
         "height": 2.32
       },
       {
+        "id": "kings_bridge_sign",
+        "label": "Kings Avenue Bridge",
+        "kind": "signpost",
+        "position": [58.0, 1.6, -10.0],
+        "yawDegrees": 350.0,
+        "color": [0.94, 0.84, 0.40, 0.92],
+        "height": 2.28
+      },
+      {
         "id": "russell_causeway_sign",
         "label": "Russell Causeway Frame",
         "kind": "signpost",
@@ -258,6 +298,15 @@
         "yawDegrees": 244.0,
         "color": [0.94, 0.84, 0.40, 0.92],
         "height": 2.30
+      },
+      {
+        "id": "barton_foreshore_sign",
+        "label": "Barton Foreshore",
+        "kind": "signpost",
+        "position": [90.0, 1.6, 8.0],
+        "yawDegrees": 338.0,
+        "color": [0.95, 0.85, 0.40, 0.92],
+        "height": 2.28
       },
       {
         "id": "parliament_axis_sign",
@@ -278,29 +327,29 @@
         "height": 2.30
       },
       {
-        "id": "woden_south_sign",
-        "label": "Woden Street Frame",
+        "id": "civic_grid_sign",
+        "label": "Civic Grid",
         "kind": "signpost",
-        "position": [10.0, 1.0, 154.0],
-        "yawDegrees": 184.0,
+        "position": [40.0, 1.6, -128.0],
+        "yawDegrees": 8.0,
         "color": [0.96, 0.86, 0.40, 0.92],
-        "height": 2.34
+        "height": 2.32
       },
       {
-        "id": "black_mountain_sign",
-        "label": "Black Mountain Scope Frame",
+        "id": "anzac_parade_sign",
+        "label": "Anzac Parade North",
         "kind": "signpost",
-        "position": [-36.0, 8.5, -150.0],
-        "yawDegrees": 300.0,
+        "position": [90.0, 1.4, -82.0],
+        "yawDegrees": 16.0,
         "color": [0.94, 0.86, 0.42, 0.92],
         "height": 2.32
       },
       {
-        "id": "belconnen_horizon_sign",
-        "label": "Belconnen Street Frame",
+        "id": "mount_ainslie_sign",
+        "label": "Mount Ainslie Rise",
         "kind": "signpost",
-        "position": [-148.0, 7.0, -186.0],
-        "yawDegrees": 116.0,
+        "position": [126.0, 6.8, -138.0],
+        "yawDegrees": 26.0,
         "color": [0.96, 0.88, 0.42, 0.94],
         "height": 2.38
       },

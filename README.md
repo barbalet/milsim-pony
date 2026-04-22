@@ -4,7 +4,7 @@
 
 ## Game Overview
 
-The current default build launches into **Canberra Street Atlas Review**, a basin-scale demo that starts on an elevated perch above the east basin and sends the player across a sequence of authored district review points. The route is designed to confirm that the world remains readable at distance through a 4x scope, especially around Lake Burley Griffin, the Parliament axis, Civic, Barton-Russell, Woden, Black Mountain, and the Belconnen skyline.
+The current default build launches into **Canberra Civic, Barton, And Russell Atlas Review**, a basin-scale demo that starts on an elevated perch above the east basin and sends the player across a sequence of authored district review points. The route is designed to confirm that the world remains readable at distance through a 4x scope, especially around Lake Burley Griffin, Kings Avenue bridge, Russell, Barton, City Hill, Civic, Anzac Parade, and Mount Ainslie.
 
 At the moment, the game is more of a traversal and observation prototype than a complete combat sandbox. You move on foot through the authored route, use the scope to inspect distant landmarks, and open the overhead map to keep your bearings, confirm which sector of Canberra you are in, and read the named road network that is now drawn into the atlas overlay. The HUD, route markers, pause flow, settings screen, checkpoint restarts, and completion shell are already implemented so the build can be used as a repeatable review demo.
 
@@ -15,7 +15,7 @@ The broader project goal is a playable Canberra milsim with long-range combat su
 1. Launch the game and begin from the briefing shell.
 2. Spawn at the East Basin scope terrace.
 3. Walk or sprint between the authored district-atlas checkpoints.
-4. Raise the 4x scope at review points to inspect distant Canberra features and street corridors.
+4. Raise the 4x scope at review points to inspect distant Canberra features and the central district connectors around Civic, Barton, Russell, and Mount Ainslie.
 5. Open the overhead map whenever you need sector context, checkpoint progress, or the named road atlas.
 6. Pause, restart, retry, or return to briefing as needed.
 
@@ -82,4 +82,4 @@ You can also open [MilsimPonyGame.xcodeproj](/Users/barbalet/github/milsim-pony/
 
 ## Current Focus
 
-The active direction for the project is basin-scale Canberra coverage from Woden to Belconnen, with Lake Burley Griffin as a readable anchor, a district street atlas in the overhead map, and the 4x scope as the core validation tool. The current program runs through cycles `15` to `20`, expanding district coverage, street density, online-reference capture, and route integration before the next major push toward a sniper-capable milsim.
+The active direction for the project is basin-scale Canberra coverage from Woden to Belconnen, with Lake Burley Griffin as a readable anchor, a district street atlas in the overhead map, and the 4x scope as the core validation tool. The live build is now on cycle `17`, pushing the Civic, Barton, Russell, east-basin, and Mount Ainslie pass ahead of the later Belconnen and route-integration updates before the next major push toward a sniper-capable milsim.
