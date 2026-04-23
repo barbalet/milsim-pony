@@ -25,6 +25,15 @@
       "subdivisions": 14,
       "color": [0.37, 0.43, 0.32, 1.0],
       "yawDegrees": 12.0
+    },
+    {
+      "name": "TowerApproachShelf",
+      "position": [-82.0, 18.0, -140.0],
+      "size": [42.0, 34.0],
+      "cornerHeights": [2.6, 2.2, 1.2, 1.4],
+      "subdivisions": 12,
+      "color": [0.37, 0.43, 0.32, 1.0],
+      "yawDegrees": 4.0
     }
   ],
   "roadStrips": [
@@ -51,6 +60,30 @@
       "centerLineWidth": 0.08,
       "crownHeight": 0.01,
       "yawDegrees": 110.0
+    },
+    {
+      "name": "BlackMountainAccess",
+      "position": [-72.0, 12.2, -146.0],
+      "size": [5.2, 44.0],
+      "roadColor": [0.21, 0.21, 0.23, 1.0],
+      "shoulderColor": [0.40, 0.43, 0.37, 1.0],
+      "lineColor": [0.89, 0.84, 0.49, 1.0],
+      "shoulderWidth": 0.50,
+      "centerLineWidth": 0.08,
+      "crownHeight": 0.01,
+      "yawDegrees": 52.0
+    },
+    {
+      "name": "TowerViewSpur",
+      "position": [-84.0, 18.4, -138.0],
+      "size": [4.6, 24.0],
+      "roadColor": [0.22, 0.22, 0.24, 1.0],
+      "shoulderColor": [0.41, 0.44, 0.38, 1.0],
+      "lineColor": [0.88, 0.83, 0.48, 1.0],
+      "shoulderWidth": 0.44,
+      "centerLineWidth": 0.07,
+      "crownHeight": 0.01,
+      "yawDegrees": 88.0
     }
   ],
   "grayboxBlocks": [
@@ -85,6 +118,20 @@
       "color": [0.45, 0.48, 0.52, 1.0],
       "yawDegrees": 0.0,
       "collisionEnabled": false
+    },
+    {
+      "name": "PerchRetainingWall",
+      "position": [-58.0, 11.1, -176.0],
+      "halfExtents": [16.0, 1.2, 0.9],
+      "color": [0.47, 0.50, 0.54, 1.0],
+      "yawDegrees": 108.0
+    },
+    {
+      "name": "TowerLookBarrier",
+      "position": [-88.0, 18.2, -144.0],
+      "halfExtents": [6.0, 1.0, 0.8],
+      "color": [0.49, 0.52, 0.56, 1.0],
+      "yawDegrees": 0.0
     }
   ],
   "collisionVolumes": [
@@ -99,6 +146,12 @@
       "position": [-42.0, 10.4, -144.0],
       "halfExtents": [12.0, 1.0, 0.8],
       "yawDegrees": 24.0
+    },
+    {
+      "name": "TowerLookBarrierCollision",
+      "position": [-88.0, 18.2, -144.0],
+      "halfExtents": [6.0, 1.0, 0.8],
+      "yawDegrees": 0.0
     }
   ]
 }

@@ -66,12 +66,14 @@ struct JungleTerrainFrame {
 struct SceneVertex {
     var position: SIMD3<Float>
     var normal: SIMD3<Float>
+    var tangent: SIMD4<Float>
     var uv: SIMD2<Float>
     var color: SIMD4<Float>
 }
 
 struct SceneUniforms {
     var viewProjectionMatrix: simd_float4x4
+    var shadowViewProjectionMatrix: simd_float4x4
     var modelMatrix: simd_float4x4
     var lightDirection: SIMD4<Float>
     var sunColor: SIMD4<Float>
@@ -79,6 +81,19 @@ struct SceneUniforms {
     var fogColor: SIMD4<Float>
     var lightingParameters: SIMD4<Float>
     var atmosphereParameters: SIMD4<Float>
+    var shadowParameters: SIMD4<Float>
+}
+
+struct SceneMaterialUniforms {
+    var baseColorFactor: SIMD4<Float>
+    var channelFactors: SIMD4<Float>
+}
+
+struct ScenePostProcessUniforms {
+    var exposureParameters: SIMD4<Float>
+    var shadowTint: SIMD4<Float>
+    var highlightTint: SIMD4<Float>
+    var gradeParameters: SIMD4<Float>
 }
 
 struct SkyUniforms {
@@ -162,6 +177,31 @@ extension simd_float4x4 {
             SIMD4<Float>(0, yScale, 0, 0),
             SIMD4<Float>(0, 0, zScale, -1),
             SIMD4<Float>(0, 0, wzScale, 0)
+        )
+    }
+
+    static func orthographic(
+        left: Float,
+        right: Float,
+        bottom: Float,
+        top: Float,
+        nearZ: Float,
+        farZ: Float
+    ) -> simd_float4x4 {
+        let width = max(right - left, 0.001)
+        let height = max(top - bottom, 0.001)
+        let depth = max(farZ - nearZ, 0.001)
+
+        return simd_float4x4(
+            SIMD4<Float>(2.0 / width, 0, 0, 0),
+            SIMD4<Float>(0, 2.0 / height, 0, 0),
+            SIMD4<Float>(0, 0, -2.0 / depth, 0),
+            SIMD4<Float>(
+                -((right + left) / width),
+                -((top + bottom) / height),
+                -((farZ + nearZ) / depth),
+                1
+            )
         )
     }
 

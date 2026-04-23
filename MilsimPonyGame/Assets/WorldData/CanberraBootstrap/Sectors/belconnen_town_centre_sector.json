@@ -25,6 +25,15 @@
       "subdivisions": 12,
       "color": [0.37, 0.43, 0.32, 1.0],
       "yawDegrees": 8.0
+    },
+    {
+      "name": "BelconnenNorthPad",
+      "position": [-160.0, 2.2, -220.0],
+      "size": [74.0, 54.0],
+      "cornerHeights": [2.4, 2.0, 1.2, 1.3],
+      "subdivisions": 14,
+      "color": [0.37, 0.43, 0.32, 1.0],
+      "yawDegrees": 10.0
     }
   ],
   "roadStrips": [
@@ -87,6 +96,54 @@
       "centerLineWidth": 0.10,
       "crownHeight": 0.02,
       "yawDegrees": 66.0
+    },
+    {
+      "name": "CameronAvenue",
+      "position": [-136.0, 0.97, -176.0],
+      "size": [7.0, 76.0],
+      "roadColor": [0.20, 0.20, 0.22, 1.0],
+      "shoulderColor": [0.39, 0.42, 0.36, 1.0],
+      "lineColor": [0.90, 0.84, 0.49, 1.0],
+      "shoulderWidth": 0.68,
+      "centerLineWidth": 0.12,
+      "crownHeight": 0.02,
+      "yawDegrees": 86.0
+    },
+    {
+      "name": "JoyntonSmithDrive",
+      "position": [-154.0, 0.92, -224.0],
+      "size": [6.8, 64.0],
+      "roadColor": [0.19, 0.19, 0.21, 1.0],
+      "shoulderColor": [0.38, 0.41, 0.35, 1.0],
+      "lineColor": [0.88, 0.83, 0.48, 1.0],
+      "shoulderWidth": 0.62,
+      "centerLineWidth": 0.10,
+      "crownHeight": 0.02,
+      "yawDegrees": 84.0
+    },
+    {
+      "name": "LathlainStreet",
+      "position": [-124.0, 0.95, -202.0],
+      "size": [6.0, 52.0],
+      "roadColor": [0.20, 0.20, 0.22, 1.0],
+      "shoulderColor": [0.39, 0.42, 0.36, 1.0],
+      "lineColor": [0.89, 0.84, 0.49, 1.0],
+      "shoulderWidth": 0.60,
+      "centerLineWidth": 0.10,
+      "crownHeight": 0.02,
+      "yawDegrees": 2.0
+    },
+    {
+      "name": "CollegeStreetLink",
+      "position": [-96.0, 0.96, -182.0],
+      "size": [6.4, 58.0],
+      "roadColor": [0.19, 0.19, 0.21, 1.0],
+      "shoulderColor": [0.38, 0.41, 0.35, 1.0],
+      "lineColor": [0.88, 0.83, 0.48, 1.0],
+      "shoulderWidth": 0.60,
+      "centerLineWidth": 0.10,
+      "crownHeight": 0.02,
+      "yawDegrees": 48.0
     }
   ],
   "grayboxBlocks": [
@@ -120,6 +177,44 @@
       "color": [0.44, 0.47, 0.50, 1.0],
       "yawDegrees": 8.0,
       "collisionEnabled": false
+    },
+    {
+      "name": "BelcoBusInterchangeCanopy",
+      "position": [-148.0, 4.0, -212.0],
+      "halfExtents": [18.0, 4.0, 10.0],
+      "color": [0.46, 0.49, 0.53, 1.0],
+      "yawDegrees": 8.0,
+      "collisionEnabled": false
+    },
+    {
+      "name": "BelconnenLakeEdgeTower",
+      "position": [-172.0, 14.0, -152.0],
+      "halfExtents": [7.0, 14.0, 7.0],
+      "color": [0.48, 0.51, 0.55, 1.0],
+      "yawDegrees": 0.0
+    },
+    {
+      "name": "CameronOfficeBand",
+      "position": [-130.0, 9.0, -170.0],
+      "halfExtents": [18.0, 9.0, 10.0],
+      "color": [0.45, 0.48, 0.52, 1.0],
+      "yawDegrees": 2.0,
+      "collisionEnabled": false
+    },
+    {
+      "name": "JoyntonSmithApartments",
+      "position": [-154.0, 12.0, -226.0],
+      "halfExtents": [10.0, 12.0, 10.0],
+      "color": [0.47, 0.50, 0.54, 1.0],
+      "yawDegrees": 10.0
+    },
+    {
+      "name": "BelcoArtsCentre",
+      "position": [-118.0, 6.0, -204.0],
+      "halfExtents": [12.0, 6.0, 10.0],
+      "color": [0.45, 0.48, 0.52, 1.0],
+      "yawDegrees": 6.0,
+      "collisionEnabled": false
     }
   ],
   "collisionVolumes": [
@@ -128,6 +223,18 @@
       "position": [-142.0, 1.2, -190.0],
       "halfExtents": [1.0, 0.9, 12.0],
       "yawDegrees": 2.0
+    },
+    {
+      "name": "BelcoInterchangeMedian",
+      "position": [-150.0, 1.2, -202.0],
+      "halfExtents": [0.9, 0.9, 10.0],
+      "yawDegrees": 90.0
+    },
+    {
+      "name": "EmuBankLakeWall",
+      "position": [-176.0, 1.1, -160.0],
+      "halfExtents": [12.0, 0.8, 0.7],
+      "yawDegrees": 86.0
     }
   ]
 }

@@ -6,6 +6,14 @@ import JungleShared
 
 @MainActor
 public final class JungleMetalRenderer: NSObject, MTKViewDelegate {
+    private static let maxFramesInFlight = 3
+
+    private struct TerrainFrameResources {
+        var uniformBuffer: MTLBuffer
+        var vertexBuffers: [MTLBuffer?]
+        var vertexCapacity = 0
+    }
+
     private struct TerrainVertex {
         var position: SIMD3<Float>
         var color: SIMD4<Float>
@@ -196,7 +204,10 @@ public final class JungleMetalRenderer: NSObject, MTKViewDelegate {
     private var framesPerSecond: Double
     private var lastMetricsTimestamp: CFTimeInterval
     private var lastMetricsFrameCount: UInt64
+    private let inFlightFrameSemaphore: DispatchSemaphore
     private var cachedIndexBuffers: [Int: (buffer: MTLBuffer, indexCount: Int)] = [:]
+    private var nextFrameResourceIndex = 0
+    private var frameResources: [TerrainFrameResources]
 
     public init?(snapshot: JungleFrameSnapshot, device: MTLDevice? = MTLCreateSystemDefaultDevice()) {
         guard let metalDevice = device,
@@ -242,6 +253,26 @@ public final class JungleMetalRenderer: NSObject, MTKViewDelegate {
             return nil
         }
 
+        var frameResources: [TerrainFrameResources] = []
+        frameResources.reserveCapacity(Self.maxFramesInFlight)
+
+        for frameIndex in 0..<Self.maxFramesInFlight {
+            guard let uniformBuffer = metalDevice.makeBuffer(
+                length: MemoryLayout<TerrainUniforms>.stride,
+                options: .storageModeShared
+            ) else {
+                return nil
+            }
+
+            uniformBuffer.label = "JungleTerrainUniformBuffer[\(frameIndex)]"
+            frameResources.append(
+                TerrainFrameResources(
+                    uniformBuffer: uniformBuffer,
+                    vertexBuffers: Array(repeating: nil, count: Self.terrainLayers.count)
+                )
+            )
+        }
+
         self.metalDevice = metalDevice
         self.commandQueue = commandQueue
         self.solidPipelineState = solidPipelineState
@@ -255,6 +286,8 @@ public final class JungleMetalRenderer: NSObject, MTKViewDelegate {
         framesPerSecond = 0
         lastMetricsTimestamp = CACurrentMediaTime()
         lastMetricsFrameCount = 0
+        self.inFlightFrameSemaphore = DispatchSemaphore(value: Self.maxFramesInFlight)
+        self.frameResources = frameResources
         super.init()
     }
 
@@ -283,6 +316,22 @@ public final class JungleMetalRenderer: NSObject, MTKViewDelegate {
             return
         }
 
+        // Reuse one buffer set per in-flight frame so CPU uploads stay bounded.
+        inFlightFrameSemaphore.wait()
+        let frameResourceIndex = nextFrameResourceIndex
+        nextFrameResourceIndex = (nextFrameResourceIndex + 1) % Self.maxFramesInFlight
+        let inFlightFrameSemaphore = self.inFlightFrameSemaphore
+        var shouldSignalInFlightSemaphore = true
+        defer {
+            if shouldSignalInFlightSemaphore {
+                inFlightFrameSemaphore.signal()
+            }
+        }
+
+        commandBuffer.addCompletedHandler { _ in
+            inFlightFrameSemaphore.signal()
+        }
+
         let skyColor = skyColor(for: snapshot)
         descriptor.colorAttachments[0].loadAction = .clear
         descriptor.colorAttachments[0].storeAction = .store
@@ -296,8 +345,11 @@ public final class JungleMetalRenderer: NSObject, MTKViewDelegate {
         descriptor.depthAttachment.storeAction = .dontCare
         descriptor.depthAttachment.clearDepth = 1.0
 
-        if let terrainPayloads = makeTerrainPayloads(),
-           let uniformBuffer = makeUniformBuffer(skyColor: skyColor) {
+        if let terrainPayloads = makeTerrainPayloads(frameResourceIndex: frameResourceIndex),
+           let uniformBuffer = updateUniformBuffer(
+               skyColor: skyColor,
+               frameResourceIndex: frameResourceIndex
+           ) {
             let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: descriptor)
             encoder?.label = "JungleTerrainLayerPass"
             encoder?.setVertexBuffer(uniformBuffer, offset: 0, index: 1)
@@ -326,6 +378,7 @@ public final class JungleMetalRenderer: NSObject, MTKViewDelegate {
 
         commandBuffer.present(drawable)
         commandBuffer.commit()
+        shouldSignalInFlightSemaphore = false
 
         renderedFrameCount += 1
         drawableWidth = view.drawableSize.width
@@ -333,7 +386,7 @@ public final class JungleMetalRenderer: NSObject, MTKViewDelegate {
         reportMetrics(force: renderedFrameCount == 1 || renderedFrameCount.isMultiple(of: 20))
     }
 
-    private func makeTerrainPayloads() -> [TerrainPayload]? {
+    private func makeTerrainPayloads(frameResourceIndex: Int) -> [TerrainPayload]? {
         let patch = snapshot.terrainPatch
         guard patch.sampleSide >= 2,
               patch.samples.count == patch.sampleSide * patch.sampleSide,
@@ -342,20 +395,22 @@ public final class JungleMetalRenderer: NSObject, MTKViewDelegate {
         }
 
         var payloads: [TerrainPayload] = []
+        let vertexBufferLength = patch.samples.count * MemoryLayout<TerrainVertex>.stride
 
-        for layer in Self.terrainLayers {
+        guard ensureVertexBufferCapacity(
+            frameResourceIndex: frameResourceIndex,
+            requiredLength: vertexBufferLength
+        ) else {
+            return nil
+        }
+
+        for (layerIndex, layer) in Self.terrainLayers.enumerated() {
             let vertices = buildVertices(from: patch, layer: layer)
-            guard let vertexBuffer = vertices.withUnsafeBytes({ bytes -> MTLBuffer? in
-                guard let baseAddress = bytes.baseAddress else {
-                    return nil
-                }
-
-                return metalDevice.makeBuffer(
-                    bytes: baseAddress,
-                    length: bytes.count,
-                    options: .storageModeShared
-                )
-            }) else {
+            guard let vertexBuffer = updateVertexBuffer(
+                with: vertices,
+                frameResourceIndex: frameResourceIndex,
+                layerIndex: layerIndex
+            ) else {
                 return nil
             }
 
@@ -856,7 +911,10 @@ public final class JungleMetalRenderer: NSObject, MTKViewDelegate {
         )
     }
 
-    private func makeUniformBuffer(skyColor: SIMD3<Float>) -> MTLBuffer? {
+    private func updateUniformBuffer(
+        skyColor: SIMD3<Float>,
+        frameResourceIndex: Int
+    ) -> MTLBuffer? {
         let viewProjection = simd_mul(
             simdMatrix(from: snapshot.projectionMatrix),
             simdMatrix(from: snapshot.viewMatrix)
@@ -879,17 +937,73 @@ public final class JungleMetalRenderer: NSObject, MTKViewDelegate {
             atmosphereControls: atmosphereControls
         )
 
-        return withUnsafeBytes(of: &uniforms) { bytes in
+        let uniformBuffer = frameResources[frameResourceIndex].uniformBuffer
+        withUnsafeBytes(of: &uniforms) { bytes in
             guard let baseAddress = bytes.baseAddress else {
-                return nil
+                return
             }
 
-            return metalDevice.makeBuffer(
-                bytes: baseAddress,
-                length: bytes.count,
-                options: .storageModeShared
-            )
+            uniformBuffer.contents().copyMemory(from: baseAddress, byteCount: bytes.count)
         }
+
+        return uniformBuffer
+    }
+
+    private func updateVertexBuffer(
+        with vertices: [TerrainVertex],
+        frameResourceIndex: Int,
+        layerIndex: Int
+    ) -> MTLBuffer? {
+        guard let vertexBuffer = frameResources[frameResourceIndex].vertexBuffers[layerIndex] else {
+            return nil
+        }
+
+        let byteCount = vertices.count * MemoryLayout<TerrainVertex>.stride
+        guard byteCount <= vertexBuffer.length else {
+            return nil
+        }
+
+        vertices.withUnsafeBytes { bytes in
+            guard let baseAddress = bytes.baseAddress else {
+                return
+            }
+
+            vertexBuffer.contents().copyMemory(from: baseAddress, byteCount: bytes.count)
+        }
+
+        return vertexBuffer
+    }
+
+    private func ensureVertexBufferCapacity(
+        frameResourceIndex: Int,
+        requiredLength: Int
+    ) -> Bool {
+        guard requiredLength > 0 else {
+            return true
+        }
+
+        if frameResources[frameResourceIndex].vertexCapacity >= requiredLength {
+            return true
+        }
+
+        var buffers: [MTLBuffer?] = []
+        buffers.reserveCapacity(Self.terrainLayers.count)
+
+        for layerIndex in Self.terrainLayers.indices {
+            guard let buffer = metalDevice.makeBuffer(
+                length: requiredLength,
+                options: .storageModeShared
+            ) else {
+                return false
+            }
+
+            buffer.label = "JungleTerrainVertexBuffer[\(frameResourceIndex):\(layerIndex)]"
+            buffers.append(buffer)
+        }
+
+        frameResources[frameResourceIndex].vertexBuffers = buffers
+        frameResources[frameResourceIndex].vertexCapacity = requiredLength
+        return true
     }
 
     private func indexBuffer(for sampleSide: Int) -> (buffer: MTLBuffer, indexCount: Int)? {

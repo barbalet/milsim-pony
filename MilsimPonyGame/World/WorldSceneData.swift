@@ -29,7 +29,11 @@ struct SceneConfiguration: Decodable {
     let atmosphere: AtmosphereConfiguration?
     let player: PlayerConfiguration?
     let scope: ScopeConfiguration?
+    let shadow: ShadowConfiguration?
+    let postProcess: PostProcessConfiguration?
     let route: RouteConfiguration
+    let reviewPack: ReviewPackConfiguration?
+    let combatRehearsal: CombatRehearsalConfiguration?
     let detection: DetectionConfiguration?
     let guidance: GuidanceConfiguration?
     let proceduralElements: [ProceduralElementConfiguration]
@@ -105,6 +109,75 @@ struct ScopeConfiguration: Decodable {
 
     var reticleColorVector: SIMD4<Float> {
         reticleColor?.simdColor(or: SIMD4<Float>(0.92, 0.86, 0.42, 0.94)) ?? SIMD4<Float>(0.92, 0.86, 0.42, 0.94)
+    }
+}
+
+struct ShadowConfiguration: Decodable {
+    let mapResolution: Int?
+    let coverage: Float?
+    let depthBias: Float?
+    let normalBias: Float?
+    let strength: Float?
+    let scopeCoverageMultiplier: Float?
+    let forwardOffsetMultiplier: Float?
+
+    init(
+        mapResolution: Int? = 2048,
+        coverage: Float? = 120.0,
+        depthBias: Float? = 0.015,
+        normalBias: Float? = 0.010,
+        strength: Float? = 0.72,
+        scopeCoverageMultiplier: Float? = 1.25,
+        forwardOffsetMultiplier: Float? = 0.35
+    ) {
+        self.mapResolution = mapResolution
+        self.coverage = coverage
+        self.depthBias = depthBias
+        self.normalBias = normalBias
+        self.strength = strength
+        self.scopeCoverageMultiplier = scopeCoverageMultiplier
+        self.forwardOffsetMultiplier = forwardOffsetMultiplier
+    }
+}
+
+struct PostProcessConfiguration: Decodable {
+    let exposureBias: Float?
+    let whitePoint: Float?
+    let contrast: Float?
+    let saturation: Float?
+    let shadowBalance: Float?
+    let vignetteStrength: Float?
+    let shadowTint: [Float]?
+    let highlightTint: [Float]?
+
+    init(
+        exposureBias: Float? = 0.18,
+        whitePoint: Float? = 1.25,
+        contrast: Float? = 1.04,
+        saturation: Float? = 1.02,
+        shadowBalance: Float? = 0.44,
+        vignetteStrength: Float? = 0.08,
+        shadowTint: [Float]? = nil,
+        highlightTint: [Float]? = nil
+    ) {
+        self.exposureBias = exposureBias
+        self.whitePoint = whitePoint
+        self.contrast = contrast
+        self.saturation = saturation
+        self.shadowBalance = shadowBalance
+        self.vignetteStrength = vignetteStrength
+        self.shadowTint = shadowTint
+        self.highlightTint = highlightTint
+    }
+
+    var shadowTintVector: SIMD4<Float> {
+        shadowTint?.simdColor(or: SIMD4<Float>(0.95, 0.99, 1.04, 1.0))
+            ?? SIMD4<Float>(0.95, 0.99, 1.04, 1.0)
+    }
+
+    var highlightTintVector: SIMD4<Float> {
+        highlightTint?.simdColor(or: SIMD4<Float>(1.04, 1.01, 0.95, 1.0))
+            ?? SIMD4<Float>(1.04, 1.01, 0.95, 1.0)
     }
 }
 
@@ -230,6 +303,74 @@ struct RouteConfiguration: Decodable {
     let checkpoints: [RouteCheckpointConfiguration]
 }
 
+struct ReviewPackConfiguration: Decodable {
+    let title: String
+    let summary: String
+    let referenceGallery: String
+    let textureLibrary: String
+    let captureFormat: String
+    let openRisks: [String]
+    let comparisonStops: [ReviewComparisonStopConfiguration]
+
+    init(
+        title: String = "Review Pack unavailable",
+        summary: String = "Reference-backed review data unavailable.",
+        referenceGallery: String = "Unavailable",
+        textureLibrary: String = "Unavailable",
+        captureFormat: String = "Unavailable",
+        openRisks: [String] = [],
+        comparisonStops: [ReviewComparisonStopConfiguration] = []
+    ) {
+        self.title = title
+        self.summary = summary
+        self.referenceGallery = referenceGallery
+        self.textureLibrary = textureLibrary
+        self.captureFormat = captureFormat
+        self.openRisks = openRisks
+        self.comparisonStops = comparisonStops
+    }
+}
+
+struct ReviewComparisonStopConfiguration: Decodable {
+    let checkpointID: String
+    let district: String
+    let sourceFocus: String
+    let combatLane: String
+    let captureNote: String
+}
+
+struct CombatRehearsalConfiguration: Decodable {
+    let title: String
+    let summary: String
+    let exposureGuide: String
+    let recoveryRule: String
+    let contactStops: [CombatContactStopConfiguration]
+
+    init(
+        title: String = "Combat rehearsal unavailable",
+        summary: String = "Combat-lane rehearsal data unavailable.",
+        exposureGuide: String = "Unavailable",
+        recoveryRule: String = "Unavailable",
+        contactStops: [CombatContactStopConfiguration] = []
+    ) {
+        self.title = title
+        self.summary = summary
+        self.exposureGuide = exposureGuide
+        self.recoveryRule = recoveryRule
+        self.contactStops = contactStops
+    }
+}
+
+struct CombatContactStopConfiguration: Decodable {
+    let checkpointID: String
+    let district: String
+    let lane: String
+    let exposure: String
+    let expectedObservers: Int
+    let coverHint: String
+    let recoveryNote: String
+}
+
 struct RouteCheckpointConfiguration: Decodable {
     let id: String
     let label: String
@@ -256,6 +397,41 @@ struct RouteCheckpointConfiguration: Decodable {
     }
 }
 
+struct MaterialConfiguration: Decodable {
+    let albedoTexture: String?
+    let normalTexture: String?
+    let roughnessTexture: String?
+    let ambientOcclusionTexture: String?
+    let baseColor: [Float]?
+    let roughness: Float?
+    let ambientOcclusionStrength: Float?
+    let normalScale: Float?
+
+    init(
+        albedoTexture: String? = nil,
+        normalTexture: String? = nil,
+        roughnessTexture: String? = nil,
+        ambientOcclusionTexture: String? = nil,
+        baseColor: [Float]? = nil,
+        roughness: Float? = nil,
+        ambientOcclusionStrength: Float? = nil,
+        normalScale: Float? = nil
+    ) {
+        self.albedoTexture = albedoTexture
+        self.normalTexture = normalTexture
+        self.roughnessTexture = roughnessTexture
+        self.ambientOcclusionTexture = ambientOcclusionTexture
+        self.baseColor = baseColor
+        self.roughness = roughness
+        self.ambientOcclusionStrength = ambientOcclusionStrength
+        self.normalScale = normalScale
+    }
+
+    var baseColorVector: SIMD4<Float>? {
+        baseColor?.simdColor(or: SIMD4<Float>(1, 1, 1, 1))
+    }
+}
+
 enum ProceduralElementKind: String, Decodable {
     case checkerboard
     case box
@@ -272,6 +448,9 @@ struct ProceduralElementConfiguration: Decodable {
     let colorA: [Float]?
     let colorB: [Float]?
     let yawDegrees: Float?
+    let material: MaterialConfiguration?
+    let castsShadow: Bool?
+    let receivesShadow: Bool?
 
     var positionVector: SIMD3<Float> {
         position?.simd3(or: .zero) ?? .zero
@@ -300,6 +479,9 @@ struct AssetInstanceConfiguration: Decodable {
     let position: [Float]
     let targetExtent: Float
     let yawDegrees: Float?
+    let material: MaterialConfiguration?
+    let castsShadow: Bool?
+    let receivesShadow: Bool?
 
     var positionVector: SIMD3<Float> {
         position.simd3(or: .zero)
@@ -346,6 +528,9 @@ struct TerrainPatchConfiguration: Decodable {
     let subdivisions: Int?
     let color: [Float]
     let yawDegrees: Float?
+    let material: MaterialConfiguration?
+    let castsShadow: Bool?
+    let receivesShadow: Bool?
 
     var positionVector: SIMD3<Float> {
         position.simd3(or: .zero)
@@ -375,6 +560,9 @@ struct RoadStripConfiguration: Decodable {
     let centerLineWidth: Float?
     let crownHeight: Float?
     let yawDegrees: Float?
+    let material: MaterialConfiguration?
+    let castsShadow: Bool?
+    let receivesShadow: Bool?
 
     var positionVector: SIMD3<Float> {
         position.simd3(or: .zero)
@@ -403,8 +591,11 @@ struct GrayboxBlockConfiguration: Decodable {
     let halfExtents: [Float]
     let color: [Float]
     let yawDegrees: Float?
+    let material: MaterialConfiguration?
     let collisionEnabled: Bool?
     let contributesToGround: Bool?
+    let castsShadow: Bool?
+    let receivesShadow: Bool?
 
     var positionVector: SIMD3<Float> {
         position.simd3(or: .zero)

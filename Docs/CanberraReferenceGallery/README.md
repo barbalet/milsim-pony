@@ -1,12 +1,12 @@
 # Canberra Reference Gallery
 
-Captured on `2026-04-21` for the cycle `15` Canberra street-atlas expansion pass.
+Locked on `2026-04-22` for the cycle `21` Canberra combat-lane rehearsal baseline.
 
 ## Adequacy Check
 
-- Google Maps has now been accessed for three core Canberra components: the central basin, Woden, and Belconnen.
-- That is adequate for the cycle `15` atlas reset and the first district comparison pass.
-- It is not yet a full-city reference set. Future gallery updates should add Barton-Russell closeups, Mount Ainslie-Campbell, west basin/Yarralumla, Fyshwick-Kingston, and any combat-lane districts introduced after cycle `15`.
+- Google Maps captures now anchor the Woden, central basin, and Belconnen halves of the live Woden-to-Belconnen route.
+- That is adequate for the cycle `21` combat rehearsal because every major district stop can now point at an existing source family plus a live contact-lane frame in-game.
+- It is still not a full-city combat reference set. Future gallery updates should add dedicated west-basin, Black Mountain, Barton-Russell, and Mount Ainslie closeups before a heavier combat build.
 
 ## Google Maps Road Atlas Captures
 
@@ -55,7 +55,7 @@ The upgraded overhead map showing `18` Canberra sectors and `60` named road stri
 ### Scope Overlay
 
 Focus:
-Live scoped review mode in the cycle `15` atlas pass.
+Live scoped review mode carried forward into the cycle `21` contact rehearsal.
 
 ![In-game scope overlay](game_scope_overlay.png)
 
@@ -63,6 +63,12 @@ Live scoped review mode in the cycle `15` atlas pass.
 
 Focus:
 The updated review shell and district-atlas route framing.
+
+## Cycle 21 Route Coverage
+
+- Woden and State Circle use the Woden atlas capture plus ACT transport guides as the southern anchor for the first live contact lanes.
+- East Basin, Barton-Russell, Civic, and West Basin use the central Canberra atlas capture as the basin-core source for the active rehearsal route.
+- Black Mountain, Belconnen Town Centre, and Ginninderra use the Belconnen atlas capture plus regional guides as the north-west source for the closing contact lanes.
 
 ![In-game pause shell](game_pause_shell.png)
 

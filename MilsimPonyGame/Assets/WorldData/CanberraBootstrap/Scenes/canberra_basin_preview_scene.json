@@ -1,58 +1,94 @@
 {
-  "cycleLabel": "Cycle 17 Civic, Barton, Russell, And East-Basin Pass",
-  "sceneName": "Canberra Civic, Barton, And Russell Atlas Review",
+  "cycleLabel": "Cycle 21 Combat-Lane Rehearsal",
+  "sceneName": "Canberra Combat-Lane Rehearsal",
   "planningNotes": [
-    "Plan: cycle 17 densifies Civic, Barton, Russell, the east basin, and Mount Ainslie before the Belconnen-heavy pass.",
-    "Breakdown: keep the central districts resident with stronger telemetry while the atlas route proves separate readouts for the lake edge, City Hill, Civic, and the inner north-east.",
-    "Reference: Google Maps central-district captures plus ACT transport maps define the Civic, Barton, Russell, and Mount Ainslie street pass."
+    "Plan: cycle 21 turns the locked Woden-to-Belconnen review pack into a live combat-lane rehearsal rather than another atlas-only pass.",
+    "Breakdown: keep the cross-district route stable, add basin-scale observer pressure, and surface the next contact lane plus its cover cues in the HUD and map.",
+    "Reference: carry the review pack, texture library, smoke coverage, and lane notes forward as the baseline for the first combat-focused Canberra run."
   ],
   "spawn": {
-    "label": "East Basin Scope Terrace",
-    "position": [96.0, 22.0, 14.0],
-    "yawDegrees": 268.0,
-    "pitchDegrees": -8.0
+    "label": "Woden Town Centre Staging",
+    "position": [18.0, 1.0, 182.0],
+    "yawDegrees": 358.0,
+    "pitchDegrees": -4.0
   },
   "randomSpawns": [
     {
-      "label": "East Basin Scope Terrace",
-      "position": [96.0, 22.0, 14.0],
-      "yawDegrees": 268.0,
-      "pitchDegrees": -8.0
-    },
-    {
-      "label": "Russell Causeway Start",
-      "position": [127.0, 4.2, -50.0],
-      "yawDegrees": 246.0,
-      "pitchDegrees": -5.0
-    },
-    {
-      "label": "Parliament Axis Start",
-      "position": [0.0, 1.2, 9.0],
+      "label": "Woden Town Centre Staging",
+      "position": [18.0, 1.0, 182.0],
       "yawDegrees": 358.0,
       "pitchDegrees": -4.0
     },
     {
-      "label": "City Hill Civic Start",
-      "position": [54.0, 2.8, -116.0],
-      "yawDegrees": 206.0,
+      "label": "Woden Scope Perch",
+      "position": [10.0, 1.6, 156.0],
+      "yawDegrees": 356.0,
       "pitchDegrees": -6.0
     },
     {
-      "label": "Barton Foreshore Start",
-      "position": [76.0, 1.2, -8.0],
-      "yawDegrees": 334.0,
+      "label": "State Circle Transfer",
+      "position": [0.0, 0.25, 24.0],
+      "yawDegrees": 350.0,
       "pitchDegrees": -4.0
     },
     {
-      "label": "Civic Grid Start",
-      "position": [72.0, 1.2, -136.0],
-      "yawDegrees": 4.0,
-      "pitchDegrees": -5.0
+      "label": "Kings Avenue East Start",
+      "position": [64.0, 0.98, -18.0],
+      "yawDegrees": 336.0,
+      "pitchDegrees": -4.0
     },
     {
-      "label": "Anzac Parade Start",
-      "position": [94.0, 1.0, -92.0],
-      "yawDegrees": 12.0,
+      "label": "East Basin Lookout",
+      "position": [96.0, 22.0, 18.0],
+      "yawDegrees": 304.0,
+      "pitchDegrees": -7.0
+    },
+    {
+      "label": "Constitution Axis Start",
+      "position": [74.0, 1.0, -90.0],
+      "yawDegrees": 286.0,
+      "pitchDegrees": -4.0
+    },
+    {
+      "label": "Civic Interchange Start",
+      "position": [44.0, 1.02, -136.0],
+      "yawDegrees": 2.0,
+      "pitchDegrees": -4.0
+    },
+    {
+      "label": "West Basin Promenade Start",
+      "position": [-96.0, 0.88, -22.0],
+      "yawDegrees": 278.0,
+      "pitchDegrees": -4.0
+    },
+    {
+      "label": "Telstra Tower Start",
+      "position": [-84.0, 18.0, -138.0],
+      "yawDegrees": 214.0,
+      "pitchDegrees": -8.0
+    },
+    {
+      "label": "Black Mountain Scope Perch",
+      "position": [-58.0, 11.0, -168.0],
+      "yawDegrees": 304.0,
+      "pitchDegrees": -6.0
+    },
+    {
+      "label": "Belconnen Way Start",
+      "position": [-118.0, 1.2, -176.0],
+      "yawDegrees": 344.0,
+      "pitchDegrees": -4.0
+    },
+    {
+      "label": "Belconnen Town Centre Start",
+      "position": [-138.0, 1.2, -192.0],
+      "yawDegrees": 18.0,
+      "pitchDegrees": -4.0
+    },
+    {
+      "label": "Ginninderra Start",
+      "position": [-174.0, 1.1, -214.0],
+      "yawDegrees": 104.0,
       "pitchDegrees": -5.0
     }
   ],
@@ -86,279 +122,680 @@
     "farPlaneMultiplier": 1.55,
     "reticleColor": [0.94, 0.86, 0.44, 0.96]
   },
+  "shadow": {
+    "mapResolution": 2048,
+    "coverage": 140.0,
+    "depthBias": 0.015,
+    "normalBias": 0.010,
+    "strength": 0.72,
+    "scopeCoverageMultiplier": 1.35,
+    "forwardOffsetMultiplier": 0.42
+  },
+  "postProcess": {
+    "exposureBias": 0.24,
+    "whitePoint": 1.18,
+    "contrast": 1.08,
+    "saturation": 1.05,
+    "shadowBalance": 0.43,
+    "vignetteStrength": 0.10,
+    "shadowTint": [0.95, 0.99, 1.04],
+    "highlightTint": [1.05, 1.01, 0.94]
+  },
   "route": {
-    "name": "Canberra Central District Survey",
-    "summary": "Move through authored review markers that prove the Canberra atlas now resolves the east basin, Kings Avenue bridge, Russell, Barton, Parliament, City Hill, Civic, Anzac Parade, and Mount Ainslie as separate connected districts.",
+    "name": "Canberra Combat-Lane Rehearsal",
+    "summary": "Follow one authored line from Woden to Belconnen while observer pressure, contact-lane cues, and cover hints validate that the atlas can now carry a real combat rehearsal without losing Canberra readability.",
     "checkpoints": [
       {
-        "id": "east_basin_scope_perch",
-        "label": "East Basin Scope Perch",
-        "position": [86.0, 22.0, 8.0],
-        "triggerRadius": 8.5,
-        "yawDegrees": 270.0,
-        "pitchDegrees": -8.0,
+        "id": "woden_town_centre_staging",
+        "label": "Woden Town Centre Staging",
+        "position": [18.0, 1.0, 182.0],
+        "triggerRadius": 8.8,
+        "yawDegrees": 358.0,
+        "pitchDegrees": -4.0,
         "goal": false,
         "beaconColor": [0.34, 0.76, 0.96, 0.84],
+        "beaconHeight": 5.2
+      },
+      {
+        "id": "woden_scope_perch",
+        "label": "Woden Scope Perch",
+        "position": [10.0, 1.6, 156.0],
+        "triggerRadius": 9.0,
+        "yawDegrees": 356.0,
+        "pitchDegrees": -6.0,
+        "goal": false,
+        "beaconColor": [0.36, 0.80, 0.96, 0.84],
+        "beaconHeight": 5.3
+      },
+      {
+        "id": "state_circle_transfer",
+        "label": "State Circle Transfer",
+        "position": [0.0, 0.25, 24.0],
+        "triggerRadius": 9.4,
+        "yawDegrees": 350.0,
+        "pitchDegrees": -4.0,
+        "goal": false,
+        "beaconColor": [0.38, 0.82, 0.94, 0.84],
         "beaconHeight": 5.4
       },
       {
-        "id": "kings_avenue_bridge_review",
-        "label": "Kings Avenue Bridge Review",
-        "position": [56.0, 1.0, -18.0],
-        "triggerRadius": 9.2,
-        "yawDegrees": 350.0,
-        "pitchDegrees": -5.0,
-        "goal": false,
-        "beaconColor": [0.36, 0.80, 0.96, 0.84],
-        "beaconHeight": 5.5
-      },
-      {
-        "id": "russell_causeway_review",
-        "label": "Russell Causeway Review",
-        "position": [118.0, 4.2, -46.0],
-        "triggerRadius": 9.5,
-        "yawDegrees": 246.0,
-        "pitchDegrees": -5.0,
-        "goal": false,
-        "beaconColor": [0.38, 0.80, 0.96, 0.84],
-        "beaconHeight": 5.5
-      },
-      {
-        "id": "barton_foreshore_review",
-        "label": "Barton Foreshore Review",
-        "position": [92.0, 1.2, 4.0],
+        "id": "kings_avenue_east_review",
+        "label": "Kings Avenue East Review",
+        "position": [64.0, 0.98, -18.0],
         "triggerRadius": 9.8,
         "yawDegrees": 336.0,
         "pitchDegrees": -4.0,
         "goal": false,
         "beaconColor": [0.40, 0.84, 0.88, 0.84],
+        "beaconHeight": 5.5
+      },
+      {
+        "id": "east_basin_lookout",
+        "label": "East Basin Lookout",
+        "position": [96.0, 22.0, 18.0],
+        "triggerRadius": 10.0,
+        "yawDegrees": 304.0,
+        "pitchDegrees": -7.0,
+        "goal": false,
+        "beaconColor": [0.42, 0.84, 0.88, 0.84],
         "beaconHeight": 5.6
       },
       {
-        "id": "parliament_axis_scope_test",
-        "label": "Parliament Axis Scope Test",
-        "position": [0.0, 1.2, 2.0],
-        "triggerRadius": 10.5,
-        "yawDegrees": 358.0,
+        "id": "constitution_axis_review",
+        "label": "Constitution Axis Review",
+        "position": [74.0, 1.0, -90.0],
+        "triggerRadius": 10.4,
+        "yawDegrees": 286.0,
         "pitchDegrees": -4.0,
         "goal": false,
-        "beaconColor": [0.92, 0.84, 0.38, 0.84],
+        "beaconColor": [0.90, 0.84, 0.40, 0.84],
+        "beaconHeight": 5.8
+      },
+      {
+        "id": "civic_interchange_review",
+        "label": "Civic Interchange Review",
+        "position": [44.0, 1.02, -136.0],
+        "triggerRadius": 10.4,
+        "yawDegrees": 2.0,
+        "pitchDegrees": -4.0,
+        "goal": false,
+        "beaconColor": [0.92, 0.84, 0.40, 0.84],
+        "beaconHeight": 5.8
+      },
+      {
+        "id": "west_basin_promenade_review",
+        "label": "West Basin Promenade Review",
+        "position": [-96.0, 0.88, -22.0],
+        "triggerRadius": 10.6,
+        "yawDegrees": 278.0,
+        "pitchDegrees": -4.0,
+        "goal": false,
+        "beaconColor": [0.92, 0.84, 0.42, 0.84],
+        "beaconHeight": 5.8
+      },
+      {
+        "id": "telstra_tower_frame",
+        "label": "Telstra Tower Frame",
+        "position": [-84.0, 18.0, -138.0],
+        "triggerRadius": 9.8,
+        "yawDegrees": 214.0,
+        "pitchDegrees": -8.0,
+        "goal": false,
+        "beaconColor": [0.94, 0.84, 0.40, 0.84],
         "beaconHeight": 5.6
       },
       {
-        "id": "city_hill_arterial_review",
-        "label": "City Hill Arterial Review",
-        "position": [47.0, 3.0, -118.0],
-        "triggerRadius": 11.0,
-        "yawDegrees": 214.0,
+        "id": "black_mountain_scope_perch",
+        "label": "Black Mountain Scope Perch",
+        "position": [-58.0, 11.0, -168.0],
+        "triggerRadius": 10.2,
+        "yawDegrees": 304.0,
         "pitchDegrees": -6.0,
         "goal": false,
-        "beaconColor": [0.42, 0.80, 0.94, 0.84],
+        "beaconColor": [0.94, 0.84, 0.38, 0.84],
         "beaconHeight": 5.8
       },
       {
-        "id": "civic_centre_grid_review",
-        "label": "Civic Centre Grid Review",
-        "position": [70.0, 1.2, -140.0],
+        "id": "belconnen_way_overlook",
+        "label": "Belconnen Way Overlook",
+        "position": [-118.0, 1.1, -176.0],
+        "triggerRadius": 10.6,
+        "yawDegrees": 344.0,
+        "pitchDegrees": -4.0,
+        "goal": false,
+        "beaconColor": [0.42, 0.84, 0.62, 0.84],
+        "beaconHeight": 5.8
+      },
+      {
+        "id": "belconnen_town_centre_review",
+        "label": "Belconnen Town Centre Review",
+        "position": [-138.0, 1.2, -192.0],
         "triggerRadius": 10.8,
-        "yawDegrees": 10.0,
-        "pitchDegrees": -5.0,
+        "yawDegrees": 18.0,
+        "pitchDegrees": -4.0,
         "goal": false,
-        "beaconColor": [0.86, 0.82, 0.42, 0.84],
-        "beaconHeight": 5.8
-      },
-      {
-        "id": "anzac_parade_north_review",
-        "label": "Anzac Parade North Review",
-        "position": [92.0, 1.0, -88.0],
-        "triggerRadius": 11.0,
-        "yawDegrees": 14.0,
-        "pitchDegrees": -5.0,
-        "goal": false,
-        "beaconColor": [0.38, 0.84, 0.62, 0.84],
+        "beaconColor": [0.40, 0.86, 0.62, 0.84],
         "beaconHeight": 5.9
       },
       {
-        "id": "mount_ainslie_rise_review",
-        "label": "Mount Ainslie Rise Review",
-        "position": [128.0, 6.5, -144.0],
-        "triggerRadius": 11.6,
-        "yawDegrees": 214.0,
-        "pitchDegrees": -6.0,
+        "id": "ginninderra_drive_review",
+        "label": "Ginninderra Drive Review",
+        "position": [-174.0, 1.0, -214.0],
+        "triggerRadius": 11.2,
+        "yawDegrees": 104.0,
+        "pitchDegrees": -5.0,
         "goal": true,
         "beaconColor": [0.40, 0.88, 0.60, 0.88],
         "beaconHeight": 6.2
       }
     ]
   },
+  "reviewPack": {
+    "title": "Canberra Review Pack Baseline",
+    "summary": "Reference-backed Woden-to-Belconnen atlas baseline carried forward into the first combat-lane rehearsal.",
+    "referenceGallery": "CanberraReferenceGallery",
+    "textureLibrary": "Canberra Texture Library",
+    "captureFormat": "Open the map on district handoffs, raise the 4x scope on skyline stops, and use the pause shell for route-proof captures.",
+    "openRisks": [
+      "Dedicated west-basin and Black Mountain close-up photo references are still lighter than the Woden and Civic source set.",
+      "Several landmark massing blocks still rely on the shared Canberra concrete material instead of district-specific facade sources.",
+      "Comparison capture flow is still checklist-driven rather than a scripted screenshot export."
+    ],
+    "comparisonStops": [
+      {
+        "checkpointID": "woden_scope_perch",
+        "district": "Woden",
+        "sourceFocus": "Google Maps Woden core",
+        "combatLane": "Southern basin overwatch lane",
+        "captureNote": "Raise the scope and frame the Woden towers above Hindmarsh Drive."
+      },
+      {
+        "checkpointID": "state_circle_transfer",
+        "district": "State Circle",
+        "sourceFocus": "Inner-south approach references",
+        "combatLane": "Parliament south approach lane",
+        "captureNote": "Verify State Circle, Adelaide Avenue, and Sydney Avenue as one handoff."
+      },
+      {
+        "checkpointID": "east_basin_lookout",
+        "district": "East Basin",
+        "sourceFocus": "Google Maps central east basin",
+        "combatLane": "East-basin shoreline lane",
+        "captureNote": "Hold the lake edge, Kings Avenue approach, and eastern ridge in one frame."
+      },
+      {
+        "checkpointID": "constitution_axis_review",
+        "district": "Barton-Russell",
+        "sourceFocus": "Constitution Avenue axis",
+        "combatLane": "Russell transfer lane",
+        "captureNote": "Keep Constitution Avenue and Kings Avenue readable together."
+      },
+      {
+        "checkpointID": "civic_interchange_review",
+        "district": "Civic",
+        "sourceFocus": "Google Maps Civic grid",
+        "combatLane": "City-centre response lane",
+        "captureNote": "Open the map and confirm Northbourne, Alinga, and Civic massing without narration."
+      },
+      {
+        "checkpointID": "west_basin_promenade_review",
+        "district": "West Basin",
+        "sourceFocus": "West-basin shoreline references",
+        "combatLane": "West-basin embankment lane",
+        "captureNote": "Capture Commonwealth Avenue west and the shoreline handoff into Yarralumla."
+      },
+      {
+        "checkpointID": "black_mountain_scope_perch",
+        "district": "Black Mountain",
+        "sourceFocus": "Black Mountain skyline references",
+        "combatLane": "North-west overwatch lane",
+        "captureNote": "Raise the scope and frame Telstra Tower plus the Bruce saddle."
+      },
+      {
+        "checkpointID": "belconnen_town_centre_review",
+        "district": "Belconnen",
+        "sourceFocus": "Google Maps Belconnen core",
+        "combatLane": "Belconnen town-centre lane",
+        "captureNote": "Keep Belconnen Way, the interchange, and the town centre towers legible in one pass."
+      },
+      {
+        "checkpointID": "ginninderra_drive_review",
+        "district": "Ginninderra",
+        "sourceFocus": "Belconnen lake edge north",
+        "combatLane": "Ginninderra northern exit lane",
+        "captureNote": "Finish on the northern lake edge and Ginninderra Drive exit read."
+      }
+    ]
+  },
+  "combatRehearsal": {
+    "title": "Canberra Cycle 21 Contact Rehearsal",
+    "summary": "Live Woden-to-Belconnen contact pass with observer pressure, cover cues, and recovery notes anchored to the full atlas route.",
+    "exposureGuide": "Open ground is intentional; move between named cover screens before raising the optic on skyline-heavy checkpoints.",
+    "recoveryRule": "If suspicion spikes, break line of sight, re-anchor on the nearest cover screen, and retry the current lane from the latest checkpoint rather than freelancing a shortcut.",
+    "contactStops": [
+      {
+        "checkpointID": "woden_scope_perch",
+        "district": "Woden",
+        "lane": "Southern basin overwatch lane",
+        "exposure": "medium",
+        "expectedObservers": 1,
+        "coverHint": "Use Woden Interchange Screen, then settle behind Woden Scope Wall before raising the optic.",
+        "recoveryNote": "Reset behind Woden Scope Wall if the towers stay exposed."
+      },
+      {
+        "checkpointID": "state_circle_transfer",
+        "district": "State Circle",
+        "lane": "Parliament south approach lane",
+        "exposure": "medium",
+        "expectedObservers": 1,
+        "coverHint": "Treat State Circle Median as the break point before crossing the approach.",
+        "recoveryNote": "Drop back to State Circle Median before re-entering the avenue handoff."
+      },
+      {
+        "checkpointID": "kings_avenue_east_review",
+        "district": "Kings Avenue East",
+        "lane": "Kings Avenue transfer lane",
+        "exposure": "medium",
+        "expectedObservers": 1,
+        "coverHint": "Use Kings Avenue Screen before stepping into the east-basin transfer.",
+        "recoveryNote": "Re-enter from the Kings Avenue Screen instead of pushing the open shoulder."
+      },
+      {
+        "checkpointID": "east_basin_lookout",
+        "district": "East Basin",
+        "lane": "East-basin shoreline lane",
+        "exposure": "high",
+        "expectedObservers": 1,
+        "coverHint": "Use East Basin Survey Wall before holding the shoreline and ridge in scope.",
+        "recoveryNote": "Reset to East Basin Survey Wall if the lookout stays hot."
+      },
+      {
+        "checkpointID": "constitution_axis_review",
+        "district": "Barton-Russell",
+        "lane": "Russell transfer lane",
+        "exposure": "medium",
+        "expectedObservers": 1,
+        "coverHint": "Constitution Axis Screen is the last safe stop before the basin-core crossing.",
+        "recoveryNote": "Recover behind Constitution Axis Screen and restart the crossing from there."
+      },
+      {
+        "checkpointID": "civic_interchange_review",
+        "district": "Civic",
+        "lane": "City-centre response lane",
+        "exposure": "high",
+        "expectedObservers": 1,
+        "coverHint": "Use Civic Interchange Screen before checking the Northbourne and Alinga read.",
+        "recoveryNote": "Let the grid cool from Civic Interchange Screen before another peek."
+      },
+      {
+        "checkpointID": "west_basin_promenade_review",
+        "district": "West Basin",
+        "lane": "West-basin embankment lane",
+        "exposure": "medium",
+        "expectedObservers": 1,
+        "coverHint": "West Basin Screen protects the embankment handoff before the shoreline opens.",
+        "recoveryNote": "Recover to West Basin Screen before pushing the promenade again."
+      },
+      {
+        "checkpointID": "black_mountain_scope_perch",
+        "district": "Black Mountain",
+        "lane": "North-west overwatch lane",
+        "exposure": "high",
+        "expectedObservers": 1,
+        "coverHint": "Use Tower Footing Screen before exposing the Telstra Tower perch.",
+        "recoveryNote": "Drop to Tower Footing Screen if the Bruce saddle stays watched."
+      },
+      {
+        "checkpointID": "belconnen_town_centre_review",
+        "district": "Belconnen",
+        "lane": "Belconnen town-centre lane",
+        "exposure": "medium",
+        "expectedObservers": 1,
+        "coverHint": "Belconnen Median Screen is the safe pause before the interchange towers.",
+        "recoveryNote": "Reset to Belconnen Median Screen before re-entering the town-centre lane."
+      },
+      {
+        "checkpointID": "ginninderra_drive_review",
+        "district": "Ginninderra",
+        "lane": "Ginninderra northern exit lane",
+        "exposure": "medium",
+        "expectedObservers": 1,
+        "coverHint": "Use Ginninderra Access Screen before finishing on the northern exit read.",
+        "recoveryNote": "Break contact at Ginninderra Access Screen, then finish the lane on the retry."
+      }
+    ]
+  },
   "detection": {
-    "suspicionDecayPerSecond": 0.28,
-    "failThreshold": 1.0,
-    "observers": []
+    "suspicionDecayPerSecond": 0.30,
+    "failThreshold": 1.15,
+    "observers": [
+      {
+        "id": "woden_interchange_watch",
+        "label": "Woden Interchange Watch",
+        "position": [22.0, 2.1, 162.0],
+        "yawDegrees": 300.0,
+        "pitchDegrees": -6.0,
+        "range": 24.0,
+        "fieldOfViewDegrees": 54.0,
+        "suspicionPerSecond": 0.20,
+        "markerColor": [0.92, 0.46, 0.30, 0.94]
+      },
+      {
+        "id": "state_circle_watch",
+        "label": "State Circle Watch",
+        "position": [18.0, 1.9, 30.0],
+        "yawDegrees": 290.0,
+        "pitchDegrees": -5.0,
+        "range": 28.0,
+        "fieldOfViewDegrees": 52.0,
+        "suspicionPerSecond": 0.18,
+        "markerColor": [0.94, 0.48, 0.32, 0.94]
+      },
+      {
+        "id": "east_basin_shore_watch",
+        "label": "East Basin Shore Watch",
+        "position": [92.0, 2.2, -8.0],
+        "yawDegrees": 290.0,
+        "pitchDegrees": -4.0,
+        "range": 38.0,
+        "fieldOfViewDegrees": 50.0,
+        "suspicionPerSecond": 0.19,
+        "markerColor": [0.94, 0.50, 0.34, 0.94]
+      },
+      {
+        "id": "constitution_axis_watch",
+        "label": "Constitution Axis Watch",
+        "position": [90.0, 2.0, -74.0],
+        "yawDegrees": 315.0,
+        "pitchDegrees": -4.0,
+        "range": 26.0,
+        "fieldOfViewDegrees": 48.0,
+        "suspicionPerSecond": 0.20,
+        "markerColor": [0.94, 0.52, 0.34, 0.94]
+      },
+      {
+        "id": "civic_grid_watch",
+        "label": "Civic Grid Watch",
+        "position": [30.0, 2.2, -128.0],
+        "yawDegrees": 60.0,
+        "pitchDegrees": -4.0,
+        "range": 24.0,
+        "fieldOfViewDegrees": 50.0,
+        "suspicionPerSecond": 0.21,
+        "markerColor": [0.96, 0.54, 0.34, 0.94]
+      },
+      {
+        "id": "west_basin_watch",
+        "label": "West Basin Watch",
+        "position": [-72.0, 2.0, -28.0],
+        "yawDegrees": 256.0,
+        "pitchDegrees": -4.0,
+        "range": 30.0,
+        "fieldOfViewDegrees": 50.0,
+        "suspicionPerSecond": 0.18,
+        "markerColor": [0.94, 0.50, 0.32, 0.94]
+      },
+      {
+        "id": "black_mountain_watch",
+        "label": "Black Mountain Watch",
+        "position": [-74.0, 18.5, -150.0],
+        "yawDegrees": 42.0,
+        "pitchDegrees": -6.0,
+        "range": 28.0,
+        "fieldOfViewDegrees": 46.0,
+        "suspicionPerSecond": 0.22,
+        "markerColor": [0.96, 0.56, 0.34, 0.94]
+      },
+      {
+        "id": "belconnen_town_watch",
+        "label": "Belconnen Town Watch",
+        "position": [-152.0, 2.2, -182.0],
+        "yawDegrees": 54.0,
+        "pitchDegrees": -4.0,
+        "range": 24.0,
+        "fieldOfViewDegrees": 50.0,
+        "suspicionPerSecond": 0.20,
+        "markerColor": [0.94, 0.50, 0.32, 0.94]
+      },
+      {
+        "id": "ginninderra_exit_watch",
+        "label": "Ginninderra Exit Watch",
+        "position": [-190.0, 2.0, -208.0],
+        "yawDegrees": 69.0,
+        "pitchDegrees": -4.0,
+        "range": 22.0,
+        "fieldOfViewDegrees": 48.0,
+        "suspicionPerSecond": 0.19,
+        "markerColor": [0.92, 0.48, 0.30, 0.94]
+      }
+    ]
   },
   "guidance": {
     "coverPoints": [
       {
-        "id": "scope_terrace_wall",
-        "label": "Scope Terrace Wall",
+        "id": "woden_interchange_cover",
+        "label": "Woden Interchange Screen",
         "kind": "cover",
-        "position": [84.0, 22.0, 6.0],
-        "yawDegrees": 350.0,
+        "position": [12.0, 1.1, 168.0],
+        "yawDegrees": 88.0,
         "color": [0.30, 0.78, 0.58, 0.92],
-        "height": 1.10
+        "height": 1.06
       },
       {
-        "id": "kings_bridge_cover",
-        "label": "Kings Bridge Screen",
+        "id": "woden_scope_cover",
+        "label": "Woden Scope Wall",
         "kind": "cover",
-        "position": [54.0, 1.0, -22.0],
-        "yawDegrees": 16.0,
-        "color": [0.32, 0.80, 0.60, 0.92],
-        "height": 1.00
-      },
-      {
-        "id": "russell_bridge_cover",
-        "label": "Russell Bridge Screen",
-        "kind": "cover",
-        "position": [112.0, 4.2, -54.0],
-        "yawDegrees": 68.0,
-        "color": [0.34, 0.80, 0.60, 0.92],
-        "height": 1.02
-      },
-      {
-        "id": "barton_foreshore_cover",
-        "label": "Barton Foreshore Screen",
-        "kind": "cover",
-        "position": [98.0, 1.2, 0.0],
-        "yawDegrees": 344.0,
-        "color": [0.34, 0.80, 0.62, 0.92],
-        "height": 1.04
-      },
-      {
-        "id": "civic_median_cover",
-        "label": "City Hill Civic Screen",
-        "kind": "cover",
-        "position": [52.0, 2.6, -116.0],
-        "yawDegrees": 90.0,
-        "color": [0.33, 0.80, 0.62, 0.92],
+        "position": [10.0, 2.0, 154.0],
+        "yawDegrees": 2.0,
+        "color": [0.31, 0.79, 0.59, 0.92],
         "height": 1.08
       },
       {
-        "id": "civic_grid_cover",
-        "label": "Civic Grid Screen",
+        "id": "state_circle_cover",
+        "label": "State Circle Median",
         "kind": "cover",
-        "position": [64.0, 1.2, -144.0],
-        "yawDegrees": 90.0,
+        "position": [0.0, 0.45, 23.0],
+        "yawDegrees": 0.0,
+        "color": [0.34, 0.80, 0.60, 0.92],
+        "height": 0.94
+      },
+      {
+        "id": "kings_avenue_cover",
+        "label": "Kings Avenue Screen",
+        "kind": "cover",
+        "position": [68.0, 1.0, -24.0],
+        "yawDegrees": 8.0,
+        "color": [0.34, 0.80, 0.62, 0.92],
+        "height": 1.00
+      },
+      {
+        "id": "east_basin_cover",
+        "label": "East Basin Survey Wall",
+        "kind": "cover",
+        "position": [84.0, 23.0, 6.0],
+        "yawDegrees": -10.0,
+        "color": [0.33, 0.80, 0.62, 0.92],
+        "height": 1.02
+      },
+      {
+        "id": "constitution_axis_cover",
+        "label": "Constitution Axis Screen",
+        "kind": "cover",
+        "position": [72.0, 1.0, -84.0],
+        "yawDegrees": 84.0,
+        "color": [0.34, 0.82, 0.64, 0.92],
+        "height": 1.04
+      },
+      {
+        "id": "civic_interchange_cover",
+        "label": "Civic Interchange Screen",
+        "kind": "cover",
+        "position": [46.0, 1.0, -140.0],
+        "yawDegrees": 4.0,
+        "color": [0.33, 0.80, 0.62, 0.92],
+        "height": 1.06
+      },
+      {
+        "id": "west_basin_cover",
+        "label": "West Basin Screen",
+        "kind": "cover",
+        "position": [-84.0, 1.0, -38.0],
+        "yawDegrees": 8.0,
         "color": [0.34, 0.82, 0.64, 0.92],
         "height": 1.06
       },
       {
-        "id": "anzac_parade_cover",
-        "label": "Anzac Parade Screen",
+        "id": "tower_footing_cover",
+        "label": "Tower Footing Screen",
         "kind": "cover",
-        "position": [96.0, 1.0, -96.0],
-        "yawDegrees": 12.0,
-        "color": [0.34, 0.82, 0.66, 0.92],
-        "height": 1.10
+        "position": [-84.0, 18.0, -144.0],
+        "yawDegrees": 0.0,
+        "color": [0.32, 0.80, 0.60, 0.92],
+        "height": 1.00
       },
       {
-        "id": "mount_ainslie_cover",
-        "label": "Mount Ainslie Rise Screen",
+        "id": "belco_median_cover",
+        "label": "Belconnen Median Screen",
         "kind": "cover",
-        "position": [132.0, 6.2, -148.0],
-        "yawDegrees": 24.0,
-        "color": [0.36, 0.82, 0.66, 0.92],
-        "height": 1.12
+        "position": [-142.0, 1.2, -190.0],
+        "yawDegrees": 2.0,
+        "color": [0.33, 0.80, 0.62, 0.92],
+        "height": 1.08
+      },
+      {
+        "id": "ginninderra_cover",
+        "label": "Ginninderra Access Screen",
+        "kind": "cover",
+        "position": [-176.0, 1.1, -210.0],
+        "yawDegrees": 66.0,
+        "color": [0.34, 0.82, 0.66, 0.92],
+        "height": 1.10
       }
     ],
     "signposts": [
       {
-        "id": "lake_axis_sign",
-        "label": "Lake Basin Scope Lane",
+        "id": "woden_town_centre_sign",
+        "label": "Woden Town Centre Staging",
         "kind": "signpost",
-        "position": [70.0, 22.0, 2.0],
-        "yawDegrees": 276.0,
+        "position": [18.0, 1.4, 180.0],
+        "yawDegrees": 358.0,
         "color": [0.94, 0.84, 0.38, 0.92],
         "height": 2.32
       },
       {
-        "id": "kings_bridge_sign",
-        "label": "Kings Avenue Bridge",
+        "id": "woden_scope_sign",
+        "label": "Woden Scope Perch",
         "kind": "signpost",
-        "position": [58.0, 1.6, -10.0],
-        "yawDegrees": 350.0,
+        "position": [10.0, 2.2, 154.0],
+        "yawDegrees": 356.0,
         "color": [0.94, 0.84, 0.40, 0.92],
         "height": 2.28
       },
       {
-        "id": "russell_causeway_sign",
-        "label": "Russell Causeway Frame",
+        "id": "state_circle_sign",
+        "label": "State Circle Transfer",
         "kind": "signpost",
-        "position": [120.0, 4.6, -38.0],
-        "yawDegrees": 244.0,
+        "position": [0.0, 0.6, 28.0],
+        "yawDegrees": 350.0,
         "color": [0.94, 0.84, 0.40, 0.92],
         "height": 2.30
       },
       {
-        "id": "barton_foreshore_sign",
-        "label": "Barton Foreshore",
+        "id": "kings_avenue_sign",
+        "label": "Kings Avenue East Review",
         "kind": "signpost",
-        "position": [90.0, 1.6, 8.0],
-        "yawDegrees": 338.0,
+        "position": [64.0, 1.4, -12.0],
+        "yawDegrees": 336.0,
         "color": [0.95, 0.85, 0.40, 0.92],
         "height": 2.28
       },
       {
-        "id": "parliament_axis_sign",
-        "label": "Parliament Scope Axis",
+        "id": "east_basin_sign",
+        "label": "East Basin Lookout",
         "kind": "signpost",
-        "position": [0.0, 1.2, -0.8],
-        "yawDegrees": 0.0,
+        "position": [96.0, 23.2, 16.0],
+        "yawDegrees": 304.0,
         "color": [0.95, 0.85, 0.40, 0.92],
         "height": 2.28
       },
       {
-        "id": "city_hill_sign",
-        "label": "City Hill Arterials",
+        "id": "constitution_axis_sign",
+        "label": "Constitution Axis Review",
         "kind": "signpost",
-        "position": [48.0, 3.4, -108.0],
-        "yawDegrees": 214.0,
+        "position": [74.0, 1.3, -84.0],
+        "yawDegrees": 286.0,
         "color": [0.95, 0.86, 0.40, 0.92],
         "height": 2.30
       },
       {
-        "id": "civic_grid_sign",
-        "label": "Civic Grid",
+        "id": "civic_interchange_sign",
+        "label": "Civic Interchange",
         "kind": "signpost",
-        "position": [40.0, 1.6, -128.0],
-        "yawDegrees": 8.0,
+        "position": [44.0, 1.4, -132.0],
+        "yawDegrees": 2.0,
         "color": [0.96, 0.86, 0.40, 0.92],
         "height": 2.32
       },
       {
-        "id": "anzac_parade_sign",
-        "label": "Anzac Parade North",
+        "id": "west_basin_sign",
+        "label": "West Basin Promenade",
         "kind": "signpost",
-        "position": [90.0, 1.4, -82.0],
-        "yawDegrees": 16.0,
+        "position": [-96.0, 1.2, -18.0],
+        "yawDegrees": 278.0,
         "color": [0.94, 0.86, 0.42, 0.92],
         "height": 2.32
       },
       {
-        "id": "mount_ainslie_sign",
-        "label": "Mount Ainslie Rise",
+        "id": "telstra_tower_sign",
+        "label": "Telstra Tower Frame",
         "kind": "signpost",
-        "position": [126.0, 6.8, -138.0],
-        "yawDegrees": 26.0,
-        "color": [0.96, 0.88, 0.42, 0.94],
-        "height": 2.38
+        "position": [-86.0, 18.3, -136.0],
+        "yawDegrees": 214.0,
+        "color": [0.94, 0.84, 0.40, 0.92],
+        "height": 2.28
+      },
+      {
+        "id": "black_mountain_scope_sign",
+        "label": "Black Mountain Scope Lane",
+        "kind": "signpost",
+        "position": [-58.0, 11.3, -166.0],
+        "yawDegrees": 302.0,
+        "color": [0.94, 0.84, 0.38, 0.92],
+        "height": 2.32
+      },
+      {
+        "id": "belconnen_way_sign",
+        "label": "Belconnen Way",
+        "kind": "signpost",
+        "position": [-116.0, 1.4, -170.0],
+        "yawDegrees": 344.0,
+        "color": [0.95, 0.85, 0.40, 0.92],
+        "height": 2.28
+      },
+      {
+        "id": "belconnen_interchange_sign",
+        "label": "Belconnen Interchange",
+        "kind": "signpost",
+        "position": [-146.0, 1.6, -198.0],
+        "yawDegrees": 12.0,
+        "color": [0.95, 0.86, 0.40, 0.92],
+        "height": 2.30
+      },
+      {
+        "id": "ginninderra_sign",
+        "label": "Ginninderra Approach",
+        "kind": "signpost",
+        "position": [-172.0, 1.3, -206.0],
+        "yawDegrees": 104.0,
+        "color": [0.94, 0.86, 0.42, 0.92],
+        "height": 2.32
       },
       {
         "id": "scope_lane_sign",
-        "label": "Raise 4x Scope",
+        "label": "Raise 4x Scope On Skyline Markers",
         "kind": "signpost",
-        "position": [104.0, 22.0, 24.0],
-        "yawDegrees": 286.0,
+        "position": [-48.0, 11.6, -160.0],
+        "yawDegrees": 300.0,
         "color": [0.90, 0.82, 0.34, 0.92],
         "height": 2.30
       }
@@ -394,7 +831,56 @@
       "color": [0.29, 0.35, 0.32, 1.0]
     }
   ],
-  "assetInstances": [],
+  "assetInstances": [
+    {
+      "category": "Props",
+      "name": "Compass_Open",
+      "position": [18.0, 1.0, 178.0],
+      "targetExtent": 0.8,
+      "yawDegrees": 92.0
+    },
+    {
+      "category": "Accessories",
+      "name": "Flashlight",
+      "position": [94.0, 22.0, 14.0],
+      "targetExtent": 0.9,
+      "yawDegrees": 42.0
+    },
+    {
+      "category": "Accessories",
+      "name": "Scope_2",
+      "position": [-54.0, 11.0, -170.0],
+      "targetExtent": 1.6,
+      "yawDegrees": 22.0,
+      "material": {
+        "roughness": 0.22
+      }
+    },
+    {
+      "category": "Props",
+      "name": "Backpack",
+      "position": [-138.0, 1.2, -188.0],
+      "targetExtent": 1.1,
+      "yawDegrees": 38.0,
+      "material": {
+        "roughness": 0.94
+      }
+    },
+    {
+      "category": "Guns",
+      "name": "Rifle",
+      "position": [42.0, 1.0, -142.0],
+      "targetExtent": 1.45,
+      "yawDegrees": 18.0
+    },
+    {
+      "category": "Guns",
+      "name": "SMG",
+      "position": [-132.0, 1.2, -194.0],
+      "targetExtent": 1.1,
+      "yawDegrees": 74.0
+    }
+  ],
   "includedSectors": [
     "mount_ainslie_campbell_sector",
     "east_basin_overlook_sector",

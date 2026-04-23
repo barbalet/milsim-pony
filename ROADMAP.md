@@ -153,6 +153,7 @@ Exit criteria:
 | `18` | Belconnen and Black Mountain pass | Extend long-range culling, collision support, and texture streaming coverage across denser northern district targets | Improve skyline layering and atlas readability for Black Mountain and Belconnen while texturing northern-district landmarks, blockers, and supporting drawables | Densify Belconnen Town Centre, Bruce, Ginninderra approaches, and Black Mountain connectors, and add Canberra-sourced northern-district materials under `MilsimPonyGame/Assets/Textures/` | Add Belconnen district review flow and long-range validation metrics | Belconnen and Black Mountain read as distinct, navigable components of the atlas, and their shipped drawable set is texture-complete |
 | `19` | Cross-district route integration | Tune streaming, restart, route logic, and texture-audit reporting for a longer multi-district survey | Polish route visibility, map-state feedback, screenshot-ready overlays, and close remaining texture-binding gaps across the full review route | Close remaining holes between Woden, Civic, the lake, Black Mountain, and Belconnen, and expand `MilsimPonyGame/Assets/Textures/` with any missing Canberra-derived materials needed for full route coverage | Build one review loop that samples every major district and atlas corridor | A single route proves the expanded Canberra atlas without developer explanation, and any remaining untextured drawables are reduced to a reviewed final punch list |
 | `20` | Reference-backed review pack | Lock data interfaces for capture automation, comparison notes, regression review, and final drawable texture validation | Polish review overlays, capture framing, atlas presentation, and the final per-drawable texture pass for release candidates | Finalize the first reference-backed Canberra package with curated Google Maps, in-game gallery assets, and the complete Canberra texture library in `MilsimPonyGame/Assets/Textures/` | Ship a review pack, smoke test, and capture notes that connect atlas work to future combat lanes | Reviewers can compare the in-game Canberra atlas against source references and confirm that every shipped scene drawable has a Canberra-sourced texture assignment |
+| `21` | Combat-lane rehearsal | Promote review-pack lane notes into live checkpoint metadata, threat overlays, and basin-scale observer pressure | Surface next-contact cues, threat rings, recovery lines, and rehearsal summaries directly in the HUD and overhead map | Reuse the full Woden-to-Belconnen atlas route as the first combat rehearsal with live observers, cover guidance, and checkpoint recovery notes | Ship a combat rehearsal brief, smoke test, and updated lane documentation | One route proves Canberra readability, observer pressure, and checkpoint recovery together without losing the atlas framing |
 
 ## Standard Cycle Cadence
 
@@ -160,7 +161,7 @@ Exit criteria:
 - `Week 2`: integrate terrain, roads, landmarks, textures, streaming, and review viewpoints until the demo reads as Canberra without developer narration.
 - `Week 3`: use only when needed for reference correction, new source-image intake under `MilsimPonyGame/Assets/Textures/`, world-data rebuilds, performance cleanup, and another review pass if the coverage gate is still not met.
 
-For cycles `15` to `20`, use `Week 1` to lock Google Maps, official Canberra reference captures, and Canberra texture-source needs, `Week 2` to author and integrate the district pass plus update `MilsimPonyGame/Assets/Textures/`, and `Week 3` to capture gallery deltas, add any missing Canberra source images, and fix atlas or texture-coverage regressions.
+For cycles `15` to `21`, use `Week 1` to lock Google Maps, official Canberra reference captures, Canberra texture-source needs, and the exact live lane cues needed for the current pass, `Week 2` to author and integrate the district or combat rehearsal pass plus update `MilsimPonyGame/Assets/Textures/`, and `Week 3` to capture gallery deltas, add any missing Canberra source images, and fix atlas, texture-coverage, or threat-overlay regressions.
 
 ## Recommended Sequencing Rules
 
@@ -173,15 +174,15 @@ For cycles `15` to `20`, use `Week 1` to lock Google Maps, official Canberra ref
 - Do not ship the sniper rifle until the map supports stable distant observation and reliable long-range collision.
 - Add fidelity in layers: basin coverage first, then higher resolution around travel lanes, landmarks, and sniper perches.
 - Treat the online reference gallery as production data: every district pass should add or replace source captures when the target streets change.
-- Require each cycle from `15` to `20` to improve both the atlas overlay and the in-world district pass.
+- Require each cycle from `15` to `21` to improve both the atlas overlay and the in-world district pass.
 - Treat `MilsimPonyGame/Assets/Textures/` as the canonical Canberra texture library: source captures, provenance notes, and derived outputs should live there rather than in ad hoc side directories.
-- Do not close a cycle from `15` to `20` while shipped drawables added or revised in that pass still lack Canberra-sourced texture assignments.
+- Do not close a cycle from `15` to `21` while shipped drawables added or revised in that pass still lack Canberra-sourced texture assignments.
 
 ## Near-Term Next Actions
 
 1. Lock the street-atlas sector list and district naming for Civic, Barton-Russell, Woden, Belconnen, Mount Ainslie, and the west basin.
 2. Capture baseline Google Maps and official ACT transport references for each district and keep them in a reviewable gallery.
 3. Densify the road network so the overhead map shows a convincing Canberra street structure rather than only coarse traversal lanes.
-4. Build a longer review route that proves the atlas reads across the full Woden-to-Belconnen package before another combat-heavy pass is accepted.
+4. Keep the Woden-to-Belconnen route stable while tuning live observer placement, cover cues, and checkpoint recovery for the first combat rehearsal.
 5. Audit every current scene drawable that still falls back to flat-color treatment and map it to a Canberra texture task.
-6. Expand `MilsimPonyGame/Assets/Textures/Origin/` and `MilsimPonyGame/Assets/Textures/Final/` with additional Canberra source images and derived materials until the review build has no untextured shipped drawables.
+6. Expand `MilsimPonyGame/Assets/Textures/Origin/` and `MilsimPonyGame/Assets/Textures/Final/` with additional Canberra source images and derived materials until the rehearsal build has no untextured shipped drawables.

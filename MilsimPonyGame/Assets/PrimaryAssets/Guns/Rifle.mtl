@@ -11,3 +11,6 @@ Ni 1.450000
 d 1.000000
 illum 1
 map_Kd Zombie_Atlas.png
+norm Zombie_Atlas_normal.png
+map_Pr Zombie_Atlas_roughness.png
+map_AO Zombie_Atlas_ao.png

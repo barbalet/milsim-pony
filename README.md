@@ -4,22 +4,22 @@
 
 ## Game Overview
 
-The current default build launches into **Canberra Civic, Barton, And Russell Atlas Review**, a basin-scale demo that starts on an elevated perch above the east basin and sends the player across a sequence of authored district review points. The route is designed to confirm that the world remains readable at distance through a 4x scope, especially around Lake Burley Griffin, Kings Avenue bridge, Russell, Barton, City Hill, Civic, Anzac Parade, and Mount Ainslie.
+The current default build launches into **Canberra Combat-Lane Rehearsal**, a cycle `21` pass that keeps the Woden-to-Belconnen route from cycle `20` but turns the locked review pack into a live contact rehearsal. The route is designed to prove that the world remains readable at distance through a 4x scope while the HUD, overhead map, cover cues, and observer pressure now expose the next combat lane without losing the named road and district read.
 
-At the moment, the game is more of a traversal and observation prototype than a complete combat sandbox. You move on foot through the authored route, use the scope to inspect distant landmarks, and open the overhead map to keep your bearings, confirm which sector of Canberra you are in, and read the named road network that is now drawn into the atlas overlay. The HUD, route markers, pause flow, settings screen, checkpoint restarts, and completion shell are already implemented so the build can be used as a repeatable review demo.
+At the moment, the game is still a rehearsal build rather than a complete combat sandbox. You move on foot through the authored route, use the scope to inspect distant landmarks, and open the overhead map to keep your bearings, confirm which sector of Canberra you are in, read the named road network, and see where the next threat lane and watcher pressure live. The HUD, route markers, pause flow, settings screen, checkpoint restarts, and completion shell are already implemented so the build can be used as a repeatable review demo.
 
 The broader project goal is a playable Canberra milsim with long-range combat support, stable distant rendering, and a usable sniper rifle. The current scene is the foundation for that work: it proves the world scale, sightlines, streaming behavior, district coverage, and scoped viewing path that later weapon systems will rely on.
 
 ## Current Demo Loop
 
 1. Launch the game and begin from the briefing shell.
-2. Spawn at the East Basin scope terrace.
-3. Walk or sprint between the authored district-atlas checkpoints.
-4. Raise the 4x scope at review points to inspect distant Canberra features and the central district connectors around Civic, Barton, Russell, and Mount Ainslie.
-5. Open the overhead map whenever you need sector context, checkpoint progress, or the named road atlas.
+2. Spawn at the Woden town-centre staging point.
+3. Walk or sprint through the authored cross-district checkpoints from Woden to Belconnen.
+4. Raise the 4x scope at review points to inspect the Woden towers, lake edge, Civic skyline, West Basin handoff, Black Mountain skyline, and Belconnen approaches.
+5. Open the overhead map whenever you need sector context, checkpoint progress, comparison-stop notes, contact-lane cues, threat rings, or the named road atlas.
 6. Pause, restart, retry, or return to briefing as needed.
 
-The repository also contains an earlier Parliament House escape scenario with detection, observer pressure, and checkpoint fallback logic. The default world manifest now points at the wider Canberra street-atlas review build instead of that smaller escape slice.
+The repository also contains an earlier Parliament House escape scenario with detection, observer pressure, and checkpoint fallback logic. The default world manifest now points at the wider Canberra combat-rehearsal build instead of that smaller escape slice.
 
 ## Controls
 
@@ -41,13 +41,13 @@ Click inside the game window first so the Metal view becomes the active input ta
 
 ## What The Player Is Doing
 
-This build is not about firefights yet. The player is acting as a field observer moving through a guided Canberra survey route:
+This build is not about firefights yet. The player is acting as a field observer moving through a guided Canberra contact rehearsal:
 
 - Validate that major Canberra landmarks and arterial streets are visible and readable at long range.
 - Confirm that scoped rendering remains stable across distant terrain and skyline silhouettes.
-- Move between authored perches that test different basin sightlines and district connectors.
-- Use the overhead map to understand current location, sector, road network, and route progress.
-- Replay the route quickly to compare world-data, streaming, and rendering changes between cycles.
+- Move between authored perches that test the Woden-to-Belconnen handoff instead of only isolated district slices.
+- Use the overhead map to understand current location, sector, road network, contact lane, and route progress.
+- Replay the route quickly to compare world-data, streaming, observer pressure, and rendering changes between cycles.
 
 ## Build And Run
 
@@ -82,4 +82,4 @@ You can also open [MilsimPonyGame.xcodeproj](/Users/barbalet/github/milsim-pony/
 
 ## Current Focus
 
-The active direction for the project is basin-scale Canberra coverage from Woden to Belconnen, with Lake Burley Griffin as a readable anchor, a district street atlas in the overhead map, and the 4x scope as the core validation tool. The live build is now on cycle `17`, pushing the Civic, Barton, Russell, east-basin, and Mount Ainslie pass ahead of the later Belconnen and route-integration updates before the next major push toward a sniper-capable milsim.
+The active direction for the project is basin-scale Canberra coverage from Woden to Belconnen, with Lake Burley Griffin as a readable anchor, a district street atlas in the overhead map, and the 4x scope as the core validation tool. The live build is now on cycle `21`, using the locked review pack as the baseline for the first contact-lane rehearsal so the atlas, source gallery, texture library, cover cues, and live observer pressure can be reviewed in one pass.

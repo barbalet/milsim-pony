@@ -33,9 +33,13 @@ struct MetalGameView: NSViewRepresentable {
         if let renderer = GameRenderer(view: metalView, session: session) {
             context.coordinator.renderer = renderer
             metalView.delegate = renderer
-            session.noteRendererReady(deviceName: renderer.deviceName)
+            DispatchQueue.main.async {
+                session.noteRendererReady(deviceName: renderer.deviceName)
+            }
         } else {
-            session.noteRendererUnavailable()
+            DispatchQueue.main.async {
+                session.noteRendererUnavailable()
+            }
         }
 
         return metalView
@@ -43,14 +47,17 @@ struct MetalGameView: NSViewRepresentable {
 
     func updateNSView(_ nsView: InputTrackingMetalView, context: Context) {
         context.coordinator.session = session
+        context.coordinator.syncInputFocusRequest(with: nsView, session: session)
     }
 
     final class Coordinator: NSObject, InputTrackingMetalViewDelegate {
         var session: GameSession
         var renderer: GameRenderer?
+        private var handledInputFocusRequestID = 0
 
         init(session: GameSession) {
             self.session = session
+            self.handledInputFocusRequestID = session.inputFocusRequestID
         }
 
         func inputView(
@@ -75,6 +82,15 @@ struct MetalGameView: NSViewRepresentable {
         func inputViewDidBecomeActive(_ view: InputTrackingMetalView) {
             session.noteViewActivation()
         }
+
+        func syncInputFocusRequest(with view: InputTrackingMetalView, session: GameSession) {
+            guard handledInputFocusRequestID != session.inputFocusRequestID else {
+                return
+            }
+
+            handledInputFocusRequestID = session.inputFocusRequestID
+            view.captureInputFocus()
+        }
     }
 }
 
@@ -98,7 +114,13 @@ final class InputTrackingMetalView: MTKView {
         window?.acceptsMouseMovedEvents = true
         window?.makeFirstResponder(self)
         installLocalKeyMonitorIfNeeded()
-        inputDelegate?.inputViewDidBecomeActive(self)
+        DispatchQueue.main.async { [weak self] in
+            guard let self else {
+                return
+            }
+
+            self.inputDelegate?.inputViewDidBecomeActive(self)
+        }
     }
 
     override func updateTrackingAreas() {
@@ -122,8 +144,21 @@ final class InputTrackingMetalView: MTKView {
     }
 
     override func mouseDown(with event: NSEvent) {
-        window?.makeFirstResponder(self)
+        captureInputFocus()
         super.mouseDown(with: event)
+    }
+
+    func captureInputFocus() {
+        guard let window else {
+            return
+        }
+
+        if !window.isKeyWindow {
+            window.makeKeyAndOrderFront(nil)
+        }
+        window.acceptsMouseMovedEvents = true
+        window.makeFirstResponder(self)
+        inputDelegate?.inputViewDidBecomeActive(self)
     }
 
     override func keyDown(with event: NSEvent) {

@@ -171,10 +171,21 @@ Exit gate:
 
 - A reference-backed Canberra review pack is ready for the next combat-focused phase.
 
+### Cycle 21: Combat-Lane Rehearsal
+
+- Keep the same Woden-to-Belconnen route, but promote the lane notes into live combat-rehearsal metadata with named exposure and recovery cues.
+- Add the first basin-scale observer placements so the route can fail, recover, and continue without collapsing the Canberra district read.
+- Surface the next contact lane, cover hint, and watcher pressure directly in the HUD and overhead map.
+- Keep the reference gallery and texture audit as the baseline so the first combat-focused pass still stays anchored to real Canberra targets.
+
+Exit gate:
+
+- One coherent route proves Canberra readability, live observer pressure, and checkpoint recovery together without extra explanation.
+
 ## Sequencing Rules
 
 - Do not prioritize another narrow route slice ahead of basin-scale coverage.
 - Do not ship the sniper rifle before the map can support long-range observation at useful fidelity.
 - Treat Lake Burley Griffin and the basin ridgelines as world anchors for scale and orientation.
 - Treat the online reference gallery as part of the asset pipeline rather than optional documentation.
-- Every cycle from `10` to `20` must improve both Canberra readability and sniper viability, with cycles `15` to `20` also required to improve the street atlas.
+- Every cycle from `10` to `21` must improve both Canberra readability and sniper viability, with cycles `15` to `21` also required to improve the street atlas.

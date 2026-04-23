@@ -50,12 +50,18 @@ struct OverheadMapSnapshot {
     let completedCheckpointCount: Int
     let totalCheckpointCount: Int
     let nextCheckpointLabel: String?
+    let nextComparisonStop: SceneMapComparisonStop?
+    let nextCombatStop: SceneMapCombatStop?
+    let suspicionLevel: Float
+    let activeObserverCount: Int
+    let seeingObserverCount: Int
+    let failCount: Int
 }
 
 final class GameSession: ObservableObject {
     @Published private(set) var statusLine = "Bootstrapping game session"
     @Published private(set) var overlayLines: [String] = []
-    @Published private(set) var overlayTitle = "Cycle 17 Civic, Barton, Russell, And East-Basin Pass"
+    @Published private(set) var overlayTitle = "Cycle 21 Combat-Lane Rehearsal"
     @Published private(set) var demoFlowState: DemoFlowState = .title
     @Published private(set) var isSettingsPresented = false
     @Published private(set) var isScopeActive = false
@@ -63,6 +69,7 @@ final class GameSession: ObservableObject {
     @Published private(set) var hudOpacity: Double
     @Published private(set) var invertLookY: Bool
     @Published private(set) var lookSensitivityScale: Double
+    @Published private(set) var inputFocusRequestID = 0
 
     private let configuration: LaunchConfiguration
     private var pressedCommands: Set<InputCommand> = []
@@ -98,7 +105,10 @@ final class GameSession: ObservableObject {
     private var scopeFarPlaneMultiplierValue: Float = 1.35
     private var scopeReticleColorComponents = SIMD4<Float>(0.92, 0.86, 0.42, 0.94)
     private var mapConfiguration: SceneMapConfiguration?
+    private var cachedOverheadMapSnapshot: OverheadMapSnapshot?
     private var freshRunHandler: (() -> Void)?
+    private var pendingOverlayLines: [String]?
+    private var isOverlayPublishScheduled = false
 
     init(configuration: LaunchConfiguration) {
         let storedSettings = Self.loadStoredSettings()
@@ -187,7 +197,7 @@ final class GameSession: ObservableObject {
     }
 
     var scopeInstructionText: String {
-        isScopeActive ? "Press Space to lower scope" : "Raise scope on the review markers"
+        isScopeActive ? "Press Space to lower scope" : "Raise scope on the contact and skyline markers"
     }
 
     var scopeReticleColor: NSColor {
@@ -208,8 +218,17 @@ final class GameSession: ObservableObject {
     }
 
     var overheadMapSnapshot: OverheadMapSnapshot? {
+        cachedOverheadMapSnapshot
+    }
+
+    private var currentMapSectorName: String {
+        cachedOverheadMapSnapshot?.currentSectorName ?? "waiting for Canberra layout"
+    }
+
+    private func refreshOverheadMapSnapshot() {
         guard let mapConfiguration else {
-            return nil
+            cachedOverheadMapSnapshot = nil
+            return
         }
 
         let snapshot = latestSnapshot
@@ -224,13 +243,23 @@ final class GameSession: ObservableObject {
         let nextCheckpointLabel = completedCheckpointCount < mapConfiguration.checkpoints.count
             ? mapConfiguration.checkpoints[completedCheckpointCount].label
             : nil
+        let nextComparisonStop = completedCheckpointCount < mapConfiguration.checkpoints.count
+            ? mapConfiguration.comparisonStops.first { comparisonStop in
+                comparisonStop.checkpointID == mapConfiguration.checkpoints[completedCheckpointCount].id
+            }
+            : nil
+        let nextCombatStop = completedCheckpointCount < mapConfiguration.checkpoints.count
+            ? mapConfiguration.contactStops.first { contactStop in
+                contactStop.checkpointID == mapConfiguration.checkpoints[completedCheckpointCount].id
+            }
+            : nil
         let currentSectorName = preferredSectorName(
             for: mapConfiguration.sectors,
             playerX: playerX,
             playerZ: playerZ
         )
 
-        return OverheadMapSnapshot(
+        cachedOverheadMapSnapshot = OverheadMapSnapshot(
             configuration: mapConfiguration,
             playerX: playerX,
             playerZ: playerZ,
@@ -239,7 +268,13 @@ final class GameSession: ObservableObject {
             currentSectorName: currentSectorName,
             completedCheckpointCount: completedCheckpointCount,
             totalCheckpointCount: mapConfiguration.checkpoints.count,
-            nextCheckpointLabel: nextCheckpointLabel
+            nextCheckpointLabel: nextCheckpointLabel,
+            nextComparisonStop: nextComparisonStop,
+            nextCombatStop: nextCombatStop,
+            suspicionLevel: snapshot?.suspicionLevel ?? 0,
+            activeObserverCount: Int(snapshot?.activeObserverCount ?? 0),
+            seeingObserverCount: Int(snapshot?.seeingObserverCount ?? 0),
+            failCount: Int(snapshot?.failCount ?? 0)
         )
     }
 
@@ -252,7 +287,7 @@ final class GameSession: ObservableObject {
         case .failed:
             return "Compromised"
         case .complete:
-            return "Survey Complete"
+            return "Rehearsal Complete"
         case .settings:
             return "Field Settings"
         }
@@ -261,7 +296,7 @@ final class GameSession: ObservableObject {
     func menuSubtitle(for panel: GameMenuPanel) -> String {
         switch panel {
         case .title:
-            return sceneReady ? overlayTitle : "Loading Canberra street atlas review"
+            return sceneReady ? overlayTitle : "Loading Canberra combat rehearsal"
         case .paused:
             return routeSummary
         case .failed:
@@ -323,6 +358,32 @@ final class GameSession: ObservableObject {
         rebuildOverlay()
     }
 
+    func noteSceneBootstrap(
+        label: String,
+        summary: String,
+        details: [String],
+        overlayTitle: String,
+        scopeConfiguration: ScopeConfiguration,
+        mapConfiguration: SceneMapConfiguration
+    ) {
+        sceneLabel = label
+        sceneSummary = summary
+        sceneDetails = details
+        sceneReady = true
+        statusLine = "Demo briefing ready"
+        self.overlayTitle = overlayTitle
+        scopeLabel = scopeConfiguration.label ?? "4x Scope"
+        scopeMagnification = max(scopeConfiguration.magnification, 1.0)
+        scopeFieldOfViewDegrees = max(scopeConfiguration.fieldOfViewDegrees, 4.0)
+        scopeLookSensitivityMultiplier = max(scopeConfiguration.lookSensitivityMultiplier ?? 0.26, 0.08)
+        scopeDrawDistanceMultiplier = max(scopeConfiguration.drawDistanceMultiplier ?? 2.4, 1.0)
+        scopeFarPlaneMultiplierValue = max(scopeConfiguration.farPlaneMultiplier ?? 1.35, 1.0)
+        scopeReticleColorComponents = scopeConfiguration.reticleColorVector
+        self.mapConfiguration = mapConfiguration
+        refreshOverheadMapSnapshot()
+        rebuildOverlay()
+    }
+
     func noteScopeConfiguration(_ configuration: ScopeConfiguration) {
         scopeLabel = configuration.label ?? "4x Scope"
         scopeMagnification = max(configuration.magnification, 1.0)
@@ -336,6 +397,7 @@ final class GameSession: ObservableObject {
 
     func noteMapConfiguration(_ configuration: SceneMapConfiguration) {
         mapConfiguration = configuration
+        refreshOverheadMapSnapshot()
         rebuildOverlay()
     }
 
@@ -344,11 +406,10 @@ final class GameSession: ObservableObject {
     }
 
     func noteFrameTiming(milliseconds: Double, framesPerSecond: Double, drawableCount: Int) {
-        frameTimingLine = String(
-            format: "Frame: %.2f ms / %.1f fps / %d drawables",
-            milliseconds,
-            framesPerSecond,
-            drawableCount
+        updateFrameTimingLine(
+            milliseconds: milliseconds,
+            framesPerSecond: framesPerSecond,
+            drawableCount: drawableCount
         )
         rebuildOverlay()
     }
@@ -387,7 +448,8 @@ final class GameSession: ObservableObject {
         isSettingsPresented = false
         demoFlowState = .playing
         resetMissionRuntime()
-        statusLine = "Demo live - move through the current Canberra atlas survey"
+        statusLine = "Demo live - move through the current Canberra contact rehearsal"
+        requestInputFocusIfNeeded()
         rebuildOverlay()
     }
 
@@ -400,6 +462,7 @@ final class GameSession: ObservableObject {
         demoFlowState = .playing
         clearGameplayInputState()
         statusLine = "Demo resumed"
+        requestInputFocusIfNeeded()
         rebuildOverlay()
     }
 
@@ -417,6 +480,7 @@ final class GameSession: ObservableObject {
         clearGameplayInputState()
         refreshSnapshotFromCore()
         statusLine = "Retry from latest checkpoint"
+        requestInputFocusIfNeeded()
         rebuildOverlay()
     }
 
@@ -429,7 +493,8 @@ final class GameSession: ObservableObject {
         isSettingsPresented = false
         demoFlowState = .playing
         resetMissionRuntime()
-        statusLine = "Demo restarted from a fresh district start"
+        statusLine = "Demo restarted from a fresh rehearsal start"
+        requestInputFocusIfNeeded()
         rebuildOverlay()
     }
 
@@ -460,6 +525,7 @@ final class GameSession: ObservableObject {
     func closeSettings() {
         isSettingsPresented = false
         statusLine = statusLineForCurrentFlowState()
+        requestInputFocusIfNeeded()
         rebuildOverlay()
     }
 
@@ -500,6 +566,9 @@ final class GameSession: ObservableObject {
 
         isMapPresented = value
         statusLine = value ? "Canberra map opened" : statusLineForCurrentFlowState()
+        if !value {
+            requestInputFocusIfNeeded()
+        }
         rebuildOverlay()
     }
 
@@ -625,6 +694,67 @@ final class GameSession: ObservableObject {
         routeWasFailed = snapshot.routeFailed
         latestSnapshot = snapshot
         viewportSize = drawableSize
+        refreshOverheadMapSnapshot()
+        rebuildOverlay()
+    }
+
+    func applyRendererUpdate(
+        snapshot: GameFrameSnapshot,
+        drawableSize: CGSize,
+        briefing: (summary: String, details: [String]),
+        route: (summary: String, details: [String]),
+        evasion: (summary: String, details: [String]),
+        streaming: (summary: String, details: [String]),
+        frameTiming: (milliseconds: Double, framesPerSecond: Double, drawableCount: Int)?
+    ) {
+        captureBaseTraversalIfNeeded(from: snapshot)
+
+        if demoFlowState == .playing {
+            if snapshot.routeFailed && !routeWasFailed {
+                demoFlowState = .failed
+                clearGameplayInputState()
+                statusLine = "Compromised - choose retry or restart"
+            } else if snapshot.routeComplete && !routeWasComplete {
+                demoFlowState = .complete
+                clearGameplayInputState()
+                statusLine = "Survey route complete"
+            } else if Int(snapshot.completedCheckpointCount) > completedCheckpointCount {
+                statusLine = "Checkpoint \(snapshot.completedCheckpointCount) reached"
+            }
+        }
+
+        completedCheckpointCount = Int(snapshot.completedCheckpointCount)
+        routeWasComplete = snapshot.routeComplete
+        routeWasFailed = snapshot.routeFailed
+        latestSnapshot = snapshot
+        viewportSize = drawableSize
+        briefingSummary = briefing.summary
+        briefingDetails = briefing.details
+        routeSummary = route.summary
+        routeDetails = route.details
+        evasionSummary = evasion.summary
+        evasionDetails = evasion.details
+        streamingSummary = streaming.summary
+        streamingDetails = streaming.details
+
+        if let frameTiming {
+            updateFrameTimingLine(
+                milliseconds: frameTiming.milliseconds,
+                framesPerSecond: frameTiming.framesPerSecond,
+                drawableCount: frameTiming.drawableCount
+            )
+        }
+
+        refreshOverheadMapSnapshot()
+        rebuildOverlay()
+    }
+
+    func applyRendererFrameTimingUpdate(milliseconds: Double, framesPerSecond: Double, drawableCount: Int) {
+        updateFrameTimingLine(
+            milliseconds: milliseconds,
+            framesPerSecond: framesPerSecond,
+            drawableCount: drawableCount
+        )
         rebuildOverlay()
     }
 
@@ -721,6 +851,16 @@ final class GameSession: ObservableObject {
         completedCheckpointCount = Int(snapshot.completedCheckpointCount)
         routeWasComplete = snapshot.routeComplete
         routeWasFailed = snapshot.routeFailed
+        refreshOverheadMapSnapshot()
+    }
+
+    private func updateFrameTimingLine(milliseconds: Double, framesPerSecond: Double, drawableCount: Int) {
+        frameTimingLine = String(
+            format: "Frame: %.2f ms / %.1f fps / %d drawables",
+            milliseconds,
+            framesPerSecond,
+            drawableCount
+        )
     }
 
     private func captureBaseTraversalIfNeeded(from snapshot: GameFrameSnapshot) {
@@ -793,14 +933,20 @@ final class GameSession: ObservableObject {
         } else {
             riskLine = "Threats: active observers can still trigger a checkpoint fallback if the route enters an exposed lane."
         }
+        let objectiveLine: String
+        if let routeObjective = routeDetails.first, routeObjective.hasPrefix("Objective:") {
+            objectiveLine = routeObjective
+        } else {
+            objectiveLine = "Objective: rehearse the current Canberra contact lanes and move through the authored markers from the assigned start."
+        }
 
         var lines = [
-            "Objective: survey the central-district atlas pass and move through the connected review markers from the assigned start.",
-            "Priority: validate Lake Burley Griffin, Kings Avenue bridge, Russell, Barton, City Hill, Civic, Anzac Parade, and Mount Ainslie through the 4x optic.",
+            objectiveLine,
+            String(format: "Priority: keep the authored districts readable at %.1fx while validating skyline layering, streaming handoff, and route continuity.", scopeMagnification),
             riskLine,
             "Release: \(configuration.releaseDisplayName) / \(configuration.bundleIdentifier)",
             "Content: \(configuration.contentSourceSummary)",
-            String(format: "Optic: %.1fx scope ready for live review markers.", scopeMagnification),
+            String(format: "Optic: %.1fx scope ready for live contact and skyline markers.", scopeMagnification),
             "Locator: press M at any time to raise the Canberra map.",
             "Deploy: press Space or Return, then use Esc at any time for the pause shell.",
         ]
@@ -811,11 +957,26 @@ final class GameSession: ObservableObject {
                 || detail.hasPrefix("Reference:")
         }
         lines.append(contentsOf: planningLines.prefix(3))
+        let reviewLines = sceneDetails.filter { detail in
+            detail.hasPrefix("Review Pack:")
+                || detail.hasPrefix("Reference Pack:")
+                || detail.hasPrefix("Capture Framing:")
+                || detail.hasPrefix("Texture Audit:")
+        }
+        lines.append(contentsOf: reviewLines.prefix(3))
+        let combatLines = sceneDetails.filter { detail in
+            detail.hasPrefix("Combat Rehearsal:")
+                || detail.hasPrefix("Exposure Guide:")
+                || detail.hasPrefix("Recovery Rule:")
+        }
+        lines.append(contentsOf: combatLines.prefix(2))
 
         if sceneReady {
             lines.append("Route: \(routeSummary)")
             lines.append(briefingDetails.first ?? routeSummary)
-            if briefingDetails.count > 1 {
+            if let contactLine = routeDetails.first(where: { $0.hasPrefix("Contact:") || $0.hasPrefix("Compare:") || $0.hasPrefix("Capture:") }) {
+                lines.append(contactLine)
+            } else if briefingDetails.count > 1 {
                 lines.append(briefingDetails[1])
             }
             lines.append("Slice: \(sceneSummary)")
@@ -827,17 +988,25 @@ final class GameSession: ObservableObject {
     }
 
     private func pausedPanelLines() -> [String] {
-        [
+        let contactLine = routeDetails.first(where: { $0.hasPrefix("Contact:") })
+        let coverLine = routeDetails.first(where: { $0.hasPrefix("Cover:") })
+        let compareLine = routeDetails.first(where: { $0.hasPrefix("Compare:") })
+        let captureLine = routeDetails.first(where: { $0.hasPrefix("Capture:") })
+        return [
             briefingSummary,
-            routeDetails.first ?? "Route: continue through the current review markers.",
+            routeSummary,
+            contactLine ?? compareLine ?? routeDetails.first(where: { $0.hasPrefix("Next:") }) ?? "Next: continue through the current rehearsal markers.",
+            coverLine ?? captureLine ?? sceneDetails.first(where: { $0.hasPrefix("Recovery Rule:") || $0.hasPrefix("Capture Framing:") }) ?? "Capture: keep the next district marker and atlas cues in frame.",
             evasionDetails.first ?? "Threats: preview pressure and world updates are frozen while paused.",
             String(format: "Scope: %.1fx optic %@.", scopeMagnification, isScopeActive ? "was active before the pause shell" : "can be raised again when live"),
-            "Resume keeps the current survey live. Restart rolls a fresh district start.",
+            "Resume keeps the current rehearsal live. Restart rolls a fresh rehearsal start.",
         ]
     }
 
     private func failedPanelLines() -> [String] {
         let snapshot = latestSnapshot
+        let contactLine = routeDetails.first(where: { $0.hasPrefix("Contact:") })
+        let coverLine = routeDetails.first(where: { $0.hasPrefix("Cover:") })
         return [
             String(
                 format: "Threats: %.2f suspicion / %d failures / %d observers seeing",
@@ -845,8 +1014,10 @@ final class GameSession: ObservableObject {
                 snapshot?.failCount ?? 0,
                 snapshot?.seeingObserverCount ?? 0
             ),
-            routeDetails.first ?? "Route: the latest checkpoint remains available for retry.",
-            "Retry restarts from the most recent checkpoint. Restart rolls a fresh district start.",
+            routeSummary,
+            contactLine ?? routeDetails.first(where: { $0.hasPrefix("Next:") }) ?? "Next: the latest checkpoint remains available for retry.",
+            coverLine ?? sceneDetails.first(where: { $0.hasPrefix("Recovery Rule:") }) ?? "Recovery: use cover, then re-enter the rehearsal lane from the last checkpoint.",
+            "Retry restarts from the most recent checkpoint. Restart rolls a fresh rehearsal start.",
             "Return to Briefing resets the run and leaves the demo at the title shell.",
         ]
     }
@@ -854,17 +1025,20 @@ final class GameSession: ObservableObject {
     private func completePanelLines() -> [String] {
         let snapshot = latestSnapshot
         return [
+            routeSummary,
             String(
                 format: "Run: %.1fs / %.0fm / %d restarts",
                 snapshot?.elapsedSeconds ?? 0,
                 snapshot?.routeDistanceMeters ?? 0,
                 snapshot?.restartCount ?? 0
             ),
-            "Outcome: the central Canberra districts now read as one connected atlas pass and are ready for the Belconnen-heavy follow-up.",
+            sceneDetails.first(where: { $0.hasPrefix("Review Pack:") }) ?? "Review Pack: final review pack data unavailable.",
+            sceneDetails.first(where: { $0.hasPrefix("Combat Rehearsal:") }) ?? "Combat Rehearsal: final rehearsal data unavailable.",
+            "Outcome: the current Canberra line now reads as one contact rehearsal with live observer pressure and explicit recovery cues across the full route.",
             "Release: \(configuration.releaseDisplayName) / \(configuration.contentSourceSummary)",
             String(format: "Optic: %.1fx scoped review remained available across the full route.", scopeMagnification),
-            "Script: title shell, live scope route, optional fail or retry loop, and completion summary all resolve in one session.",
-            "New Run restarts the survey immediately from a fresh district start. Briefing returns to the title shell.",
+            "Script: title shell, live contact route, optional fail or retry loop, and completion summary all resolve in one session.",
+            "New Run restarts the rehearsal immediately from a fresh contact-lane start. Briefing returns to the title shell.",
         ]
     }
 
@@ -873,7 +1047,7 @@ final class GameSession: ObservableObject {
             String(format: "Look scale: %.2fx of the authored cycle tuning", lookSensitivityScale),
             "Invert Y: \(invertLookY ? "enabled" : "disabled")",
             String(format: "Scope: %.1fx / %.1f deg / x%.1f draw", scopeMagnification, scopeFieldOfViewDegrees, scopeDrawDistanceMultiplier),
-            "Map: \(isMapPresented ? "open" : "hidden") / \(overheadMapSnapshot?.currentSectorName ?? "waiting for scene data")",
+            "Map: \(isMapPresented ? "open" : "hidden") / \(currentMapSectorName)",
             String(format: "HUD opacity: %.0f%%", hudOpacity * 100),
             "Build: \(configuration.releaseDisplayName)",
             "Bundle: \(configuration.bundleIdentifier)",
@@ -889,13 +1063,13 @@ final class GameSession: ObservableObject {
         case .playing:
             return isScopeActive
                 ? String(format: "%.1fx scope active - inspect distant landmarks", scopeMagnification)
-                : "Demo live - move through the current Canberra atlas survey"
+                : "Demo live - move through the current Canberra contact rehearsal"
         case .paused:
             return "Demo paused"
         case .failed:
             return "Compromised - choose retry or restart"
         case .complete:
-            return "Survey route complete"
+            return "Combat rehearsal complete"
         }
     }
 
@@ -916,7 +1090,7 @@ final class GameSession: ObservableObject {
             "Assets: \(shortenedPath(configuration.assetRoot))",
             "World Data: \(shortenedPath(configuration.worldDataRoot))",
             "Manifest: \(shortenedPath(configuration.worldManifestPath))",
-            "Locator: \(isMapPresented ? "Canberra map open" : "Canberra map hidden") / \(overheadMapSnapshot?.currentSectorName ?? "waiting for Canberra layout")",
+            "Locator: \(isMapPresented ? "Canberra map open" : "Canberra map hidden") / \(currentMapSectorName)",
             "Renderer: \(rendererName)",
             "Scene Summary: \(sceneSummary)",
             String(
@@ -960,7 +1134,42 @@ final class GameSession: ObservableObject {
             String(format: "Uptime: %.2fs", snapshot?.elapsedSeconds ?? 0),
         ]
 
-        overlayLines = headerLines + sceneDetails + briefingDetails + routeDetails + evasionDetails + streamingDetails + metricLines
+        publishOverlayLines(
+            headerLines + sceneDetails + briefingDetails + routeDetails + evasionDetails + streamingDetails + metricLines
+        )
+    }
+
+    private func publishOverlayLines(_ newOverlayLines: [String]) {
+        pendingOverlayLines = newOverlayLines
+
+        guard !isOverlayPublishScheduled else {
+            return
+        }
+
+        isOverlayPublishScheduled = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else {
+                return
+            }
+
+            self.isOverlayPublishScheduled = false
+            guard let pendingOverlayLines = self.pendingOverlayLines else {
+                return
+            }
+
+            self.pendingOverlayLines = nil
+            if self.overlayLines != pendingOverlayLines {
+                self.overlayLines = pendingOverlayLines
+            }
+        }
+    }
+
+    private func requestInputFocusIfNeeded() {
+        guard menuPanel == nil else {
+            return
+        }
+
+        inputFocusRequestID &+= 1
     }
 
     private func persistSettings() {

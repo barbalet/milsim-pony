@@ -9,6 +9,81 @@ enum SceneTextureKey: String, CaseIterable {
     case water = "canberra_lake_water_texture.png"
 }
 
+enum SceneTextureReference: Hashable {
+    case sceneKey(SceneTextureKey)
+    case assetRelativePath(String)
+}
+
+struct SceneMaterial {
+    let albedoTexture: SceneTextureReference?
+    let normalTexture: SceneTextureReference?
+    let roughnessTexture: SceneTextureReference?
+    let ambientOcclusionTexture: SceneTextureReference?
+    let baseColorFactor: SIMD4<Float>
+    let roughnessFactor: Float
+    let ambientOcclusionStrength: Float
+    let normalScale: Float
+
+    var hasAnyTexture: Bool {
+        albedoTexture != nil || normalTexture != nil || roughnessTexture != nil || ambientOcclusionTexture != nil
+    }
+
+    static func legacy(
+        textureKey: SceneTextureKey?,
+        baseColorFactor: SIMD4<Float> = SIMD4<Float>(1, 1, 1, 1),
+        roughnessFactor: Float = 0.88
+    ) -> SceneMaterial {
+        SceneMaterial(
+            albedoTexture: textureKey.map { .sceneKey($0) },
+            normalTexture: nil,
+            roughnessTexture: nil,
+            ambientOcclusionTexture: nil,
+            baseColorFactor: baseColorFactor,
+            roughnessFactor: roughnessFactor,
+            ambientOcclusionStrength: 1.0,
+            normalScale: 1.0
+        )
+    }
+
+    func applying(configuration: MaterialConfiguration?) -> SceneMaterial {
+        guard let configuration else {
+            return self
+        }
+
+        return SceneMaterial(
+            albedoTexture: configuration.albedoTexture.map(SceneTextureReference.assetRelativePath) ?? albedoTexture,
+            normalTexture: configuration.normalTexture.map(SceneTextureReference.assetRelativePath) ?? normalTexture,
+            roughnessTexture: configuration.roughnessTexture.map(SceneTextureReference.assetRelativePath) ?? roughnessTexture,
+            ambientOcclusionTexture: configuration.ambientOcclusionTexture.map(SceneTextureReference.assetRelativePath) ?? ambientOcclusionTexture,
+            baseColorFactor: configuration.baseColorVector ?? baseColorFactor,
+            roughnessFactor: simd_clamp(configuration.roughness ?? roughnessFactor, 0.04, 1.0),
+            ambientOcclusionStrength: simd_clamp(configuration.ambientOcclusionStrength ?? ambientOcclusionStrength, 0.0, 1.0),
+            normalScale: max(configuration.normalScale ?? normalScale, 0.0)
+        )
+    }
+}
+
+struct SceneShadowSettings {
+    let mapResolution: Int
+    let coverage: Float
+    let depthBias: Float
+    let normalBias: Float
+    let strength: Float
+    let scopeCoverageMultiplier: Float
+    let forwardOffsetMultiplier: Float
+}
+
+struct ScenePostProcessSettings {
+    let exposureBias: Float
+    let whitePoint: Float
+    let contrast: Float
+    let saturation: Float
+    let shadowTint: SIMD4<Float>
+    let highlightTint: SIMD4<Float>
+    let shadowBalance: Float
+    let vignetteStrength: Float
+}
+
 struct SceneDrawable {
     let name: String
     let vertexBuffer: MTLBuffer
@@ -19,7 +94,40 @@ struct SceneDrawable {
     let maxDrawDistance: Float
     let minimumViewDot: Float
     let textureKey: SceneTextureKey?
+    let material: SceneMaterial
     let retainedInJungleRenderer: Bool
+    let castsShadow: Bool
+    let receivesShadow: Bool
+
+    init(
+        name: String,
+        vertexBuffer: MTLBuffer,
+        vertexCount: Int,
+        modelMatrix: simd_float4x4,
+        worldCenter: SIMD3<Float>,
+        boundingRadius: Float,
+        maxDrawDistance: Float,
+        minimumViewDot: Float,
+        textureKey: SceneTextureKey?,
+        material: SceneMaterial? = nil,
+        retainedInJungleRenderer: Bool,
+        castsShadow: Bool = false,
+        receivesShadow: Bool = false
+    ) {
+        self.name = name
+        self.vertexBuffer = vertexBuffer
+        self.vertexCount = vertexCount
+        self.modelMatrix = modelMatrix
+        self.worldCenter = worldCenter
+        self.boundingRadius = boundingRadius
+        self.maxDrawDistance = maxDrawDistance
+        self.minimumViewDot = minimumViewDot
+        self.textureKey = textureKey
+        self.material = material ?? SceneMaterial.legacy(textureKey: textureKey)
+        self.retainedInJungleRenderer = retainedInJungleRenderer
+        self.castsShadow = castsShadow
+        self.receivesShadow = receivesShadow
+    }
 }
 
 struct SceneEnvironment {
@@ -33,6 +141,8 @@ struct SceneEnvironment {
     let fogNear: Float
     let fogFar: Float
     let hazeStrength: Float
+    let shadow: SceneShadowSettings
+    let postProcess: ScenePostProcessSettings
 }
 
 struct SceneDebugInfo {
@@ -53,6 +163,37 @@ struct SceneMapCheckpoint: Identifiable {
     let label: String
     let point: SceneMapPoint
     let isGoal: Bool
+}
+
+struct SceneMapComparisonStop: Identifiable {
+    let id: String
+    let checkpointID: String
+    let checkpointLabel: String
+    let district: String
+    let sourceFocus: String
+    let combatLane: String
+    let captureNote: String
+}
+
+struct SceneMapCombatStop: Identifiable {
+    let id: String
+    let checkpointID: String
+    let checkpointLabel: String
+    let district: String
+    let lane: String
+    let exposure: String
+    let expectedObservers: Int
+    let coverHint: String
+    let recoveryNote: String
+}
+
+struct SceneMapThreatObserver: Identifiable {
+    let id: String
+    let label: String
+    let point: SceneMapPoint
+    let range: Float
+    let fieldOfViewDegrees: Float
+    let markerColor: SIMD4<Float>
 }
 
 struct SceneMapRoad: Identifiable {
@@ -193,6 +334,24 @@ struct SceneMapConfiguration {
     let sectors: [SceneMapSector]
     let roads: [SceneMapRoad]
     let checkpoints: [SceneMapCheckpoint]
+    let routeName: String
+    let routeStartLabel: String
+    let routeGoalLabel: String
+    let routePlannedDistanceMeters: Float
+    let routeSectorNames: [String]
+    let reviewPackTitle: String
+    let reviewPackSummary: String
+    let referenceGallery: String
+    let textureLibrary: String
+    let captureFormat: String
+    let openRisks: [String]
+    let comparisonStops: [SceneMapComparisonStop]
+    let combatRehearsalTitle: String
+    let combatRehearsalSummary: String
+    let exposureGuide: String
+    let recoveryRule: String
+    let contactStops: [SceneMapCombatStop]
+    let threatObservers: [SceneMapThreatObserver]
 
     var width: Float {
         max(maxX - minX, 1)
@@ -218,6 +377,10 @@ struct SceneRouteInfo {
     let name: String
     let summary: String
     let checkpoints: [RouteCheckpointConfiguration]
+    let startLabel: String
+    let goalLabel: String
+    let plannedDistanceMeters: Float
+    let sectorNames: [String]
 }
 
 struct SceneRouteState {
@@ -243,6 +406,21 @@ struct SceneBriefingState {
 }
 
 final class BootstrapScene {
+    private static let terrainPatchSampleSide = 25
+    private static let terrainPatchSpacing: Float = 2.0
+    private static let terrainPatchUpdateStride: Float = terrainPatchSpacing * 0.5
+
+    private struct TerrainPatchCacheKey: Equatable {
+        let centerColumn: Int
+        let centerRow: Int
+        let profileToken: String
+    }
+
+    private struct CachedTerrainPatchState {
+        let key: TerrainPatchCacheKey
+        let patch: JungleTerrainPatch
+    }
+
     let drawables: [SceneDrawable]
     private(set) var debugInfo: SceneDebugInfo
     let environment: SceneEnvironment
@@ -259,6 +437,7 @@ final class BootstrapScene {
     private let mapConfigurationTemplate: SceneMapConfiguration
     private let groundSampler: WorldGroundSurfaceSampler
     private let spawnOptions: [SpawnConfiguration]
+    private var cachedTerrainPatchState: CachedTerrainPatchState?
 
     init(device: MTLDevice, assetRoot: String, worldDataRoot: String, worldManifestPath: String) {
         let manifestURL = URL(fileURLWithPath: worldManifestPath)
@@ -351,6 +530,7 @@ final class BootstrapScene {
     }
 
     func prepareFreshRun() {
+        cachedTerrainPatchState = nil
         let spawn = spawnOptions.randomElement() ?? debugInfoTemplate.spawn
         debugInfo = sceneDebugInfo(applying: spawn)
         mapConfiguration = sceneMapConfiguration(applying: spawn)
@@ -395,6 +575,30 @@ final class BootstrapScene {
         return SceneVisibilityState(drawables: visibleDrawables, culledCount: culledCount)
     }
 
+    func shadowCasterDrawables(
+        for cameraPosition: SIMD3<Float>,
+        scopeActive: Bool
+    ) -> [SceneDrawable] {
+        let drawIndices = Array(Set(alwaysLoadedIndices + residentDrawIndices(for: cameraPosition))).sorted()
+        let scopeDrawDistanceMultiplier = scopeActive ? max(scopeConfiguration.drawDistanceMultiplier ?? 2.4, 1) : 1
+
+        return drawIndices.compactMap { drawIndex in
+            let drawable = drawables[drawIndex]
+            guard drawable.retainedInJungleRenderer, drawable.castsShadow else {
+                return nil
+            }
+
+            let offset = drawable.worldCenter - cameraPosition
+            let distance = simd_length(offset)
+            let maximumDrawDistance = drawable.maxDrawDistance * scopeDrawDistanceMultiplier
+            guard distance - drawable.boundingRadius <= maximumDrawDistance else {
+                return nil
+            }
+
+            return drawable
+        }
+    }
+
     func makeJungleTerrainFrame(
         snapshot: GameFrameSnapshot,
         cameraPosition: SIMD3<Float>,
@@ -404,64 +608,11 @@ final class BootstrapScene {
     ) -> JungleTerrainFrame {
         let currentSector = currentMapSector(for: cameraPosition)
         let profile = terrainProfile(for: currentSector)
-        let sampleSide = 25
-        let spacing: Float = 2.0
-        let halfExtent = (Float(sampleSide - 1) * spacing) * 0.5
-        var samples: [JungleTerrainSample] = []
-        samples.reserveCapacity(sampleSide * sampleSide)
-
-        for row in 0..<sampleSide {
-            let worldZ = cameraPosition.z - halfExtent + (Float(row) * spacing)
-
-            for column in 0..<sampleSide {
-                let worldX = cameraPosition.x - halfExtent + (Float(column) * spacing)
-                let roadFactor = roadInfluence(at: SIMD2<Float>(worldX, worldZ))
-                let foliageNoise = terrainNoise(x: worldX, z: worldZ, frequency: 0.034, phase: 0.9)
-                let canopyNoise = terrainNoise(x: worldX, z: worldZ, frequency: 0.017, phase: 2.1)
-                let microNoise = terrainNoise(x: worldX, z: worldZ, frequency: 0.081, phase: 1.7)
-                let height = resolvedTerrainHeight(x: worldX, z: worldZ)
-                let wetnessLift = max(0, (profile.ambientWetness - 0.18) * 0.28)
-                let groundCover = clamp(
-                    profile.groundCoverDensity * (0.68 + foliageNoise * 0.32) * (1.0 - roadFactor * 0.88),
-                    min: 0,
-                    max: 1
-                )
-                let waist = clamp(
-                    profile.waistDensity * (0.48 + foliageNoise * 0.52) * (1.0 - roadFactor * 0.92),
-                    min: 0,
-                    max: 1
-                )
-                let head = clamp(
-                    profile.headDensity * (0.44 + canopyNoise * 0.56) * (1.0 - roadFactor * 0.95),
-                    min: 0,
-                    max: 1
-                )
-                let canopy = clamp(
-                    profile.canopyDensity * (0.42 + canopyNoise * 0.58) * (1.0 - roadFactor * 0.97),
-                    min: 0,
-                    max: 1
-                )
-                let wetness = clamp(
-                    profile.ambientWetness * (0.72 + microNoise * 0.16) +
-                        wetnessLift +
-                        (profile.shorelineSpace * 0.18) -
-                        (roadFactor * 0.10),
-                    min: 0,
-                    max: 1
-                )
-
-                samples.append(
-                    JungleTerrainSample(
-                        position: SIMD3<Float>(worldX, height, worldZ),
-                        groundCover: groundCover,
-                        waist: waist,
-                        head: head,
-                        canopy: canopy,
-                        wetness: wetness
-                    )
-                )
-            }
-        }
+        let terrainPatch = terrainPatch(
+            for: cameraPosition,
+            currentSector: currentSector,
+            profile: profile
+        )
 
         return JungleTerrainFrame(
             cameraPosition: cameraPosition,
@@ -479,12 +630,7 @@ final class BootstrapScene {
             visibilityDistance: profile.visibilityDistance,
             ambientWetness: profile.ambientWetness,
             shorelineSpace: profile.shorelineSpace,
-            terrainPatch: JungleTerrainPatch(
-                sampleSide: sampleSide,
-                spacing: spacing,
-                center: cameraPosition,
-                samples: samples
-            ),
+            terrainPatch: terrainPatch,
             groundMaterial: profile.groundMaterial,
             groundCoverMaterial: profile.groundCoverMaterial,
             waistMaterial: profile.waistMaterial,
@@ -536,6 +682,15 @@ final class BootstrapScene {
                 details: [
                     "Goal: \(routeInfo.checkpoints.last?.label ?? "Final review marker")",
                     String(
+                        format: "Footprint: %@ -> %@ / %d sectors / %.0fm planned",
+                        routeInfo.startLabel,
+                        routeInfo.goalLabel,
+                        routeInfo.sectorNames.count,
+                        routeInfo.plannedDistanceMeters
+                    ),
+                    "Review Pack: \(mapConfiguration.reviewPackTitle) / \(mapConfiguration.comparisonStops.count) comparison stops / \(mapConfiguration.openRisks.count) open risks",
+                    "Combat Rehearsal: \(mapConfiguration.combatRehearsalTitle) / \(mapConfiguration.contactStops.count) contact lanes / \(mapConfiguration.threatObservers.count) observers",
+                    String(
                         format: "Run: %.1fs / %.0fm / %d restarts",
                         snapshot.elapsedSeconds,
                         snapshot.routeDistanceMeters,
@@ -547,22 +702,55 @@ final class BootstrapScene {
 
         let nextIndex = min(Int(snapshot.completedCheckpointCount), max(routeInfo.checkpoints.count - 1, 0))
         let nextCheckpoint = routeInfo.checkpoints[nextIndex]
+        let nextComparisonStop = comparisonStop(for: nextCheckpoint.id)
+        let nextCombatStop = combatStop(for: nextCheckpoint.id)
+        var details = [
+            "Objective: \(routeInfo.summary)",
+            String(
+                format: "Footprint: %@ -> %@ / %d sectors / %.0fm planned",
+                routeInfo.startLabel,
+                routeInfo.goalLabel,
+                routeInfo.sectorNames.count,
+                routeInfo.plannedDistanceMeters
+            ),
+        ]
+
+        if let nextCombatStop {
+            details.append("Contact: \(nextCombatStop.lane) / \(nextCombatStop.exposure) / \(nextCombatStop.expectedObservers) watchers")
+            details.append("Cover: \(nextCombatStop.coverHint)")
+        }
+
+        if let nextComparisonStop {
+            details.append("Compare: \(nextComparisonStop.district) / \(nextComparisonStop.sourceFocus)")
+            details.append("Combat: \(nextComparisonStop.combatLane)")
+            details.append("Capture: \(nextComparisonStop.captureNote)")
+        }
+
+        details.append(
+            String(
+                format: "Next: %@ (%.1fm)",
+                nextCheckpoint.label,
+                snapshot.distanceToNextCheckpointMeters
+            )
+        )
+        details.append(
+            String(
+                format: "Run: %.1fs / %.0fm / %d restarts",
+                snapshot.elapsedSeconds,
+                snapshot.routeDistanceMeters,
+                snapshot.restartCount
+            )
+        )
+
         return SceneRouteState(
-            summary: "Route: \(snapshot.completedCheckpointCount) / \(snapshot.totalCheckpointCount) checkpoints",
-            details: [
-                "Objective: \(routeInfo.summary)",
-                String(
-                    format: "Next: %@ (%.1fm)",
-                    nextCheckpoint.label,
-                    snapshot.distanceToNextCheckpointMeters
-                ),
-                String(
-                    format: "Run: %.1fs / %.0fm / %d restarts",
-                    snapshot.elapsedSeconds,
-                    snapshot.routeDistanceMeters,
-                    snapshot.restartCount
-                ),
-            ]
+            summary: String(
+                format: "Route: %d / %d checkpoints / %.0fm of %.0fm",
+                snapshot.completedCheckpointCount,
+                snapshot.totalCheckpointCount,
+                snapshot.routeDistanceMeters,
+                routeInfo.plannedDistanceMeters
+            ),
+            details: details
         )
     }
 
@@ -611,19 +799,19 @@ final class BootstrapScene {
 
         if snapshot.routeComplete {
             return SceneBriefingState(
-                summary: "Briefing: survey complete",
+                summary: "Briefing: rehearsal complete",
                 details: [
-                    "Outcome: the central Canberra atlas line reads clearly without developer prompts",
-                    "Reset: use Restart for a fresh run from a new district start",
+                    "Outcome: the current Canberra contact rehearsal reads clearly without developer prompts",
+                    "Reset: use Restart for a fresh run from a new rehearsal start",
                 ]
             )
         }
 
         if snapshot.routeFailed {
             return SceneBriefingState(
-                summary: "Briefing: recover the survey line",
+                summary: "Briefing: recover the rehearsal line",
                 details: [
-                    "Recovery: restart from the latest review marker and re-establish the central district read",
+                    "Recovery: restart from the latest checkpoint and re-establish the authored district read",
                     "Priority: return to the nearest signposted viewpoint instead of pushing into dead ground",
                 ]
             )
@@ -632,19 +820,19 @@ final class BootstrapScene {
         let nextIndex = min(Int(snapshot.completedCheckpointCount), max(routeInfo.checkpoints.count - 1, 0))
         let nextCheckpoint = routeInfo.checkpoints[nextIndex]
         let originLabel = nextIndex == 0
-            ? (debugInfo.spawn.label ?? "Assigned district start")
+            ? (debugInfo.spawn.label ?? "Assigned survey start")
             : routeInfo.checkpoints[nextIndex - 1].label
         let cameraPosition = SIMD3<Float>(snapshot.cameraX, snapshot.cameraY, snapshot.cameraZ)
         let paceLine: String
 
         if snapshot.suspicionLevel >= max(evasionInfo.failThreshold * 0.55, 0.45) {
-            paceLine = "Pace: break line of sight, then resume the central-district review pass"
+            paceLine = "Pace: break line of sight, then resume the authored district review pass"
         } else if snapshot.activeObserverCount > 0 {
-            paceLine = "Pace: move between cover and keep the lake and district markers readable"
+            paceLine = "Pace: move between cover and keep the district skyline markers readable"
         } else if snapshot.distanceToNextCheckpointMeters > 18 {
-            paceLine = "Pace: cross the open ground, then stop and confirm the next Canberra landmark"
+            paceLine = "Pace: cross the open ground, then stop and confirm the next authored landmark"
         } else {
-            paceLine = "Pace: steady approach into the next review marker"
+            paceLine = "Pace: steady approach into the next rehearsal marker"
         }
 
         var details = [
@@ -657,8 +845,18 @@ final class BootstrapScene {
             paceLine,
         ]
 
+        if let nextCombatStop = combatStop(for: nextCheckpoint.id) {
+            details.append("Contact: \(nextCombatStop.lane) / \(nextCombatStop.exposure)")
+            details.append("Cover: \(nextCombatStop.coverHint)")
+        }
+
+        if let nextComparisonStop = comparisonStop(for: nextCheckpoint.id) {
+            details.append("Compare: \(nextComparisonStop.district) / \(nextComparisonStop.sourceFocus)")
+            details.append("Capture: \(nextComparisonStop.captureNote)")
+        }
+
         if let nearestSignpost = nearestGuidancePoint(from: evasionInfo.signposts, to: cameraPosition) {
-            details.append("Cue: follow \(nearestSignpost.point.label) to stay on the central atlas line")
+            details.append("Cue: follow \(nearestSignpost.point.label) to stay on the authored atlas line")
         } else if let nearestCover = nearestGuidancePoint(from: evasionInfo.coverPoints, to: cameraPosition) {
             details.append("Cue: \(nearestCover.point.label) is the closest reset point for this survey pass")
         }
@@ -667,6 +865,18 @@ final class BootstrapScene {
             summary: "Briefing: marker \(nextIndex + 1) / \(routeInfo.checkpoints.count) toward \(nextCheckpoint.label)",
             details: details
         )
+    }
+
+    private func comparisonStop(for checkpointID: String) -> SceneMapComparisonStop? {
+        mapConfiguration.comparisonStops.first { comparisonStop in
+            comparisonStop.checkpointID == checkpointID
+        }
+    }
+
+    private func combatStop(for checkpointID: String) -> SceneMapCombatStop? {
+        mapConfiguration.contactStops.first { combatStop in
+            combatStop.checkpointID == checkpointID
+        }
     }
 
     private func activeSectorIndices(for cameraPosition: SIMD3<Float>) -> [Int] {
@@ -734,7 +944,7 @@ final class BootstrapScene {
             groundSampler: groundSampler
         )
         let updatedDetails = debugInfoTemplate.details.map { detail in
-            detail.hasPrefix("Spawn:") ? "Spawn: \(groundedSpawn.label ?? "District start")" : detail
+            detail.hasPrefix("Spawn:") ? "Spawn: \(groundedSpawn.label ?? "Survey start")" : detail
         }
 
         return SceneDebugInfo(
@@ -757,7 +967,25 @@ final class BootstrapScene {
             spawnYawDegrees: spawn.yawDegrees,
             sectors: mapConfigurationTemplate.sectors,
             roads: mapConfigurationTemplate.roads,
-            checkpoints: mapConfigurationTemplate.checkpoints
+            checkpoints: mapConfigurationTemplate.checkpoints,
+            routeName: mapConfigurationTemplate.routeName,
+            routeStartLabel: mapConfigurationTemplate.routeStartLabel,
+            routeGoalLabel: mapConfigurationTemplate.routeGoalLabel,
+            routePlannedDistanceMeters: mapConfigurationTemplate.routePlannedDistanceMeters,
+            routeSectorNames: mapConfigurationTemplate.routeSectorNames,
+            reviewPackTitle: mapConfigurationTemplate.reviewPackTitle,
+            reviewPackSummary: mapConfigurationTemplate.reviewPackSummary,
+            referenceGallery: mapConfigurationTemplate.referenceGallery,
+            textureLibrary: mapConfigurationTemplate.textureLibrary,
+            captureFormat: mapConfigurationTemplate.captureFormat,
+            openRisks: mapConfigurationTemplate.openRisks,
+            comparisonStops: mapConfigurationTemplate.comparisonStops,
+            combatRehearsalTitle: mapConfigurationTemplate.combatRehearsalTitle,
+            combatRehearsalSummary: mapConfigurationTemplate.combatRehearsalSummary,
+            exposureGuide: mapConfigurationTemplate.exposureGuide,
+            recoveryRule: mapConfigurationTemplate.recoveryRule,
+            contactStops: mapConfigurationTemplate.contactStops,
+            threatObservers: mapConfigurationTemplate.threatObservers
         )
     }
 
@@ -765,6 +993,118 @@ final class BootstrapScene {
         mapConfiguration.sectors.first { sector in
             sector.contains(x: position.x, z: position.z)
         }
+    }
+
+    private func terrainPatch(
+        for cameraPosition: SIMD3<Float>,
+        currentSector: SceneMapSector?,
+        profile: JungleTerrainProfile
+    ) -> JungleTerrainPatch {
+        let patchCenter = snappedTerrainPatchCenter(for: cameraPosition)
+        let cacheKey = TerrainPatchCacheKey(
+            centerColumn: snappedTerrainPatchCoordinate(for: patchCenter.x),
+            centerRow: snappedTerrainPatchCoordinate(for: patchCenter.z),
+            profileToken: currentSector?.id ?? "__default__"
+        )
+
+        if let cachedTerrainPatchState, cachedTerrainPatchState.key == cacheKey {
+            return cachedTerrainPatchState.patch
+        }
+
+        let patch = buildTerrainPatch(center: patchCenter, profile: profile)
+        cachedTerrainPatchState = CachedTerrainPatchState(key: cacheKey, patch: patch)
+        return patch
+    }
+
+    private func buildTerrainPatch(
+        center patchCenter: SIMD3<Float>,
+        profile: JungleTerrainProfile
+    ) -> JungleTerrainPatch {
+        let sampleSide = Self.terrainPatchSampleSide
+        let spacing = Self.terrainPatchSpacing
+        let halfExtent = (Float(sampleSide - 1) * spacing) * 0.5
+        let wetnessLift = max(0, (profile.ambientWetness - 0.18) * 0.28)
+        var samples: [JungleTerrainSample] = []
+        samples.reserveCapacity(sampleSide * sampleSide)
+
+        for row in 0..<sampleSide {
+            let worldZ = patchCenter.z - halfExtent + (Float(row) * spacing)
+
+            for column in 0..<sampleSide {
+                let worldX = patchCenter.x - halfExtent + (Float(column) * spacing)
+                let roadFactor = roadInfluence(at: SIMD2<Float>(worldX, worldZ))
+                let foliageNoise = terrainNoise(x: worldX, z: worldZ, frequency: 0.034, phase: 0.9)
+                let canopyNoise = terrainNoise(x: worldX, z: worldZ, frequency: 0.017, phase: 2.1)
+                let microNoise = terrainNoise(x: worldX, z: worldZ, frequency: 0.081, phase: 1.7)
+                let height = resolvedTerrainHeight(x: worldX, z: worldZ)
+                let groundCover = clamp(
+                    profile.groundCoverDensity * (0.68 + foliageNoise * 0.32) * (1.0 - roadFactor * 0.88),
+                    min: 0,
+                    max: 1
+                )
+                let waist = clamp(
+                    profile.waistDensity * (0.48 + foliageNoise * 0.52) * (1.0 - roadFactor * 0.92),
+                    min: 0,
+                    max: 1
+                )
+                let head = clamp(
+                    profile.headDensity * (0.44 + canopyNoise * 0.56) * (1.0 - roadFactor * 0.95),
+                    min: 0,
+                    max: 1
+                )
+                let canopy = clamp(
+                    profile.canopyDensity * (0.42 + canopyNoise * 0.58) * (1.0 - roadFactor * 0.97),
+                    min: 0,
+                    max: 1
+                )
+                let wetness = clamp(
+                    profile.ambientWetness * (0.72 + microNoise * 0.16) +
+                        wetnessLift +
+                        (profile.shorelineSpace * 0.18) -
+                        (roadFactor * 0.10),
+                    min: 0,
+                    max: 1
+                )
+
+                samples.append(
+                    JungleTerrainSample(
+                        position: SIMD3<Float>(worldX, height, worldZ),
+                        groundCover: groundCover,
+                        waist: waist,
+                        head: head,
+                        canopy: canopy,
+                        wetness: wetness
+                    )
+                )
+            }
+        }
+
+        return JungleTerrainPatch(
+            sampleSide: sampleSide,
+            spacing: spacing,
+            center: patchCenter,
+            samples: samples
+        )
+    }
+
+    private func snappedTerrainPatchCenter(for cameraPosition: SIMD3<Float>) -> SIMD3<Float> {
+        SIMD3<Float>(
+            Self.terrainPatchUpdateStride > 0
+                ? round(cameraPosition.x / Self.terrainPatchUpdateStride) * Self.terrainPatchUpdateStride
+                : cameraPosition.x,
+            cameraPosition.y,
+            Self.terrainPatchUpdateStride > 0
+                ? round(cameraPosition.z / Self.terrainPatchUpdateStride) * Self.terrainPatchUpdateStride
+                : cameraPosition.z
+        )
+    }
+
+    private func snappedTerrainPatchCoordinate(for value: Float) -> Int {
+        guard Self.terrainPatchUpdateStride > 0 else {
+            return 0
+        }
+
+        return Int(round(value / Self.terrainPatchUpdateStride))
     }
 
     private func terrainProfile(for sector: SceneMapSector?) -> JungleTerrainProfile {
@@ -1136,10 +1476,31 @@ private final class ScenePackageBuilder {
         let guidanceConfiguration = sceneConfiguration.guidance ?? GuidanceConfiguration()
         let playerConfiguration = sceneConfiguration.player ?? PlayerConfiguration()
         let scopeConfiguration = sceneConfiguration.scope ?? ScopeConfiguration()
+        let shadowConfiguration = sceneConfiguration.shadow ?? ShadowConfiguration()
+        let postProcessConfiguration = sceneConfiguration.postProcess ?? PostProcessConfiguration()
         let traversalTuning = SceneTraversalTuning(
             walkSpeed: max(playerConfiguration.walkSpeed ?? 4.2, 1.0),
             sprintSpeed: max(playerConfiguration.sprintSpeed ?? 6.8, max(playerConfiguration.walkSpeed ?? 4.2, 1.0) + 0.6),
             lookSensitivity: max(playerConfiguration.lookSensitivity ?? 0.08, 0.01)
+        )
+        let shadowSettings = SceneShadowSettings(
+            mapResolution: max(shadowConfiguration.mapResolution ?? 2048, 512),
+            coverage: max(shadowConfiguration.coverage ?? 120.0, 24.0),
+            depthBias: max(shadowConfiguration.depthBias ?? 0.015, 0.0),
+            normalBias: max(shadowConfiguration.normalBias ?? 0.010, 0.0),
+            strength: min(max(shadowConfiguration.strength ?? 0.72, 0.0), 1.0),
+            scopeCoverageMultiplier: max(shadowConfiguration.scopeCoverageMultiplier ?? 1.25, 1.0),
+            forwardOffsetMultiplier: min(max(shadowConfiguration.forwardOffsetMultiplier ?? 0.35, 0.0), 1.0)
+        )
+        let postProcessSettings = ScenePostProcessSettings(
+            exposureBias: postProcessConfiguration.exposureBias ?? 0.18,
+            whitePoint: max(postProcessConfiguration.whitePoint ?? 1.25, 0.25),
+            contrast: max(postProcessConfiguration.contrast ?? 1.04, 0.0),
+            saturation: max(postProcessConfiguration.saturation ?? 1.02, 0.0),
+            shadowTint: postProcessConfiguration.shadowTintVector,
+            highlightTint: postProcessConfiguration.highlightTintVector,
+            shadowBalance: simd_clamp(postProcessConfiguration.shadowBalance ?? 0.44, 0.05, 0.95),
+            vignetteStrength: simd_clamp(postProcessConfiguration.vignetteStrength ?? 0.08, 0.0, 1.0)
         )
 
         var sceneDrawables: [SceneDrawable] = []
@@ -1176,6 +1537,17 @@ private final class ScenePackageBuilder {
             for: loadedSectors,
             fallback: sceneConfiguration.spawn.positionVector
         )
+        let furthestCheckpointDistance = sceneConfiguration.route.checkpoints.map { checkpoint in
+            simd_distance(checkpoint.positionVector, sceneConfiguration.spawn.positionVector)
+        }.max() ?? 0
+        let longRangeCheckpointCount = sceneConfiguration.route.checkpoints.filter { checkpoint in
+            simd_distance(checkpoint.positionVector, sceneConfiguration.spawn.positionVector) >= 70
+        }.count
+        let farFieldCheckpointCount = sceneConfiguration.route.checkpoints.filter { checkpoint in
+            sector(containing: checkpoint.positionVector, in: loadedSectors).map { sector in
+                (sector.residency ?? .local) == .farField
+            } ?? false
+        }.count
 
         for element in sceneConfiguration.proceduralElements {
             if let drawable = proceduralDrawable(from: element) {
@@ -1196,10 +1568,13 @@ private final class ScenePackageBuilder {
         }
 
         for assetInstance in sceneConfiguration.assetInstances {
-            if let drawable = assetDrawable(from: assetInstance, groundSampler: groundSampler) {
+            let assetDrawables = assetDrawables(from: assetInstance, groundSampler: groundSampler)
+            if !assetDrawables.isEmpty {
+                assetCount += 1
+            }
+            for drawable in assetDrawables {
                 alwaysLoadedIndices.append(sceneDrawables.count)
                 sceneDrawables.append(drawable)
-                assetCount += 1
             }
         }
 
@@ -1253,10 +1628,10 @@ private final class ScenePackageBuilder {
                 ) {
                     sceneDrawables.append(drawable)
                     terrainCount += 1
-                    if drawable.textureKey == nil {
-                        flatColorWorldDrawableCount += 1
-                    } else {
+                    if drawable.material.hasAnyTexture {
                         texturedWorldDrawableCount += 1
+                    } else {
+                        flatColorWorldDrawableCount += 1
                     }
                 }
             }
@@ -1269,10 +1644,10 @@ private final class ScenePackageBuilder {
                 ) {
                     sceneDrawables.append(drawable)
                     roadCount += 1
-                    if drawable.textureKey == nil {
-                        flatColorWorldDrawableCount += 1
-                    } else {
+                    if drawable.material.hasAnyTexture {
                         texturedWorldDrawableCount += 1
+                    } else {
+                        flatColorWorldDrawableCount += 1
                     }
                 }
             }
@@ -1285,10 +1660,10 @@ private final class ScenePackageBuilder {
                 ) {
                     sceneDrawables.append(drawable)
                     grayboxCount += 1
-                    if drawable.textureKey == nil {
-                        flatColorWorldDrawableCount += 1
-                    } else {
+                    if drawable.material.hasAnyTexture {
                         texturedWorldDrawableCount += 1
+                    } else {
+                        flatColorWorldDrawableCount += 1
                     }
                 }
                 if let shadowDrawable = grayboxShadowDrawable(from: block, sectorID: sector.id) {
@@ -1310,10 +1685,18 @@ private final class ScenePackageBuilder {
             )
         }
 
+        let reviewPack = sceneConfiguration.reviewPack ?? ReviewPackConfiguration()
+        let combatRehearsal = sceneConfiguration.combatRehearsal ?? CombatRehearsalConfiguration()
+        let routePlannedDistanceMeters = plannedRouteDistance(for: sceneConfiguration.route.checkpoints)
+        let routeSectorNames = routeSectorNames(
+            for: sceneConfiguration.route.checkpoints,
+            loadedSectors: loadedSectors
+        )
+
         var detailLines = [
             "Grid: \(coordinateSystem.name)",
             "Axes: x \(coordinateSystem.axisX) / z \(coordinateSystem.axisZ)",
-            "Spawn: \(sceneConfiguration.spawn.label ?? "District start")",
+            "Spawn: \(sceneConfiguration.spawn.label ?? "Survey start")",
             "Sectors: \(loadedSectors.map(\.displayName).joined(separator: ", "))",
             "Residency: \(residencyCounts.always) always / \(residencyCounts.farField) far-field / \(residencyCounts.local) local",
             "World: \(terrainCount) terrain / \(roadCount) roads / \(collisionCount) blockers",
@@ -1325,7 +1708,39 @@ private final class ScenePackageBuilder {
                 scopeConfiguration.fieldOfViewDegrees,
                 scopeConfiguration.drawDistanceMultiplier ?? 2.4
             ),
-            "Route: \(sceneConfiguration.route.name) / \(sceneConfiguration.route.checkpoints.count) checkpoints",
+            String(
+                format: "Shadows: 1 map / %d px / %.0fm coverage",
+                shadowSettings.mapResolution,
+                shadowSettings.coverage
+            ),
+            String(
+                format: "Long Range: %d distant checks / %d far-field markers / %.0fm furthest authored sightline",
+                longRangeCheckpointCount,
+                farFieldCheckpointCount,
+                furthestCheckpointDistance
+            ),
+            String(
+                format: "Route: %@ / %d checkpoints / %.0fm planned / %d sectors",
+                sceneConfiguration.route.name,
+                sceneConfiguration.route.checkpoints.count,
+                routePlannedDistanceMeters,
+                routeSectorNames.count
+            ),
+            "Review Pack: \(reviewPack.title) / \(reviewPack.comparisonStops.count) comparison stops / \(reviewPack.openRisks.count) open risks",
+            "Reference Pack: \(reviewPack.referenceGallery) / \(reviewPack.textureLibrary)",
+            "Capture Framing: \(reviewPack.captureFormat)",
+            "Texture Audit: \(SceneTextureKey.allCases.count) material slots / \(texturedWorldDrawableCount) textured drawables / \(flatColorWorldDrawableCount) flat-color review items",
+            "Combat Lanes: \(Set(reviewPack.comparisonStops.map(\.combatLane)).count) linked follow-on lanes",
+            "Combat Rehearsal: \(combatRehearsal.title) / \(combatRehearsal.contactStops.count) contact lanes / \(detectionConfiguration.observers.count) observers",
+            "Exposure Guide: \(combatRehearsal.exposureGuide)",
+            "Recovery Rule: \(combatRehearsal.recoveryRule)",
+            String(
+                format: "Post: %+0.2f exp / %.2f white / %.2f contrast / %.2f saturation",
+                postProcessSettings.exposureBias,
+                postProcessSettings.whitePoint,
+                postProcessSettings.contrast,
+                postProcessSettings.saturation
+            ),
             "Telemetry: \((sceneConfiguration.randomSpawns?.count ?? 1)) starts / \(sceneConfiguration.route.checkpoints.count) route markers / \(guidanceConfiguration.signposts.count) signposts",
             "Threats: \(detectionConfiguration.observers.count) observers / \(guidanceConfiguration.coverPoints.count) cover / \(guidanceConfiguration.signposts.count) signs",
             String(
@@ -1360,14 +1775,24 @@ private final class ScenePackageBuilder {
                 fogColor: atmosphereConfiguration.fogColorVector,
                 fogNear: max(atmosphereConfiguration.fogNear ?? 38, 8),
                 fogFar: max(atmosphereConfiguration.fogFar ?? 118, max(atmosphereConfiguration.fogNear ?? 38, 8) + 1),
-                hazeStrength: max(atmosphereConfiguration.hazeStrength ?? 0.16, 0)
+                hazeStrength: max(atmosphereConfiguration.hazeStrength ?? 0.16, 0),
+                shadow: shadowSettings,
+                postProcess: postProcessSettings
             ),
             scopeConfiguration: scopeConfiguration,
             mapConfiguration: buildMapConfiguration(
                 sceneName: sceneConfiguration.sceneName,
                 loadedSectors: loadedSectors,
                 spawn: sceneConfiguration.spawn,
-                checkpoints: sceneConfiguration.route.checkpoints
+                checkpoints: sceneConfiguration.route.checkpoints,
+                routeName: sceneConfiguration.route.name,
+                routeStartLabel: sceneConfiguration.route.checkpoints.first?.label ?? (sceneConfiguration.spawn.label ?? "Survey start"),
+                routeGoalLabel: sceneConfiguration.route.checkpoints.last?.label ?? "Final review marker",
+                routePlannedDistanceMeters: routePlannedDistanceMeters,
+                routeSectorNames: routeSectorNames,
+                reviewPack: reviewPack,
+                combatRehearsal: combatRehearsal,
+                threatObservers: detectionConfiguration.observers
             ),
             sectors: sceneSectors,
             groundModel: groundModel,
@@ -1383,7 +1808,11 @@ private final class ScenePackageBuilder {
             routeInfo: SceneRouteInfo(
                 name: sceneConfiguration.route.name,
                 summary: sceneConfiguration.route.summary,
-                checkpoints: sceneConfiguration.route.checkpoints
+                checkpoints: sceneConfiguration.route.checkpoints,
+                startLabel: sceneConfiguration.route.checkpoints.first?.label ?? (sceneConfiguration.spawn.label ?? "Survey start"),
+                goalLabel: sceneConfiguration.route.checkpoints.last?.label ?? "Final review marker",
+                plannedDistanceMeters: routePlannedDistanceMeters,
+                sectorNames: routeSectorNames
             ),
             evasionInfo: SceneEvasionInfo(
                 failThreshold: detectionConfiguration.failThreshold,
@@ -1402,7 +1831,15 @@ private final class ScenePackageBuilder {
         sceneName: String,
         loadedSectors: [SectorConfiguration],
         spawn: SpawnConfiguration,
-        checkpoints: [RouteCheckpointConfiguration]
+        checkpoints: [RouteCheckpointConfiguration],
+        routeName: String,
+        routeStartLabel: String,
+        routeGoalLabel: String,
+        routePlannedDistanceMeters: Float,
+        routeSectorNames: [String],
+        reviewPack: ReviewPackConfiguration,
+        combatRehearsal: CombatRehearsalConfiguration,
+        threatObservers: [ThreatObserverConfiguration]
     ) -> SceneMapConfiguration {
         let mapSectors = loadedSectors.map { sector in
             SceneMapSector(
@@ -1439,6 +1876,54 @@ private final class ScenePackageBuilder {
                     z: checkpoint.positionVector.z
                 ),
                 isGoal: checkpoint.goal ?? false
+            )
+        }
+        let checkpointLabelsByID: [String: String] = Dictionary(uniqueKeysWithValues: checkpoints.map { checkpoint in
+            (checkpoint.id, checkpoint.label)
+        })
+        let mapComparisonStops: [SceneMapComparisonStop] = reviewPack.comparisonStops.compactMap { comparisonStop -> SceneMapComparisonStop? in
+            guard let checkpointLabel = checkpointLabelsByID[comparisonStop.checkpointID] else {
+                return nil
+            }
+
+            return SceneMapComparisonStop(
+                id: comparisonStop.checkpointID,
+                checkpointID: comparisonStop.checkpointID,
+                checkpointLabel: checkpointLabel,
+                district: comparisonStop.district,
+                sourceFocus: comparisonStop.sourceFocus,
+                combatLane: comparisonStop.combatLane,
+                captureNote: comparisonStop.captureNote
+            )
+        }
+        let mapCombatStops: [SceneMapCombatStop] = combatRehearsal.contactStops.compactMap { contactStop -> SceneMapCombatStop? in
+            guard let checkpointLabel = checkpointLabelsByID[contactStop.checkpointID] else {
+                return nil
+            }
+
+            return SceneMapCombatStop(
+                id: contactStop.checkpointID,
+                checkpointID: contactStop.checkpointID,
+                checkpointLabel: checkpointLabel,
+                district: contactStop.district,
+                lane: contactStop.lane,
+                exposure: contactStop.exposure,
+                expectedObservers: contactStop.expectedObservers,
+                coverHint: contactStop.coverHint,
+                recoveryNote: contactStop.recoveryNote
+            )
+        }
+        let mapThreatObservers = threatObservers.map { observer in
+            SceneMapThreatObserver(
+                id: observer.id,
+                label: observer.label,
+                point: SceneMapPoint(
+                    x: observer.positionVector.x,
+                    z: observer.positionVector.z
+                ),
+                range: observer.range,
+                fieldOfViewDegrees: observer.fieldOfViewDegrees,
+                markerColor: observer.markerColorVector
             )
         }
         let spawnPoint = SceneMapPoint(
@@ -1484,8 +1969,68 @@ private final class ScenePackageBuilder {
             spawnYawDegrees: spawn.yawDegrees,
             sectors: mapSectors,
             roads: mapRoads,
-            checkpoints: mapCheckpoints
+            checkpoints: mapCheckpoints,
+            routeName: routeName,
+            routeStartLabel: routeStartLabel,
+            routeGoalLabel: routeGoalLabel,
+            routePlannedDistanceMeters: routePlannedDistanceMeters,
+            routeSectorNames: routeSectorNames,
+            reviewPackTitle: reviewPack.title,
+            reviewPackSummary: reviewPack.summary,
+            referenceGallery: reviewPack.referenceGallery,
+            textureLibrary: reviewPack.textureLibrary,
+            captureFormat: reviewPack.captureFormat,
+            openRisks: reviewPack.openRisks,
+            comparisonStops: mapComparisonStops,
+            combatRehearsalTitle: combatRehearsal.title,
+            combatRehearsalSummary: combatRehearsal.summary,
+            exposureGuide: combatRehearsal.exposureGuide,
+            recoveryRule: combatRehearsal.recoveryRule,
+            contactStops: mapCombatStops,
+            threatObservers: mapThreatObservers
         )
+    }
+
+    private func plannedRouteDistance(for checkpoints: [RouteCheckpointConfiguration]) -> Float {
+        zip(checkpoints, checkpoints.dropFirst()).reduce(0) { partialResult, segment in
+            partialResult + simd_distance(segment.0.positionVector, segment.1.positionVector)
+        }
+    }
+
+    private func routeSectorNames(
+        for checkpoints: [RouteCheckpointConfiguration],
+        loadedSectors: [SectorConfiguration]
+    ) -> [String] {
+        var names: [String] = []
+
+        for checkpoint in checkpoints {
+            let position = checkpoint.positionVector
+            let containingSector = loadedSectors
+                .filter { sector in
+                    let minimum = sector.bounds.minimum
+                    let maximum = sector.bounds.maximum
+                    return position.x >= minimum.x
+                        && position.x <= maximum.x
+                        && position.z >= minimum.z
+                        && position.z <= maximum.z
+                }
+                .min { lhs, rhs in
+                    sectorArea(lhs) < sectorArea(rhs)
+                }
+
+            guard let displayName = containingSector?.displayName, !names.contains(displayName) else {
+                continue
+            }
+            names.append(displayName)
+        }
+
+        return names
+    }
+
+    private func sectorArea(_ sector: SectorConfiguration) -> Float {
+        let minimum = sector.bounds.minimum
+        let maximum = sector.bounds.maximum
+        return max(maximum.x - minimum.x, 1) * max(maximum.z - minimum.z, 1)
     }
 
     private func combinedBounds(
@@ -1497,6 +2042,20 @@ private final class ScenePackageBuilder {
         let minZ = loadedSectors.map { $0.bounds.minimum.z }.min() ?? (fallback.z - 80)
         let maxZ = loadedSectors.map { $0.bounds.maximum.z }.max() ?? (fallback.z + 80)
         return (minX, maxX, minZ, maxZ)
+    }
+
+    private func sector(
+        containing position: SIMD3<Float>,
+        in loadedSectors: [SectorConfiguration]
+    ) -> SectorConfiguration? {
+        loadedSectors.first { sector in
+            let minimum = sector.bounds.minimum
+            let maximum = sector.bounds.maximum
+            return position.x >= minimum.x &&
+                position.x <= maximum.x &&
+                position.z >= minimum.z &&
+                position.z <= maximum.z
+        }
     }
 
     private func buildSectorLookup(
@@ -1541,6 +2100,11 @@ private final class ScenePackageBuilder {
                 ),
                 minimumViewDot: -1,
                 textureKey: nil,
+                material: legacyMaterial(
+                    textureKey: nil,
+                    overrides: configuration.material,
+                    roughnessFactor: 0.96
+                ),
                 retainedInJungleRenderer: false
             )
 
@@ -1569,7 +2133,13 @@ private final class ScenePackageBuilder {
                 ),
                 minimumViewDot: -0.65,
                 textureKey: .terrain,
-                retainedInJungleRenderer: true
+                material: legacyMaterial(
+                    textureKey: .terrain,
+                    overrides: configuration.material
+                ),
+                retainedInJungleRenderer: true,
+                castsShadow: configuration.castsShadow ?? true,
+                receivesShadow: configuration.receivesShadow ?? true
             )
         }
     }
@@ -1602,8 +2172,14 @@ private final class ScenePackageBuilder {
                 multiplier: visibilityMultiplier(3.8, for: residency)
             ),
             minimumViewDot: visibilityMinimumViewDot(-0.55, for: residency),
-            textureKey: textureKey(for: configuration.name),
-            retainedInJungleRenderer: true
+            textureKey: .concrete,
+            material: grayboxMaterial(
+                for: configuration,
+                sectorID: sectorID
+            ),
+            retainedInJungleRenderer: true,
+            castsShadow: configuration.castsShadow ?? true,
+            receivesShadow: configuration.receivesShadow ?? true
         )
     }
 
@@ -1671,6 +2247,10 @@ private final class ScenePackageBuilder {
             ),
             minimumViewDot: -1,
             textureKey: .terrain,
+            material: legacyMaterial(
+                textureKey: .terrain,
+                overrides: configuration.material
+            ),
             retainedInJungleRenderer: false
         )
     }
@@ -1709,6 +2289,10 @@ private final class ScenePackageBuilder {
             ),
             minimumViewDot: -1,
             textureKey: .road,
+            material: roadMaterial(
+                for: configuration,
+                sectorID: sectorID
+            ),
             retainedInJungleRenderer: false
         )
     }
@@ -1754,14 +2338,18 @@ private final class ScenePackageBuilder {
             maxDrawDistance: max(bounds.maxX - bounds.minX, bounds.maxZ - bounds.minZ) * 2.4,
             minimumViewDot: -1,
             textureKey: .terrain,
+            material: legacyMaterial(
+                textureKey: .terrain,
+                overrides: nil
+            ),
             retainedInJungleRenderer: false
         )
     }
 
-    private func assetDrawable(
+    private func assetDrawables(
         from configuration: AssetInstanceConfiguration,
         groundSampler: WorldGroundSurfaceSampler
-    ) -> SceneDrawable? {
+    ) -> [SceneDrawable] {
         let cacheKey = "\(configuration.category)/\(configuration.name)"
         let loadedAsset: LoadedAsset
 
@@ -1775,11 +2363,7 @@ private final class ScenePackageBuilder {
             assetCache[cacheKey] = parsedAsset
             loadedAsset = parsedAsset
         } else {
-            return nil
-        }
-
-        guard let buffer = makeBuffer(from: loadedAsset.vertices) else {
-            return nil
+            return []
         }
 
         let maxExtent = max(loadedAsset.extent.x, max(loadedAsset.extent.y, loadedAsset.extent.z))
@@ -1798,23 +2382,41 @@ private final class ScenePackageBuilder {
             groundSampler: groundSampler
         )
         let worldCenter = groundedPosition + SIMD3<Float>(0, worldExtent.y * 0.5, 0)
-
-        return SceneDrawable(
-            name: configuration.name,
-            vertexBuffer: buffer,
-            vertexCount: loadedAsset.vertices.count,
-            modelMatrix: simd_float4x4.translation(groundedPosition) * rotation * normalization,
-            worldCenter: worldCenter,
+        let modelMatrix = simd_float4x4.translation(groundedPosition) * rotation * normalization
+        let drawDistance = adaptiveDrawDistance(
+            defaultValue: 90,
             boundingRadius: simd_length(worldExtent) * 0.5,
-            maxDrawDistance: adaptiveDrawDistance(
-                defaultValue: 90,
-                boundingRadius: simd_length(worldExtent) * 0.5,
-                multiplier: 3.2
-            ),
-            minimumViewDot: -0.45,
-            textureKey: nil,
-            retainedInJungleRenderer: true
+            multiplier: 3.2
         )
+
+        var drawables: [SceneDrawable] = []
+        drawables.reserveCapacity(loadedAsset.submeshes.count)
+
+        for submesh in loadedAsset.submeshes {
+            guard let buffer = makeBuffer(from: submesh.vertices) else {
+                continue
+            }
+
+            drawables.append(
+                SceneDrawable(
+                    name: "\(configuration.name):\(submesh.name)",
+                    vertexBuffer: buffer,
+                    vertexCount: submesh.vertices.count,
+                    modelMatrix: modelMatrix,
+                    worldCenter: worldCenter,
+                    boundingRadius: simd_length(worldExtent) * 0.5,
+                    maxDrawDistance: drawDistance,
+                    minimumViewDot: -0.45,
+                    textureKey: nil,
+                    material: submesh.material.applying(configuration: configuration.material),
+                    retainedInJungleRenderer: true,
+                    castsShadow: configuration.castsShadow ?? true,
+                    receivesShadow: configuration.receivesShadow ?? true
+                )
+            )
+        }
+
+        return drawables
     }
 
     private func routeMarkerDrawables(
@@ -2094,9 +2696,145 @@ private final class ScenePackageBuilder {
         max(defaultValue, boundingRadius * multiplier)
     }
 
-    private func textureKey(for structureName: String) -> SceneTextureKey {
-        let normalizedName = structureName.lowercased()
-        return normalizedName.contains("lake") ? .water : .concrete
+    private func legacyMaterial(
+        textureKey: SceneTextureKey?,
+        overrides: MaterialConfiguration?,
+        roughnessFactor: Float? = nil
+    ) -> SceneMaterial {
+        SceneMaterial
+            .legacy(
+                textureKey: textureKey,
+                roughnessFactor: roughnessFactor ?? defaultRoughness(for: textureKey)
+            )
+            .applying(configuration: overrides)
+    }
+
+    private func facadeMaterial(overrides: MaterialConfiguration?) -> SceneMaterial {
+        SceneMaterial(
+            albedoTexture: .assetRelativePath("Textures/Final/canberra_civic_facade_albedo.png"),
+            normalTexture: .assetRelativePath("Textures/Final/canberra_civic_facade_normal.png"),
+            roughnessTexture: .assetRelativePath("Textures/Final/canberra_civic_facade_roughness.png"),
+            ambientOcclusionTexture: .assetRelativePath("Textures/Final/canberra_civic_facade_ao.png"),
+            baseColorFactor: SIMD4<Float>(1, 1, 1, 1),
+            roughnessFactor: 0.74,
+            ambientOcclusionStrength: 1.0,
+            normalScale: 1.0
+        ).applying(configuration: overrides)
+    }
+
+    private func concreteMaterial(overrides: MaterialConfiguration?) -> SceneMaterial {
+        SceneMaterial(
+            albedoTexture: .assetRelativePath("Textures/Final/canberra_concrete_texture.png"),
+            normalTexture: .assetRelativePath("Textures/Final/canberra_concrete_normal.png"),
+            roughnessTexture: .assetRelativePath("Textures/Final/canberra_concrete_roughness.png"),
+            ambientOcclusionTexture: .assetRelativePath("Textures/Final/canberra_concrete_ao.png"),
+            baseColorFactor: SIMD4<Float>(1, 1, 1, 1),
+            roughnessFactor: 0.84,
+            ambientOcclusionStrength: 1.0,
+            normalScale: 1.0
+        ).applying(configuration: overrides)
+    }
+
+    private func arterialRoadMaterial(overrides: MaterialConfiguration?) -> SceneMaterial {
+        SceneMaterial(
+            albedoTexture: .assetRelativePath("Textures/Final/canberra_arterial_asphalt_albedo.png"),
+            normalTexture: .assetRelativePath("Textures/Final/canberra_arterial_asphalt_normal.png"),
+            roughnessTexture: .assetRelativePath("Textures/Final/canberra_arterial_asphalt_roughness.png"),
+            ambientOcclusionTexture: .assetRelativePath("Textures/Final/canberra_arterial_asphalt_ao.png"),
+            baseColorFactor: SIMD4<Float>(1, 1, 1, 1),
+            roughnessFactor: 0.86,
+            ambientOcclusionStrength: 1.0,
+            normalScale: 1.0
+        ).applying(configuration: overrides)
+    }
+
+    private func grayboxMaterial(
+        for configuration: GrayboxBlockConfiguration,
+        sectorID: String
+    ) -> SceneMaterial {
+        let normalizedName = "\(sectorID) \(configuration.name)".lowercased()
+        if usesHardscapeMaterial(for: normalizedName, configuration: configuration) {
+            return concreteMaterial(overrides: configuration.material)
+        }
+
+        if usesFacadeMaterial(for: normalizedName) {
+            return facadeMaterial(overrides: configuration.material)
+        }
+
+        return configuration.halfExtentsVector.y <= 1.4
+            ? concreteMaterial(overrides: configuration.material)
+            : facadeMaterial(overrides: configuration.material)
+    }
+
+    private func roadMaterial(
+        for configuration: RoadStripConfiguration,
+        sectorID: String
+    ) -> SceneMaterial {
+        let normalizedName = "\(sectorID) \(configuration.name)".lowercased()
+        return usesPedestrianPavingMaterial(for: normalizedName)
+            ? concreteMaterial(overrides: configuration.material)
+            : arterialRoadMaterial(overrides: configuration.material)
+    }
+
+    private func usesHardscapeMaterial(
+        for normalizedName: String,
+        configuration: GrayboxBlockConfiguration
+    ) -> Bool {
+        if configuration.contributesToGroundSurface {
+            return true
+        }
+
+        if normalizedName.contains("telstratowercore") || normalizedName.contains("towerdeck") {
+            return true
+        }
+
+        let tokens = [
+            "wall", "barrier", "median", "divider", "edge", "screen", "promenade",
+            "footing", "pylon", "retaining", "plinth", "pad", "deck", "marker",
+            "forecourt", "boundary", "backstop", "fence", "lookout", "apron",
+            "bridge", "interchange", "causeway"
+        ]
+        if tokens.contains(where: normalizedName.contains) {
+            return true
+        }
+
+        if normalizedName.contains("frame") && !usesFacadeMaterial(for: normalizedName) {
+            return true
+        }
+
+        return configuration.halfExtentsVector.y <= 0.9
+    }
+
+    private func usesFacadeMaterial(for normalizedName: String) -> Bool {
+        let tokens = [
+            "mass", "office", "hotel", "administrative", "gallery", "campus",
+            "arena", "mall", "towncentre", "towncenter", "tower", "civic",
+            "museum", "shelter", "club", "embassy", "block", "spine",
+            "group", "cluster", "centre", "center", "podium", "band"
+        ]
+        return tokens.contains(where: normalizedName.contains)
+    }
+
+    private func usesPedestrianPavingMaterial(for normalizedName: String) -> Bool {
+        let tokens = [
+            "promenade", "walk", "forecourt", "apron", "lookout", "plaza"
+        ]
+        return tokens.contains { normalizedName.contains($0) }
+    }
+
+    private func defaultRoughness(for textureKey: SceneTextureKey?) -> Float {
+        switch textureKey {
+        case .terrain:
+            return 0.94
+        case .road:
+            return 0.76
+        case .concrete:
+            return 0.84
+        case .water:
+            return 0.18
+        case nil:
+            return 0.90
+        }
     }
 
     private func visibilityDefault(_ baseValue: Float, for residency: SectorResidency) -> Float {
@@ -2206,7 +2944,26 @@ private enum FallbackSceneFactory {
                 fogColor: SIMD4<Float>(0.58, 0.68, 0.78, 1),
                 fogNear: 32,
                 fogFar: 108,
-                hazeStrength: 0.14
+                hazeStrength: 0.14,
+                shadow: SceneShadowSettings(
+                    mapResolution: 2048,
+                    coverage: 120,
+                    depthBias: 0.015,
+                    normalBias: 0.010,
+                    strength: 0.72,
+                    scopeCoverageMultiplier: 1.25,
+                    forwardOffsetMultiplier: 0.35
+                ),
+                postProcess: ScenePostProcessSettings(
+                    exposureBias: 0.18,
+                    whitePoint: 1.25,
+                    contrast: 1.04,
+                    saturation: 1.02,
+                    shadowTint: SIMD4<Float>(0.95, 0.99, 1.04, 1.0),
+                    highlightTint: SIMD4<Float>(1.04, 1.01, 0.95, 1.0),
+                    shadowBalance: 0.44,
+                    vignetteStrength: 0.08
+                )
             ),
             scopeConfiguration: ScopeConfiguration(),
             mapConfiguration: SceneMapConfiguration(
@@ -2219,7 +2976,25 @@ private enum FallbackSceneFactory {
                 spawnYawDegrees: 0,
                 sectors: [],
                 roads: [],
-                checkpoints: []
+                checkpoints: [],
+                routeName: "Fallback Route",
+                routeStartLabel: "Fallback start",
+                routeGoalLabel: "Fallback goal",
+                routePlannedDistanceMeters: 0,
+                routeSectorNames: [],
+                reviewPackTitle: "Fallback Review Pack",
+                reviewPackSummary: "Review pack data unavailable",
+                referenceGallery: "Unavailable",
+                textureLibrary: "Unavailable",
+                captureFormat: "Unavailable",
+                openRisks: [],
+                comparisonStops: [],
+                combatRehearsalTitle: "Fallback Combat Rehearsal",
+                combatRehearsalSummary: "Combat rehearsal data unavailable",
+                exposureGuide: "Unavailable",
+                recoveryRule: "Unavailable",
+                contactStops: [],
+                threatObservers: []
             ),
             sectors: [],
             groundModel: WorldGroundModel(
@@ -2240,7 +3015,11 @@ private enum FallbackSceneFactory {
             routeInfo: SceneRouteInfo(
                 name: "Fallback Route",
                 summary: "Route data unavailable",
-                checkpoints: []
+                checkpoints: [],
+                startLabel: "Fallback start",
+                goalLabel: "Fallback goal",
+                plannedDistanceMeters: 0,
+                sectorNames: []
             ),
             evasionInfo: SceneEvasionInfo(
                 failThreshold: 1.0,
@@ -2265,8 +3044,14 @@ private enum FallbackSceneFactory {
     }
 }
 
-private struct LoadedAsset {
+private struct LoadedAssetSubmesh {
+    let name: String
     let vertices: [SceneVertex]
+    let material: SceneMaterial
+}
+
+private struct LoadedAsset {
+    let submeshes: [LoadedAssetSubmesh]
     let boundsMin: SIMD3<Float>
     let boundsMax: SIMD3<Float>
 
@@ -2588,16 +3373,128 @@ private enum GeometryBuilder {
         color: SIMD4<Float>
     ) {
         let normal = simd_normalize(simd_cross(p1 - p0, p2 - p0))
-        vertices.append(SceneVertex(position: p0, normal: normal, uv: uv0, color: color))
-        vertices.append(SceneVertex(position: p1, normal: normal, uv: uv1, color: color))
-        vertices.append(SceneVertex(position: p2, normal: normal, uv: uv2, color: color))
-        vertices.append(SceneVertex(position: p0, normal: normal, uv: uv0, color: color))
-        vertices.append(SceneVertex(position: p2, normal: normal, uv: uv2, color: color))
-        vertices.append(SceneVertex(position: p3, normal: normal, uv: uv3, color: color))
+        let firstTangent = triangleTangent(
+            p0: p0,
+            p1: p1,
+            p2: p2,
+            uv0: uv0,
+            uv1: uv1,
+            uv2: uv2,
+            normal: normal
+        )
+        let secondTangent = triangleTangent(
+            p0: p0,
+            p1: p2,
+            p2: p3,
+            uv0: uv0,
+            uv1: uv2,
+            uv2: uv3,
+            normal: normal
+        )
+
+        vertices.append(SceneVertex(position: p0, normal: normal, tangent: firstTangent, uv: uv0, color: color))
+        vertices.append(SceneVertex(position: p1, normal: normal, tangent: firstTangent, uv: uv1, color: color))
+        vertices.append(SceneVertex(position: p2, normal: normal, tangent: firstTangent, uv: uv2, color: color))
+        vertices.append(SceneVertex(position: p0, normal: normal, tangent: secondTangent, uv: uv0, color: color))
+        vertices.append(SceneVertex(position: p2, normal: normal, tangent: secondTangent, uv: uv2, color: color))
+        vertices.append(SceneVertex(position: p3, normal: normal, tangent: secondTangent, uv: uv3, color: color))
+    }
+
+    private static func triangleTangent(
+        p0: SIMD3<Float>,
+        p1: SIMD3<Float>,
+        p2: SIMD3<Float>,
+        uv0: SIMD2<Float>,
+        uv1: SIMD2<Float>,
+        uv2: SIMD2<Float>,
+        normal: SIMD3<Float>
+    ) -> SIMD4<Float> {
+        let deltaPosition0 = p1 - p0
+        let deltaPosition1 = p2 - p0
+        let deltaUV0 = uv1 - uv0
+        let deltaUV1 = uv2 - uv0
+        let determinant = (deltaUV0.x * deltaUV1.y) - (deltaUV0.y * deltaUV1.x)
+
+        guard abs(determinant) > 0.000_01 else {
+            return fallbackTangent(for: normal)
+        }
+
+        let inverseDeterminant = 1 / determinant
+        let rawTangent = (deltaPosition0 * deltaUV1.y - deltaPosition1 * deltaUV0.y) * inverseDeterminant
+        let rawBitangent = (deltaPosition1 * deltaUV0.x - deltaPosition0 * deltaUV1.x) * inverseDeterminant
+        return orthogonalizedTangent(rawTangent, bitangent: rawBitangent, normal: normal)
+    }
+
+    private static func orthogonalizedTangent(
+        _ tangent: SIMD3<Float>,
+        bitangent: SIMD3<Float>,
+        normal: SIMD3<Float>
+    ) -> SIMD4<Float> {
+        let tangentLength = simd_length(tangent)
+        guard tangentLength > 0.000_01 else {
+            return fallbackTangent(for: normal)
+        }
+
+        let normalizedTangent = tangent / tangentLength
+        let orthogonalized = simd_normalize(normalizedTangent - (normal * simd_dot(normal, normalizedTangent)))
+        if !isFinite(orthogonalized) {
+            return fallbackTangent(for: normal)
+        }
+
+        let handedness: Float = simd_dot(simd_cross(normal, orthogonalized), bitangent) < 0 ? -1 : 1
+        return SIMD4<Float>(orthogonalized.x, orthogonalized.y, orthogonalized.z, handedness)
+    }
+
+    private static func fallbackTangent(for normal: SIMD3<Float>) -> SIMD4<Float> {
+        let candidate = abs(normal.y) < 0.999 ? SIMD3<Float>(0, 1, 0) : SIMD3<Float>(1, 0, 0)
+        let tangent = simd_normalize(simd_cross(candidate, normal))
+        return SIMD4<Float>(tangent.x, tangent.y, tangent.z, 1)
+    }
+
+    private static func isFinite(_ vector: SIMD3<Float>) -> Bool {
+        vector.x.isFinite && vector.y.isFinite && vector.z.isFinite
     }
 }
 
 private enum OBJAssetLoader {
+    private struct ParsedMaterial {
+        var baseColorFactor: SIMD4<Float>
+        var roughnessFactor: Float
+        var albedoTexture: SceneTextureReference?
+        var normalTexture: SceneTextureReference?
+        var roughnessTexture: SceneTextureReference?
+        var ambientOcclusionTexture: SceneTextureReference?
+
+        init(
+            baseColorFactor: SIMD4<Float> = SIMD4<Float>(0.72, 0.76, 0.82, 1),
+            roughnessFactor: Float = 0.82,
+            albedoTexture: SceneTextureReference? = nil,
+            normalTexture: SceneTextureReference? = nil,
+            roughnessTexture: SceneTextureReference? = nil,
+            ambientOcclusionTexture: SceneTextureReference? = nil
+        ) {
+            self.baseColorFactor = baseColorFactor
+            self.roughnessFactor = roughnessFactor
+            self.albedoTexture = albedoTexture
+            self.normalTexture = normalTexture
+            self.roughnessTexture = roughnessTexture
+            self.ambientOcclusionTexture = ambientOcclusionTexture
+        }
+
+        var sceneMaterial: SceneMaterial {
+            SceneMaterial(
+                albedoTexture: albedoTexture,
+                normalTexture: normalTexture,
+                roughnessTexture: roughnessTexture,
+                ambientOcclusionTexture: ambientOcclusionTexture,
+                baseColorFactor: baseColorFactor,
+                roughnessFactor: roughnessFactor,
+                ambientOcclusionStrength: 1.0,
+                normalScale: 1.0
+            )
+        }
+    }
+
     static func loadAsset(named name: String, category: String, assetRoot: String) -> LoadedAsset? {
         let assetDirectory = URL(fileURLWithPath: assetRoot, isDirectory: true).appendingPathComponent(category, isDirectory: true)
         let objectURL = assetDirectory.appendingPathComponent("\(name).obj")
@@ -2607,11 +3504,16 @@ private enum OBJAssetLoader {
             return nil
         }
 
-        var materials: [String: SIMD4<Float>] = [:]
+        let defaultMaterialName = "__default__"
+        var materials: [String: ParsedMaterial] = [
+            defaultMaterialName: ParsedMaterial(baseColorFactor: fallbackColor(for: name), roughnessFactor: 0.84)
+        ]
         var positions: [SIMD3<Float>] = []
+        var textureCoordinates: [SIMD2<Float>] = []
         var normals: [SIMD3<Float>] = []
-        var vertices: [SceneVertex] = []
-        var currentColor = SIMD4<Float>(0.72, 0.76, 0.82, 1)
+        var verticesByMaterial: [String: [SceneVertex]] = [:]
+        var materialOrder: [String] = []
+        var currentMaterialName = defaultMaterialName
 
         for rawLine in objectSource.split(whereSeparator: \.isNewline) {
             let line = rawLine.trimmingCharacters(in: .whitespaces)
@@ -2628,44 +3530,88 @@ private enum OBJAssetLoader {
             case "mtllib":
                 if parts.count > 1 {
                     let materialURL = assetDirectory.appendingPathComponent(String(parts[1]))
-                    materials = parseMaterialLibrary(at: materialURL)
+                    let parsedMaterials = parseMaterialLibrary(
+                        at: materialURL,
+                        assetDirectory: assetDirectory,
+                        assetRoot: assetRoot
+                    )
+                    for (materialName, material) in parsedMaterials {
+                        materials[materialName] = material
+                    }
                 }
             case "usemtl":
                 if parts.count > 1 {
-                    let materialName = String(parts[1])
-                    currentColor = materials[materialName] ?? fallbackColor(for: materialName)
+                    currentMaterialName = String(parts[1])
+                    if materials[currentMaterialName] == nil {
+                        materials[currentMaterialName] = ParsedMaterial(
+                            baseColorFactor: fallbackColor(for: currentMaterialName),
+                            roughnessFactor: 0.84
+                        )
+                    }
+                    if verticesByMaterial[currentMaterialName] == nil {
+                        verticesByMaterial[currentMaterialName] = []
+                        materialOrder.append(currentMaterialName)
+                    }
                 }
             case "v":
                 if let vertex = parseVertex(parts) {
                     positions.append(vertex)
+                }
+            case "vt":
+                if let textureCoordinate = parseTextureCoordinate(parts) {
+                    textureCoordinates.append(textureCoordinate)
                 }
             case "vn":
                 if let normal = parseNormal(parts) {
                     normals.append(normal)
                 }
             case "f":
+                if verticesByMaterial[currentMaterialName] == nil {
+                    verticesByMaterial[currentMaterialName] = []
+                    materialOrder.append(currentMaterialName)
+                }
                 appendFaceVertices(
                     parts.dropFirst(),
                     positions: positions,
+                    textureCoordinates: textureCoordinates,
                     normals: normals,
-                    color: currentColor,
-                    target: &vertices
+                    target: &verticesByMaterial[currentMaterialName, default: []]
                 )
             default:
                 continue
             }
         }
 
-        guard var boundsMin = vertices.first?.position, var boundsMax = vertices.first?.position else {
+        let submeshes = materialOrder.compactMap { materialName -> LoadedAssetSubmesh? in
+            guard let vertices = verticesByMaterial[materialName], !vertices.isEmpty else {
+                return nil
+            }
+
+            let sceneMaterial = materials[materialName]?.sceneMaterial ?? ParsedMaterial(
+                baseColorFactor: fallbackColor(for: materialName),
+                roughnessFactor: 0.84
+            ).sceneMaterial
+            let readableName = materialName == defaultMaterialName ? "Default" : materialName
+            return LoadedAssetSubmesh(name: readableName, vertices: vertices, material: sceneMaterial)
+        }
+
+        guard
+            let firstSubmesh = submeshes.first,
+            let firstVertex = firstSubmesh.vertices.first
+        else {
             return nil
         }
 
-        for vertex in vertices {
-            boundsMin = simd_min(boundsMin, vertex.position)
-            boundsMax = simd_max(boundsMax, vertex.position)
+        var boundsMin = firstVertex.position
+        var boundsMax = firstVertex.position
+        for submesh in submeshes {
+            for vertex in submesh.vertices {
+                boundsMin = simd_min(boundsMin, vertex.position)
+                boundsMax = simd_max(boundsMax, vertex.position)
+            }
         }
 
-        return LoadedAsset(vertices: vertices, boundsMin: boundsMin, boundsMax: boundsMax)
+        return LoadedAsset(submeshes: submeshes, boundsMin: boundsMin, boundsMax: boundsMax)
     }
 
     private static func parseVertex(_ parts: [Substring]) -> SIMD3<Float>? {
@@ -2682,6 +3628,21 @@ private enum OBJAssetLoader {
         }
 
         return SIMD3<Float>(x, z, -y)
+    }
+
+    private static func parseTextureCoordinate(_ parts: [Substring]) -> SIMD2<Float>? {
+        guard parts.count >= 3 else {
+            return nil
+        }
+
+        guard
+            let u = Float(parts[1]),
+            let v = Float(parts[2])
+        else {
+            return nil
+        }
+
+        return SIMD2<Float>(u, 1 - v)
     }
 
     private static func parseNormal(_ parts: [Substring]) -> SIMD3<Float>? {
@@ -2703,11 +3664,18 @@ private enum OBJAssetLoader {
     private static func appendFaceVertices(
         _ entries: ArraySlice<Substring>,
         positions: [SIMD3<Float>],
+        textureCoordinates: [SIMD2<Float>],
         normals: [SIMD3<Float>],
-        color: SIMD4<Float>,
         target: inout [SceneVertex]
     ) {
-        let faceIndices = entries.compactMap { parseFaceIndex(String($0), positionCount: positions.count, normalCount: normals.count) }
+        let faceIndices = entries.compactMap {
+            parseFaceIndex(
+                String($0),
+                positionCount: positions.count,
+                textureCoordinateCount: textureCoordinates.count,
+                normalCount: normals.count
+            )
+        }
         guard faceIndices.count >= 3 else {
             return
         }
@@ -2715,20 +3683,48 @@ private enum OBJAssetLoader {
         for triangleIndex in 1..<(faceIndices.count - 1) {
             let triangle = [faceIndices[0], faceIndices[triangleIndex], faceIndices[triangleIndex + 1]]
             let faceNormal = derivedFaceNormal(triangle: triangle, positions: positions)
+            let faceTangent = derivedTriangleTangent(
+                triangle: triangle,
+                positions: positions,
+                textureCoordinates: textureCoordinates,
+                faceNormal: faceNormal
+            )
 
             for corner in triangle {
                 let normal = corner.normalIndex.flatMap { normals[safe: $0] } ?? faceNormal
                 if let position = positions[safe: corner.positionIndex] {
-                    target.append(SceneVertex(position: position, normal: normal, uv: .zero, color: color))
+                    let uv = corner.textureCoordinateIndex.flatMap { textureCoordinates[safe: $0] } ?? .zero
+                    let tangent = orthogonalizedTangent(faceTangent, normal: normal)
+                    target.append(
+                        SceneVertex(
+                            position: position,
+                            normal: normal,
+                            tangent: tangent,
+                            uv: uv,
+                            color: SIMD4<Float>(1, 1, 1, 1)
+                        )
+                    )
                 }
             }
         }
     }
 
-    private static func parseFaceIndex(_ token: String, positionCount: Int, normalCount: Int) -> (positionIndex: Int, normalIndex: Int?)? {
+    private static func parseFaceIndex(
+        _ token: String,
+        positionCount: Int,
+        textureCoordinateCount: Int,
+        normalCount: Int
+    ) -> (positionIndex: Int, textureCoordinateIndex: Int?, normalIndex: Int?)? {
         let components = token.split(separator: "/", omittingEmptySubsequences: false)
         guard let positionIndex = resolveIndex(from: components[safe: 0], count: positionCount) else {
             return nil
+        }
+
+        let textureCoordinateIndex: Int?
+        if components.count >= 2 {
+            textureCoordinateIndex = resolveIndex(from: components[safe: 1], count: textureCoordinateCount)
+        } else {
+            textureCoordinateIndex = nil
         }
 
         let normalIndex: Int?
@@ -2738,7 +3734,7 @@ private enum OBJAssetLoader {
             normalIndex = nil
         }
 
-        return (positionIndex, normalIndex)
+        return (positionIndex, textureCoordinateIndex, normalIndex)
     }
 
     private static func resolveIndex(from token: Substring?, count: Int) -> Int? {
@@ -2755,7 +3751,7 @@ private enum OBJAssetLoader {
     }
 
     private static func derivedFaceNormal(
-        triangle: [(positionIndex: Int, normalIndex: Int?)],
+        triangle: [(positionIndex: Int, textureCoordinateIndex: Int?, normalIndex: Int?)],
         positions: [SIMD3<Float>]
     ) -> SIMD3<Float> {
         guard
@@ -2771,12 +3767,103 @@ private enum OBJAssetLoader {
         return length > 0.0001 ? candidate / length : SIMD3<Float>(0, 1, 0)
     }
 
-    private static func parseMaterialLibrary(at url: URL) -> [String: SIMD4<Float>] {
+    private static func derivedTriangleTangent(
+        triangle: [(positionIndex: Int, textureCoordinateIndex: Int?, normalIndex: Int?)],
+        positions: [SIMD3<Float>],
+        textureCoordinates: [SIMD2<Float>],
+        faceNormal: SIMD3<Float>
+    ) -> SIMD4<Float> {
+        guard
+            let p0 = positions[safe: triangle[0].positionIndex],
+            let p1 = positions[safe: triangle[1].positionIndex],
+            let p2 = positions[safe: triangle[2].positionIndex],
+            let uv0Index = triangle[0].textureCoordinateIndex,
+            let uv1Index = triangle[1].textureCoordinateIndex,
+            let uv2Index = triangle[2].textureCoordinateIndex,
+            let uv0 = textureCoordinates[safe: uv0Index],
+            let uv1 = textureCoordinates[safe: uv1Index],
+            let uv2 = textureCoordinates[safe: uv2Index]
+        else {
+            return fallbackTangent(for: faceNormal)
+        }
+
+        let deltaPosition0 = p1 - p0
+        let deltaPosition1 = p2 - p0
+        let deltaUV0 = uv1 - uv0
+        let deltaUV1 = uv2 - uv0
+        let determinant = (deltaUV0.x * deltaUV1.y) - (deltaUV0.y * deltaUV1.x)
+
+        guard abs(determinant) > 0.000_01 else {
+            return fallbackTangent(for: faceNormal)
+        }
+
+        let inverseDeterminant = 1 / determinant
+        let rawTangent = (deltaPosition0 * deltaUV1.y - deltaPosition1 * deltaUV0.y) * inverseDeterminant
+        let rawBitangent = (deltaPosition1 * deltaUV0.x - deltaPosition0 * deltaUV1.x) * inverseDeterminant
+        return orthogonalizedTangent(rawTangent, bitangent: rawBitangent, normal: faceNormal)
+    }
+
+    private static func orthogonalizedTangent(
+        _ tangent: SIMD4<Float>,
+        normal: SIMD3<Float>
+    ) -> SIMD4<Float> {
+        let xyz = SIMD3<Float>(tangent.x, tangent.y, tangent.z)
+        let length = simd_length(xyz)
+        guard length > 0.000_01 else {
+            return fallbackTangent(for: normal)
+        }
+
+        let normalizedTangent = xyz / length
+        let orthogonalized = simd_normalize(normalizedTangent - (normal * simd_dot(normal, normalizedTangent)))
+        guard isFinite(orthogonalized) else {
+            return fallbackTangent(for: normal)
+        }
+
+        return SIMD4<Float>(orthogonalized.x, orthogonalized.y, orthogonalized.z, tangent.w)
+    }
+
+    private static func orthogonalizedTangent(
+        _ tangent: SIMD3<Float>,
+        bitangent: SIMD3<Float>,
+        normal: SIMD3<Float>
+    ) -> SIMD4<Float> {
+        let tangentLength = simd_length(tangent)
+        guard tangentLength > 0.000_01 else {
+            return fallbackTangent(for: normal)
+        }
+
+        let normalizedTangent = tangent / tangentLength
+        let orthogonalized = simd_normalize(normalizedTangent - (normal * simd_dot(normal, normalizedTangent)))
+        guard isFinite(orthogonalized) else {
+            return fallbackTangent(for: normal)
+        }
+
+        let handedness: Float = simd_dot(simd_cross(normal, orthogonalized), bitangent) < 0 ? -1 : 1
+        return SIMD4<Float>(orthogonalized.x, orthogonalized.y, orthogonalized.z, handedness)
+    }
+
+    private static func fallbackTangent(for normal: SIMD3<Float>) -> SIMD4<Float> {
+        let candidate = abs(normal.y) < 0.999 ? SIMD3<Float>(0, 1, 0) : SIMD3<Float>(1, 0, 0)
+        let tangent = simd_normalize(simd_cross(candidate, normal))
+        return SIMD4<Float>(tangent.x, tangent.y, tangent.z, 1)
+    }
+
+    private static func isFinite(_ vector: SIMD3<Float>) -> Bool {
+        vector.x.isFinite && vector.y.isFinite && vector.z.isFinite
+    }
+
+    private static func parseMaterialLibrary(
+        at url: URL,
+        assetDirectory: URL,
+        assetRoot: String
+    ) -> [String: ParsedMaterial] {
         guard let source = try? String(contentsOf: url) else {
             return [:]
         }
 
-        var colors: [String: SIMD4<Float>] = [:]
+        let materialDirectory = url.deletingLastPathComponent()
+
+        var materials: [String: ParsedMaterial] = [:]
         var currentMaterial: String?
 
         for rawLine in source.split(whereSeparator: \.isNewline) {
@@ -2790,10 +3877,16 @@ private enum OBJAssetLoader {
                 continue
             }
 
-            switch keyword {
+            switch String(keyword).lowercased() {
             case "newmtl":
                 currentMaterial = parts.count > 1 ? String(parts[1]) : nil
-            case "Kd":
+                if let currentMaterial, materials[currentMaterial] == nil {
+                    materials[currentMaterial] = ParsedMaterial(
+                        baseColorFactor: fallbackColor(for: currentMaterial),
+                        roughnessFactor: 0.84
+                    )
+                }
+            case "kd":
                 guard
                     let currentMaterial,
                     parts.count >= 4,
@@ -2804,13 +3897,168 @@ private enum OBJAssetLoader {
                     continue
                 }
 
-                colors[currentMaterial] = SIMD4<Float>(red, green, blue, 1)
+                var material = materials[currentMaterial] ?? ParsedMaterial(
+                    baseColorFactor: fallbackColor(for: currentMaterial),
+                    roughnessFactor: 0.84
+                )
+                material.baseColorFactor = SIMD4<Float>(red, green, blue, material.baseColorFactor.w)
+                materials[currentMaterial] = material
+            case "d":
+                guard
+                    let currentMaterial,
+                    parts.count >= 2,
+                    let opacity = Float(parts[1])
+                else {
+                    continue
+                }
+
+                var material = materials[currentMaterial] ?? ParsedMaterial(
+                    baseColorFactor: fallbackColor(for: currentMaterial),
+                    roughnessFactor: 0.84
+                )
+                material.baseColorFactor.w = simd_clamp(opacity, 0.0, 1.0)
+                materials[currentMaterial] = material
+            case "tr":
+                guard
+                    let currentMaterial,
+                    parts.count >= 2,
+                    let transparency = Float(parts[1])
+                else {
+                    continue
+                }
+
+                var material = materials[currentMaterial] ?? ParsedMaterial(
+                    baseColorFactor: fallbackColor(for: currentMaterial),
+                    roughnessFactor: 0.84
+                )
+                material.baseColorFactor.w = simd_clamp(1 - transparency, 0.0, 1.0)
+                materials[currentMaterial] = material
+            case "ns":
+                guard
+                    let currentMaterial,
+                    parts.count >= 2,
+                    let specularExponent = Float(parts[1])
+                else {
+                    continue
+                }
+
+                var material = materials[currentMaterial] ?? ParsedMaterial(
+                    baseColorFactor: fallbackColor(for: currentMaterial),
+                    roughnessFactor: 0.84
+                )
+                material.roughnessFactor = roughness(fromSpecularExponent: specularExponent)
+                materials[currentMaterial] = material
+            case "map_kd":
+                guard
+                    let currentMaterial,
+                    let textureReference = parseTextureReference(
+                        from: parts,
+                        assetDirectory: materialDirectory,
+                        assetRoot: assetRoot
+                    )
+                else {
+                    continue
+                }
+
+                var material = materials[currentMaterial] ?? ParsedMaterial(
+                    baseColorFactor: fallbackColor(for: currentMaterial),
+                    roughnessFactor: 0.84
+                )
+                material.albedoTexture = textureReference
+                materials[currentMaterial] = material
+            case "map_bump", "bump", "norm", "map_normal":
+                guard
+                    let currentMaterial,
+                    let textureReference = parseTextureReference(
+                        from: parts,
+                        assetDirectory: materialDirectory,
+                        assetRoot: assetRoot
+                    )
+                else {
+                    continue
+                }
+
+                var material = materials[currentMaterial] ?? ParsedMaterial(
+                    baseColorFactor: fallbackColor(for: currentMaterial),
+                    roughnessFactor: 0.84
+                )
+                material.normalTexture = textureReference
+                materials[currentMaterial] = material
+            case "map_pr", "map_roughness":
+                guard
+                    let currentMaterial,
+                    let textureReference = parseTextureReference(
+                        from: parts,
+                        assetDirectory: materialDirectory,
+                        assetRoot: assetRoot
+                    )
+                else {
+                    continue
+                }
+
+                var material = materials[currentMaterial] ?? ParsedMaterial(
+                    baseColorFactor: fallbackColor(for: currentMaterial),
+                    roughnessFactor: 0.84
+                )
+                material.roughnessTexture = textureReference
+                materials[currentMaterial] = material
+            case "map_ao", "map_occ", "map_occlusion":
+                guard
+                    let currentMaterial,
+                    let textureReference = parseTextureReference(
+                        from: parts,
+                        assetDirectory: materialDirectory,
+                        assetRoot: assetRoot
+                    )
+                else {
+                    continue
+                }
+
+                var material = materials[currentMaterial] ?? ParsedMaterial(
+                    baseColorFactor: fallbackColor(for: currentMaterial),
+                    roughnessFactor: 0.84
+                )
+                material.ambientOcclusionTexture = textureReference
+                materials[currentMaterial] = material
             default:
                 continue
             }
         }
 
-        return colors
+        return materials
+    }
+
+    private static func parseTextureReference(
+        from parts: [Substring],
+        assetDirectory: URL,
+        assetRoot: String
+    ) -> SceneTextureReference? {
+        guard let lastToken = parts.last else {
+            return nil
+        }
+
+        let textureURL = assetDirectory.appendingPathComponent(String(lastToken))
+        guard let relativePath = relativeAssetPath(for: textureURL, assetRoot: assetRoot) else {
+            return nil
+        }
+        return .assetRelativePath(relativePath)
+    }
+
+    private static func relativeAssetPath(for url: URL, assetRoot: String) -> String? {
+        let rootPath = URL(fileURLWithPath: assetRoot, isDirectory: true).standardizedFileURL.path
+        let texturePath = url.standardizedFileURL.path
+
+        if texturePath.hasPrefix(rootPath + "/") {
+            return String(texturePath.dropFirst(rootPath.count + 1))
+        }
+
+        return nil
+    }
+
+    private static func roughness(fromSpecularExponent exponent: Float) -> Float {
+        let sanitizedExponent = max(exponent, 1)
+        let phongApproximation = sqrt(2 / (sanitizedExponent + 2))
+        return simd_clamp(phongApproximation, 0.08, 1.0)
     }
 
     private static func fallbackColor(for materialName: String) -> SIMD4<Float> {

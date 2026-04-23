@@ -3,71 +3,172 @@ import MetalKit
 import QuartzCore
 import simd
 
+private struct RendererShadowFrame {
+    let viewProjectionMatrix: simd_float4x4
+    let strength: Float
+    let normalBias: Float
+    let texelSize: Float
+}
+
+private enum SceneMaterialTextureSemantic: Hashable {
+    case albedo
+    case normal
+    case roughness
+    case ambientOcclusion
+}
+
+private struct SceneMaterialTextureKey: Hashable {
+    let reference: SceneTextureReference
+    let semantic: SceneMaterialTextureSemantic
+}
+
 final class GameRenderer: NSObject, MTKViewDelegate {
+    private static let maxFramesInFlight = 3
+    private static let sceneColorPixelFormat: MTLPixelFormat = .rgba16Float
+
+    private struct SessionOverlayUpdate {
+        let snapshot: GameFrameSnapshot
+        let drawableSize: CGSize
+        let briefing: (summary: String, details: [String])
+        let route: (summary: String, details: [String])
+        let evasion: (summary: String, details: [String])
+        let streaming: (summary: String, details: [String])
+    }
+
+    private struct SessionPerformanceUpdate {
+        let milliseconds: Double
+        let framesPerSecond: Double
+        let drawableCount: Int
+    }
+
     let deviceName: String
 
+    private let metalDevice: MTLDevice
     private let commandQueue: MTLCommandQueue
     private let terrainRenderer: JungleTerrainRenderer
     private let objectPipelineState: MTLRenderPipelineState
+    private let postProcessPipelineState: MTLRenderPipelineState
+    private let objectShadowPipelineState: MTLRenderPipelineState
     private let objectDepthStencilState: MTLDepthStencilState
+    private let shadowDepthStencilState: MTLDepthStencilState
     private let surfaceSamplerState: MTLSamplerState
+    private let postProcessSamplerState: MTLSamplerState
+    private let shadowCompareSamplerState: MTLSamplerState
     private let fallbackTexture: MTLTexture
-    private let sceneTextures: [SceneTextureKey: MTLTexture]
+    private let flatNormalTexture: MTLTexture
+    private let shadowMapTexture: MTLTexture
+    private let materialTextures: [SceneMaterialTextureKey: MTLTexture]
     private let scene: BootstrapScene
+    private let inFlightFrameSemaphore: DispatchSemaphore
     private weak var session: GameSession?
+    private var sceneColorTexture: MTLTexture?
+    private var sceneDepthTexture: MTLTexture?
     private var lastFrameTimestamp: CFTimeInterval?
     private var lastOverlayUpdateTime: CFTimeInterval = 0
     private var lastPerformanceUpdateTime: CFTimeInterval = 0
     private var accumulatedFrameTime: Double = 0
     private var accumulatedFrameCount = 0
+    private var nextFrameResourceIndex = 0
+    private let sessionUpdateLock = NSLock()
+    private var pendingSessionOverlayUpdate: SessionOverlayUpdate?
+    private var pendingSessionPerformanceUpdate: SessionPerformanceUpdate?
+    private var isSessionUpdateFlushScheduled = false
 
     init?(view: MTKView, session: GameSession) {
         guard
             let device = view.device,
-            let commandQueue = device.makeCommandQueue(),
+            let commandQueue = device.makeCommandQueue()
+        else {
+            return nil
+        }
+
+        let scene = BootstrapScene(
+            device: device,
+            assetRoot: session.assetRootPath,
+            worldDataRoot: session.worldDataRootPath,
+            worldManifestPath: session.worldManifestPath
+        )
+
+        guard
             let library = device.makeDefaultLibrary(),
             let objectVertexFunction = library.makeFunction(name: "bootstrapVertexMain"),
+            let objectShadowVertexFunction = library.makeFunction(name: "bootstrapShadowVertexMain"),
             let objectFragmentFunction = library.makeFunction(name: "bootstrapFragmentMain"),
+            let fullScreenVertexFunction = library.makeFunction(name: "skyVertexMain"),
+            let postProcessFragmentFunction = library.makeFunction(name: "postProcessFragmentMain"),
             let objectPipelineState = Self.makeObjectPipelineState(
                 device: device,
                 vertexFunction: objectVertexFunction,
                 fragmentFunction: objectFragmentFunction,
+                colorPixelFormat: Self.sceneColorPixelFormat,
+                depthPixelFormat: .depth32Float,
+                sampleCount: 1
+            ),
+            let postProcessPipelineState = Self.makePostProcessPipelineState(
+                device: device,
+                vertexFunction: fullScreenVertexFunction,
+                fragmentFunction: postProcessFragmentFunction,
                 colorPixelFormat: view.colorPixelFormat,
-                depthPixelFormat: view.depthStencilPixelFormat,
-                sampleCount: view.sampleCount
+                sampleCount: max(view.sampleCount, 1)
+            ),
+            let objectShadowPipelineState = Self.makeShadowPipelineState(
+                device: device,
+                vertexFunction: objectShadowVertexFunction,
+                depthPixelFormat: .depth32Float
             ),
             let objectDepthStencilState = Self.makeDepthStencilState(
                 device: device,
                 writeEnabled: true,
                 compareFunction: .less
             ),
+            let shadowDepthStencilState = Self.makeDepthStencilState(
+                device: device,
+                writeEnabled: true,
+                compareFunction: .less
+            ),
             let surfaceSamplerState = Self.makeSurfaceSamplerState(device: device),
+            let postProcessSamplerState = Self.makePostProcessSamplerState(device: device),
+            let shadowCompareSamplerState = Self.makeShadowCompareSamplerState(device: device),
             let fallbackTexture = Self.makeFallbackTexture(device: device),
+            let flatNormalTexture = Self.makeFlatNormalTexture(device: device),
+            let shadowMapTexture = Self.makeShadowMapTexture(
+                device: device,
+                resolution: scene.environment.shadow.mapResolution
+            ),
             let terrainRenderer = JungleTerrainRenderer(
                 device: device,
-                colorPixelFormat: view.colorPixelFormat,
-                depthPixelFormat: view.depthStencilPixelFormat
+                colorPixelFormat: Self.sceneColorPixelFormat,
+                depthPixelFormat: .depth32Float,
+                shadowDepthPixelFormat: shadowMapTexture.pixelFormat,
+                maxFramesInFlight: Self.maxFramesInFlight
             )
         else {
             return nil
         }
 
         self.deviceName = device.name
+        self.metalDevice = device
         self.commandQueue = commandQueue
         self.terrainRenderer = terrainRenderer
         self.objectPipelineState = objectPipelineState
+        self.postProcessPipelineState = postProcessPipelineState
+        self.objectShadowPipelineState = objectShadowPipelineState
         self.objectDepthStencilState = objectDepthStencilState
+        self.shadowDepthStencilState = shadowDepthStencilState
         self.surfaceSamplerState = surfaceSamplerState
+        self.postProcessSamplerState = postProcessSamplerState
+        self.shadowCompareSamplerState = shadowCompareSamplerState
         self.fallbackTexture = fallbackTexture
+        self.flatNormalTexture = flatNormalTexture
+        self.shadowMapTexture = shadowMapTexture
+        self.inFlightFrameSemaphore = DispatchSemaphore(value: Self.maxFramesInFlight)
         self.session = session
+        self.sceneColorTexture = nil
+        self.sceneDepthTexture = nil
         let textureLoader = MTKTextureLoader(device: device)
-        self.scene = BootstrapScene(
-            device: device,
-            assetRoot: session.assetRootPath,
-            worldDataRoot: session.worldDataRootPath,
-            worldManifestPath: session.worldManifestPath
-        )
-        self.sceneTextures = Self.loadSceneTextures(
+        self.scene = scene
+        self.materialTextures = Self.loadMaterialTextures(
+            for: scene.drawables,
             with: textureLoader,
             assetRoot: URL(fileURLWithPath: session.assetRootPath, isDirectory: true)
         )
@@ -123,25 +224,16 @@ final class GameRenderer: NSObject, MTKViewDelegate {
 
         if now - lastOverlayUpdateTime > 0.12 {
             lastOverlayUpdateTime = now
-            DispatchQueue.main.async { [weak self] in
-                self?.session?.accept(snapshot: snapshot, drawableSize: view.drawableSize)
-                self?.session?.noteBriefingState(
-                    summary: briefingState.summary,
-                    details: briefingState.details
+            enqueueSessionOverlayUpdate(
+                SessionOverlayUpdate(
+                    snapshot: snapshot,
+                    drawableSize: view.drawableSize,
+                    briefing: (summary: briefingState.summary, details: briefingState.details),
+                    route: (summary: routeState.summary, details: routeState.details),
+                    evasion: (summary: evasionState.summary, details: evasionState.details),
+                    streaming: (summary: streamingState.summary, details: streamingState.details)
                 )
-                self?.session?.noteRouteState(
-                    summary: routeState.summary,
-                    details: routeState.details
-                )
-                self?.session?.noteEvasionState(
-                    summary: evasionState.summary,
-                    details: evasionState.details
-                )
-                self?.session?.noteStreamingState(
-                    summary: streamingState.summary,
-                    details: streamingState.details
-                )
-            }
+            )
         }
 
         if now - lastPerformanceUpdateTime > 0.45, accumulatedFrameCount > 0 {
@@ -151,21 +243,41 @@ final class GameRenderer: NSObject, MTKViewDelegate {
             accumulatedFrameTime = 0
             accumulatedFrameCount = 0
 
-            DispatchQueue.main.async { [weak self] in
-                self?.session?.noteFrameTiming(
+            enqueueSessionPerformanceUpdate(
+                SessionPerformanceUpdate(
                     milliseconds: averageFrameTime * 1000,
                     framesPerSecond: framesPerSecond,
                     drawableCount: visibilityState.drawables.count
                 )
-            }
+            )
         }
 
         guard
-            let renderPassDescriptor = view.currentRenderPassDescriptor,
+            let presentationRenderPassDescriptor = view.currentRenderPassDescriptor,
             let drawable = view.currentDrawable,
             let commandBuffer = commandQueue.makeCommandBuffer()
         else {
             return
+        }
+
+        guard ensureSceneRenderTargets(width: drawable.texture.width, height: drawable.texture.height) else {
+            return
+        }
+
+        // Reuse one buffer set per in-flight frame so CPU writes never race the GPU.
+        inFlightFrameSemaphore.wait()
+        let frameResourceIndex = nextFrameResourceIndex
+        nextFrameResourceIndex = (nextFrameResourceIndex + 1) % Self.maxFramesInFlight
+        let inFlightFrameSemaphore = self.inFlightFrameSemaphore
+        var shouldSignalInFlightSemaphore = true
+        defer {
+            if shouldSignalInFlightSemaphore {
+                inFlightFrameSemaphore.signal()
+            }
+        }
+
+        commandBuffer.addCompletedHandler { _ in
+            inFlightFrameSemaphore.signal()
         }
 
         let aspectRatio = max(Float(view.drawableSize.width / max(view.drawableSize.height, 1)), 0.1)
@@ -202,25 +314,65 @@ final class GameRenderer: NSObject, MTKViewDelegate {
         )
         let skyColor = terrainRenderer.skyColor(for: terrainFrame)
         let atmosphereControls = terrainRenderer.atmosphereControls(for: terrainFrame)
-
-        renderPassDescriptor.colorAttachments[0].loadAction = .clear
-        renderPassDescriptor.colorAttachments[0].storeAction = .store
-        renderPassDescriptor.colorAttachments[0].clearColor = MTLClearColor(
-            red: Double(skyColor.x),
-            green: Double(skyColor.y),
-            blue: Double(skyColor.z),
-            alpha: 1
+        let lightDirection = terrainRenderer.lightDirection(for: terrainFrame)
+        let shadowFrame = makeShadowFrame(
+            cameraPosition: cameraPosition,
+            cameraForward: forwardVector,
+            lightDirection: lightDirection,
+            scopeActive: scopeActive
         )
-        renderPassDescriptor.depthAttachment.loadAction = .clear
-        renderPassDescriptor.depthAttachment.storeAction = .dontCare
-        renderPassDescriptor.depthAttachment.clearDepth = 1
+        let shadowCasters = scene.shadowCasterDrawables(
+            for: cameraPosition,
+            scopeActive: scopeActive
+        )
 
-        guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor) else {
+        if let shadowRenderPassDescriptor = Self.makeShadowRenderPassDescriptor(texture: shadowMapTexture),
+           let shadowEncoder = commandBuffer.makeRenderCommandEncoder(descriptor: shadowRenderPassDescriptor) {
+            shadowEncoder.label = "SunShadowPass"
+            shadowEncoder.setDepthStencilState(shadowDepthStencilState)
+            shadowEncoder.setCullMode(.back)
+            shadowEncoder.setFrontFacing(.counterClockwise)
+            shadowEncoder.setDepthBias(
+                scene.environment.shadow.depthBias,
+                slopeScale: 1.75,
+                clamp: max(scene.environment.shadow.depthBias * 4.0, 0.01)
+            )
+            terrainRenderer.drawShadowPass(
+                in: shadowEncoder,
+                frame: terrainFrame,
+                shadowFrame: shadowFrame,
+                frameResourceIndex: frameResourceIndex
+            )
+            drawShadowCasters(
+                shadowCasters,
+                encoder: shadowEncoder,
+                shadowFrame: shadowFrame
+            )
+            shadowEncoder.endEncoding()
+        }
+
+        guard
+            let sceneColorTexture,
+            let sceneDepthTexture,
+            let sceneRenderPassDescriptor = Self.makeSceneRenderPassDescriptor(
+                colorTexture: sceneColorTexture,
+                depthTexture: sceneDepthTexture,
+                clearColor: skyColor
+            ),
+            let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: sceneRenderPassDescriptor)
+        else {
             return
         }
 
         encoder.label = "JungleTerrainAndSolidObjectsPass"
-        terrainRenderer.draw(in: encoder, frame: terrainFrame) { [weak self] encoder in
+        terrainRenderer.draw(
+            in: encoder,
+            frame: terrainFrame,
+            shadowFrame: shadowFrame,
+            shadowTexture: shadowMapTexture,
+            shadowSamplerState: shadowCompareSamplerState,
+            frameResourceIndex: frameResourceIndex
+        ) { [weak self] encoder in
             guard let self else {
                 return
             }
@@ -231,14 +383,127 @@ final class GameRenderer: NSObject, MTKViewDelegate {
                 viewProjectionMatrix: viewProjectionMatrix,
                 cameraPosition: cameraPosition,
                 terrainFrame: terrainFrame,
+                lightDirection: lightDirection,
+                shadowFrame: shadowFrame,
                 skyColor: skyColor,
                 atmosphereControls: atmosphereControls
             )
         }
         encoder.endEncoding()
 
+        presentationRenderPassDescriptor.colorAttachments[0].loadAction = .clear
+        presentationRenderPassDescriptor.colorAttachments[0].storeAction = .store
+        presentationRenderPassDescriptor.colorAttachments[0].clearColor = MTLClearColor(
+            red: 0,
+            green: 0,
+            blue: 0,
+            alpha: 1
+        )
+        presentationRenderPassDescriptor.depthAttachment.loadAction = .dontCare
+        presentationRenderPassDescriptor.depthAttachment.storeAction = .dontCare
+
+        guard let postProcessEncoder = commandBuffer.makeRenderCommandEncoder(descriptor: presentationRenderPassDescriptor) else {
+            return
+        }
+
+        drawPostProcessedScene(
+            from: sceneColorTexture,
+            encoder: postProcessEncoder
+        )
+        postProcessEncoder.endEncoding()
+
         commandBuffer.present(drawable)
         commandBuffer.commit()
+        shouldSignalInFlightSemaphore = false
+    }
+
+    private func enqueueSessionOverlayUpdate(_ update: SessionOverlayUpdate) {
+        sessionUpdateLock.lock()
+        pendingSessionOverlayUpdate = update
+        let shouldScheduleFlush = !isSessionUpdateFlushScheduled
+        if shouldScheduleFlush {
+            isSessionUpdateFlushScheduled = true
+        }
+        sessionUpdateLock.unlock()
+
+        guard shouldScheduleFlush else {
+            return
+        }
+
+        DispatchQueue.main.async { [weak self] in
+            self?.flushPendingSessionUpdates()
+        }
+    }
+
+    private func enqueueSessionPerformanceUpdate(_ update: SessionPerformanceUpdate) {
+        sessionUpdateLock.lock()
+        pendingSessionPerformanceUpdate = update
+        let shouldScheduleFlush = !isSessionUpdateFlushScheduled
+        if shouldScheduleFlush {
+            isSessionUpdateFlushScheduled = true
+        }
+        sessionUpdateLock.unlock()
+
+        guard shouldScheduleFlush else {
+            return
+        }
+
+        DispatchQueue.main.async { [weak self] in
+            self?.flushPendingSessionUpdates()
+        }
+    }
+
+    private func flushPendingSessionUpdates() {
+        let overlayUpdate: SessionOverlayUpdate?
+        let performanceUpdate: SessionPerformanceUpdate?
+
+        sessionUpdateLock.lock()
+        overlayUpdate = pendingSessionOverlayUpdate
+        pendingSessionOverlayUpdate = nil
+        performanceUpdate = pendingSessionPerformanceUpdate
+        pendingSessionPerformanceUpdate = nil
+        isSessionUpdateFlushScheduled = false
+        sessionUpdateLock.unlock()
+
+        if let overlayUpdate {
+            session?.applyRendererUpdate(
+                snapshot: overlayUpdate.snapshot,
+                drawableSize: overlayUpdate.drawableSize,
+                briefing: overlayUpdate.briefing,
+                route: overlayUpdate.route,
+                evasion: overlayUpdate.evasion,
+                streaming: overlayUpdate.streaming,
+                frameTiming: performanceUpdate.map { performanceUpdate in
+                    (
+                        milliseconds: performanceUpdate.milliseconds,
+                        framesPerSecond: performanceUpdate.framesPerSecond,
+                        drawableCount: performanceUpdate.drawableCount
+                    )
+                }
+            )
+        } else if let performanceUpdate {
+            session?.applyRendererFrameTimingUpdate(
+                milliseconds: performanceUpdate.milliseconds,
+                framesPerSecond: performanceUpdate.framesPerSecond,
+                drawableCount: performanceUpdate.drawableCount
+            )
+        }
+
+        sessionUpdateLock.lock()
+        let shouldScheduleFlush = (pendingSessionOverlayUpdate != nil || pendingSessionPerformanceUpdate != nil)
+            && !isSessionUpdateFlushScheduled
+        if shouldScheduleFlush {
+            isSessionUpdateFlushScheduled = true
+        }
+        sessionUpdateLock.unlock()
+
+        guard shouldScheduleFlush else {
+            return
+        }
+
+        DispatchQueue.main.async { [weak self] in
+            self?.flushPendingSessionUpdates()
+        }
     }
 
     private func drawSolidObjects(
@@ -247,6 +512,8 @@ final class GameRenderer: NSObject, MTKViewDelegate {
         viewProjectionMatrix: simd_float4x4,
         cameraPosition: SIMD3<Float>,
         terrainFrame: JungleTerrainFrame,
+        lightDirection: SIMD3<Float>,
+        shadowFrame: RendererShadowFrame,
         skyColor: SIMD3<Float>,
         atmosphereControls: SIMD4<Float>
     ) {
@@ -254,7 +521,6 @@ final class GameRenderer: NSObject, MTKViewDelegate {
             return
         }
 
-        let lightDirection = terrainRenderer.lightDirection(for: terrainFrame)
         let baseFogColor = SIMD3<Float>(
             scene.environment.fogColor.x,
             scene.environment.fogColor.y,
@@ -269,10 +535,12 @@ final class GameRenderer: NSObject, MTKViewDelegate {
         encoder.setCullMode(.back)
         encoder.setFrontFacing(.counterClockwise)
         encoder.setFragmentSamplerState(surfaceSamplerState, index: 0)
+        encoder.setFragmentSamplerState(shadowCompareSamplerState, index: 1)
 
         for drawable in drawables {
             var uniforms = SceneUniforms(
                 viewProjectionMatrix: viewProjectionMatrix,
+                shadowViewProjectionMatrix: shadowFrame.viewProjectionMatrix,
                 modelMatrix: drawable.modelMatrix,
                 lightDirection: SIMD4<Float>(
                     -lightDirection.x,
@@ -294,22 +562,147 @@ final class GameRenderer: NSObject, MTKViewDelegate {
                     fogNear,
                     fogFar
                 ),
-                atmosphereParameters: SIMD4<Float>(atmosphereControls.x, 0, 0, 0)
+                atmosphereParameters: SIMD4<Float>(atmosphereControls.x, 0, 0, 0),
+                shadowParameters: SIMD4<Float>(
+                    drawable.receivesShadow ? shadowFrame.strength : 0.0,
+                    shadowFrame.normalBias,
+                    shadowFrame.texelSize,
+                    0
+                )
+            )
+            var materialUniforms = SceneMaterialUniforms(
+                baseColorFactor: drawable.material.baseColorFactor,
+                channelFactors: SIMD4<Float>(
+                    drawable.material.roughnessFactor,
+                    drawable.material.ambientOcclusionStrength,
+                    drawable.material.normalScale,
+                    0
+                )
             )
 
             encoder.setVertexBuffer(drawable.vertexBuffer, offset: 0, index: 0)
             encoder.setVertexBytes(&uniforms, length: MemoryLayout<SceneUniforms>.stride, index: 1)
             encoder.setFragmentBytes(&uniforms, length: MemoryLayout<SceneUniforms>.stride, index: 1)
-            encoder.setFragmentTexture(
-                drawable.textureKey.flatMap { sceneTextures[$0] } ?? fallbackTexture,
-                index: 0
-            )
+            encoder.setFragmentBytes(&materialUniforms, length: MemoryLayout<SceneMaterialUniforms>.stride, index: 2)
+            encoder.setFragmentTexture(materialTexture(for: drawable.material.albedoTexture, semantic: .albedo) ?? fallbackTexture, index: 0)
+            encoder.setFragmentTexture(materialTexture(for: drawable.material.normalTexture, semantic: .normal) ?? flatNormalTexture, index: 1)
+            encoder.setFragmentTexture(materialTexture(for: drawable.material.roughnessTexture, semantic: .roughness) ?? fallbackTexture, index: 2)
+            encoder.setFragmentTexture(materialTexture(for: drawable.material.ambientOcclusionTexture, semantic: .ambientOcclusion) ?? fallbackTexture, index: 3)
+            encoder.setFragmentTexture(shadowMapTexture, index: 4)
             encoder.drawPrimitives(
                 type: .triangle,
                 vertexStart: 0,
                 vertexCount: drawable.vertexCount
             )
         }
+    }
+
+    private func drawShadowCasters(
+        _ drawables: [SceneDrawable],
+        encoder: MTLRenderCommandEncoder,
+        shadowFrame: RendererShadowFrame
+    ) {
+        guard !drawables.isEmpty else {
+            return
+        }
+
+        encoder.setRenderPipelineState(objectShadowPipelineState)
+        encoder.setDepthStencilState(shadowDepthStencilState)
+        encoder.setCullMode(.back)
+        encoder.setFrontFacing(.counterClockwise)
+
+        for drawable in drawables where drawable.castsShadow {
+            var uniforms = SceneUniforms(
+                viewProjectionMatrix: .identity(),
+                shadowViewProjectionMatrix: shadowFrame.viewProjectionMatrix,
+                modelMatrix: drawable.modelMatrix,
+                lightDirection: SIMD4<Float>(0, 0, 0, 0),
+                sunColor: SIMD4<Float>(0, 0, 0, 0),
+                cameraPosition: SIMD4<Float>(0, 0, 0, 0),
+                fogColor: SIMD4<Float>(0, 0, 0, 0),
+                lightingParameters: SIMD4<Float>(0, 0, 0, 0),
+                atmosphereParameters: SIMD4<Float>(0, 0, 0, 0),
+                shadowParameters: SIMD4<Float>(0, 0, 0, 0)
+            )
+
+            encoder.setVertexBuffer(drawable.vertexBuffer, offset: 0, index: 0)
+            encoder.setVertexBytes(&uniforms, length: MemoryLayout<SceneUniforms>.stride, index: 1)
+            encoder.drawPrimitives(
+                type: .triangle,
+                vertexStart: 0,
+                vertexCount: drawable.vertexCount
+            )
+        }
+    }
+
+    private func drawPostProcessedScene(
+        from sceneTexture: MTLTexture,
+        encoder: MTLRenderCommandEncoder
+    ) {
+        var uniforms = ScenePostProcessUniforms(
+            exposureParameters: SIMD4<Float>(
+                scene.environment.postProcess.exposureBias,
+                scene.environment.postProcess.whitePoint,
+                scene.environment.postProcess.contrast,
+                scene.environment.postProcess.saturation
+            ),
+            shadowTint: scene.environment.postProcess.shadowTint,
+            highlightTint: scene.environment.postProcess.highlightTint,
+            gradeParameters: SIMD4<Float>(
+                scene.environment.postProcess.shadowBalance,
+                scene.environment.postProcess.vignetteStrength,
+                0,
+                0
+            )
+        )
+
+        encoder.label = "ScenePostProcessPass"
+        encoder.setRenderPipelineState(postProcessPipelineState)
+        encoder.setFragmentBytes(&uniforms, length: MemoryLayout<ScenePostProcessUniforms>.stride, index: 0)
+        encoder.setFragmentTexture(sceneTexture, index: 0)
+        encoder.setFragmentSamplerState(postProcessSamplerState, index: 0)
+        encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
+    }
+
+    private func ensureSceneRenderTargets(width: Int, height: Int) -> Bool {
+        guard width > 0, height > 0 else {
+            return false
+        }
+
+        if
+            let sceneColorTexture,
+            let sceneDepthTexture,
+            sceneColorTexture.width == width,
+            sceneColorTexture.height == height,
+            sceneDepthTexture.width == width,
+            sceneDepthTexture.height == height
+        {
+            return true
+        }
+
+        sceneColorTexture = Self.makeSceneColorTexture(
+            device: metalDevice,
+            width: width,
+            height: height
+        )
+        sceneDepthTexture = Self.makeSceneDepthTexture(
+            device: metalDevice,
+            width: width,
+            height: height
+        )
+
+        return sceneColorTexture != nil && sceneDepthTexture != nil
+    }
+
+    private func materialTexture(
+        for reference: SceneTextureReference?,
+        semantic: SceneMaterialTextureSemantic
+    ) -> MTLTexture? {
+        guard let reference else {
+            return nil
+        }
+
+        return materialTextures[SceneMaterialTextureKey(reference: reference, semantic: semantic)]
     }
 
     private func prepareFreshRun() {
@@ -334,14 +727,19 @@ final class GameRenderer: NSObject, MTKViewDelegate {
             return
         }
 
-        session.noteSceneReady(
-            label: scene.debugInfo.sceneName,
-            summary: scene.debugInfo.summary,
-            details: scene.debugInfo.details
-        )
-        session.noteOverlayTitle(scene.debugInfo.cycleLabel)
-        session.noteScopeConfiguration(scene.scopeConfiguration)
-        session.noteMapConfiguration(scene.mapConfiguration)
+        let debugInfo = scene.debugInfo
+        let scopeConfiguration = scene.scopeConfiguration
+        let mapConfiguration = scene.mapConfiguration
+        DispatchQueue.main.async {
+            session.noteSceneBootstrap(
+                label: debugInfo.sceneName,
+                summary: debugInfo.summary,
+                details: debugInfo.details,
+                overlayTitle: debugInfo.cycleLabel,
+                scopeConfiguration: scopeConfiguration,
+                mapConfiguration: mapConfiguration
+            )
+        }
     }
 
     private static func horizontalRightVector(from forwardVector: SIMD3<Float>) -> SIMD3<Float> {
@@ -352,6 +750,111 @@ final class GameRenderer: NSObject, MTKViewDelegate {
         }
 
         return simd_normalize(horizontal)
+    }
+
+    private func makeShadowFrame(
+        cameraPosition: SIMD3<Float>,
+        cameraForward: SIMD3<Float>,
+        lightDirection: SIMD3<Float>,
+        scopeActive: Bool
+    ) -> RendererShadowFrame {
+        let settings = scene.environment.shadow
+        let coverage = max(
+            settings.coverage * (scopeActive ? settings.scopeCoverageMultiplier : 1.0),
+            24.0
+        )
+        let horizontalForward = Self.horizontalForwardVector(from: cameraForward)
+        let focusCenter = cameraPosition + horizontalForward * (coverage * settings.forwardOffsetMultiplier)
+        let lightUpVector = Self.shadowUpVector(for: lightDirection)
+        let lightViewMatrix = simd_float4x4.lookAt(
+            eye: focusCenter - lightDirection * max(coverage * 2.0, 120.0),
+            center: focusCenter,
+            up: lightUpVector
+        )
+
+        let horizontalExtent = coverage
+        let verticalExtent = max(coverage * 0.8, 42.0)
+        let lowerExtent = max(verticalExtent * 0.55, 18.0)
+        let depthPadding = max(coverage, 48.0)
+        let corners = Self.shadowBoundsCorners(
+            center: focusCenter,
+            horizontalExtent: horizontalExtent,
+            lowerExtent: lowerExtent,
+            upperExtent: verticalExtent
+        )
+
+        var minimum = SIMD3<Float>(repeating: .greatestFiniteMagnitude)
+        var maximum = SIMD3<Float>(repeating: -.greatestFiniteMagnitude)
+        for corner in corners {
+            let lightSpaceCorner = lightViewMatrix * SIMD4<Float>(corner.x, corner.y, corner.z, 1)
+            let lightSpacePoint = SIMD3<Float>(lightSpaceCorner.x, lightSpaceCorner.y, lightSpaceCorner.z)
+            minimum = simd_min(minimum, lightSpacePoint)
+            maximum = simd_max(maximum, lightSpacePoint)
+        }
+
+        let projectionWidth = max(maximum.x - minimum.x, 1.0)
+        let projectionHeight = max(maximum.y - minimum.y, 1.0)
+        let lightSpaceCenter = (minimum + maximum) * 0.5
+        let texelWidth = projectionWidth / Float(settings.mapResolution)
+        let texelHeight = projectionHeight / Float(settings.mapResolution)
+        let snappedCenterX = round(lightSpaceCenter.x / max(texelWidth, 0.0001)) * max(texelWidth, 0.0001)
+        let snappedCenterY = round(lightSpaceCenter.y / max(texelHeight, 0.0001)) * max(texelHeight, 0.0001)
+        let left = snappedCenterX - (projectionWidth * 0.5)
+        let right = snappedCenterX + (projectionWidth * 0.5)
+        let bottom = snappedCenterY - (projectionHeight * 0.5)
+        let top = snappedCenterY + (projectionHeight * 0.5)
+        let nearZ = minimum.z - depthPadding
+        let farZ = maximum.z + depthPadding
+        let shadowProjectionMatrix = simd_float4x4.orthographic(
+            left: left,
+            right: right,
+            bottom: bottom,
+            top: top,
+            nearZ: nearZ,
+            farZ: farZ
+        )
+
+        return RendererShadowFrame(
+            viewProjectionMatrix: shadowProjectionMatrix * lightViewMatrix,
+            strength: settings.strength,
+            normalBias: settings.normalBias,
+            texelSize: 1.0 / Float(settings.mapResolution)
+        )
+    }
+
+    private static func horizontalForwardVector(from forwardVector: SIMD3<Float>) -> SIMD3<Float> {
+        let horizontal = SIMD3<Float>(forwardVector.x, 0, forwardVector.z)
+        let lengthSquared = simd_length_squared(horizontal)
+        guard lengthSquared > 0.000_001 else {
+            return SIMD3<Float>(0, 0, -1)
+        }
+
+        return simd_normalize(horizontal)
+    }
+
+    private static func shadowUpVector(for lightDirection: SIMD3<Float>) -> SIMD3<Float> {
+        let worldUp = SIMD3<Float>(0, 1, 0)
+        return abs(simd_dot(lightDirection, worldUp)) > 0.92
+            ? SIMD3<Float>(0, 0, 1)
+            : worldUp
+    }
+
+    private static func shadowBoundsCorners(
+        center: SIMD3<Float>,
+        horizontalExtent: Float,
+        lowerExtent: Float,
+        upperExtent: Float
+    ) -> [SIMD3<Float>] {
+        [
+            SIMD3<Float>(center.x - horizontalExtent, center.y - lowerExtent, center.z - horizontalExtent),
+            SIMD3<Float>(center.x - horizontalExtent, center.y - lowerExtent, center.z + horizontalExtent),
+            SIMD3<Float>(center.x + horizontalExtent, center.y - lowerExtent, center.z - horizontalExtent),
+            SIMD3<Float>(center.x + horizontalExtent, center.y - lowerExtent, center.z + horizontalExtent),
+            SIMD3<Float>(center.x - horizontalExtent, center.y + upperExtent, center.z - horizontalExtent),
+            SIMD3<Float>(center.x - horizontalExtent, center.y + upperExtent, center.z + horizontalExtent),
+            SIMD3<Float>(center.x + horizontalExtent, center.y + upperExtent, center.z - horizontalExtent),
+            SIMD3<Float>(center.x + horizontalExtent, center.y + upperExtent, center.z + horizontalExtent),
+        ]
     }
 
     private static func makeObjectPipelineState(
@@ -379,6 +882,35 @@ final class GameRenderer: NSObject, MTKViewDelegate {
         return try? device.makeRenderPipelineState(descriptor: descriptor)
     }
 
+    private static func makePostProcessPipelineState(
+        device: MTLDevice,
+        vertexFunction: MTLFunction,
+        fragmentFunction: MTLFunction,
+        colorPixelFormat: MTLPixelFormat,
+        sampleCount: Int
+    ) -> MTLRenderPipelineState? {
+        let descriptor = MTLRenderPipelineDescriptor()
+        descriptor.label = "ScenePostProcessPipeline"
+        descriptor.vertexFunction = vertexFunction
+        descriptor.fragmentFunction = fragmentFunction
+        descriptor.colorAttachments[0].pixelFormat = colorPixelFormat
+        descriptor.rasterSampleCount = sampleCount
+        return try? device.makeRenderPipelineState(descriptor: descriptor)
+    }
+
+    private static func makeShadowPipelineState(
+        device: MTLDevice,
+        vertexFunction: MTLFunction,
+        depthPixelFormat: MTLPixelFormat
+    ) -> MTLRenderPipelineState? {
+        let descriptor = MTLRenderPipelineDescriptor()
+        descriptor.label = "SolidObjectShadowPipeline"
+        descriptor.vertexFunction = vertexFunction
+        descriptor.fragmentFunction = nil
+        descriptor.depthAttachmentPixelFormat = depthPixelFormat
+        return try? device.makeRenderPipelineState(descriptor: descriptor)
+    }
+
     private static func makeDepthStencilState(
         device: MTLDevice,
         writeEnabled: Bool,
@@ -398,6 +930,27 @@ final class GameRenderer: NSObject, MTKViewDelegate {
         samplerDescriptor.sAddressMode = .repeat
         samplerDescriptor.tAddressMode = .repeat
         samplerDescriptor.maxAnisotropy = 8
+        return device.makeSamplerState(descriptor: samplerDescriptor)
+    }
+
+    private static func makePostProcessSamplerState(device: MTLDevice) -> MTLSamplerState? {
+        let samplerDescriptor = MTLSamplerDescriptor()
+        samplerDescriptor.minFilter = .linear
+        samplerDescriptor.magFilter = .linear
+        samplerDescriptor.mipFilter = .notMipmapped
+        samplerDescriptor.sAddressMode = .clampToEdge
+        samplerDescriptor.tAddressMode = .clampToEdge
+        return device.makeSamplerState(descriptor: samplerDescriptor)
+    }
+
+    private static func makeShadowCompareSamplerState(device: MTLDevice) -> MTLSamplerState? {
+        let samplerDescriptor = MTLSamplerDescriptor()
+        samplerDescriptor.minFilter = .linear
+        samplerDescriptor.magFilter = .linear
+        samplerDescriptor.mipFilter = .notMipmapped
+        samplerDescriptor.sAddressMode = .clampToEdge
+        samplerDescriptor.tAddressMode = .clampToEdge
+        samplerDescriptor.compareFunction = .lessEqual
         return device.makeSamplerState(descriptor: samplerDescriptor)
     }
 
@@ -425,17 +978,143 @@ final class GameRenderer: NSObject, MTKViewDelegate {
         return texture
     }
 
-    private static func loadSceneTextures(
+    private static func makeFlatNormalTexture(device: MTLDevice) -> MTLTexture? {
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .rgba8Unorm,
+            width: 1,
+            height: 1,
+            mipmapped: false
+        )
+        descriptor.usage = .shaderRead
+
+        guard let texture = device.makeTexture(descriptor: descriptor) else {
+            return nil
+        }
+
+        var pixel: [UInt8] = [128, 128, 255, 255]
+        texture.replace(
+            region: MTLRegionMake2D(0, 0, 1, 1),
+            mipmapLevel: 0,
+            withBytes: &pixel,
+            bytesPerRow: 4
+        )
+        texture.label = "Fallback Normal Texture"
+        return texture
+    }
+
+    private static func makeSceneColorTexture(
+        device: MTLDevice,
+        width: Int,
+        height: Int
+    ) -> MTLTexture? {
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: sceneColorPixelFormat,
+            width: max(width, 1),
+            height: max(height, 1),
+            mipmapped: false
+        )
+        descriptor.storageMode = .private
+        descriptor.usage = [.renderTarget, .shaderRead]
+        let texture = device.makeTexture(descriptor: descriptor)
+        texture?.label = "SceneHDRColor"
+        return texture
+    }
+
+    private static func makeSceneDepthTexture(
+        device: MTLDevice,
+        width: Int,
+        height: Int
+    ) -> MTLTexture? {
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .depth32Float,
+            width: max(width, 1),
+            height: max(height, 1),
+            mipmapped: false
+        )
+        descriptor.storageMode = .private
+        descriptor.usage = .renderTarget
+        let texture = device.makeTexture(descriptor: descriptor)
+        texture?.label = "SceneHDRDepth"
+        return texture
+    }
+
+    private static func makeShadowMapTexture(
+        device: MTLDevice,
+        resolution: Int
+    ) -> MTLTexture? {
+        let normalizedResolution = max(resolution, 512)
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .depth32Float,
+            width: normalizedResolution,
+            height: normalizedResolution,
+            mipmapped: false
+        )
+        descriptor.storageMode = .private
+        descriptor.usage = [.renderTarget, .shaderRead]
+        let texture = device.makeTexture(descriptor: descriptor)
+        texture?.label = "SunShadowMap"
+        return texture
+    }
+
+    private static func makeSceneRenderPassDescriptor(
+        colorTexture: MTLTexture,
+        depthTexture: MTLTexture,
+        clearColor: SIMD3<Float>
+    ) -> MTLRenderPassDescriptor? {
+        let descriptor = MTLRenderPassDescriptor()
+        descriptor.colorAttachments[0].texture = colorTexture
+        descriptor.colorAttachments[0].loadAction = .clear
+        descriptor.colorAttachments[0].storeAction = .store
+        descriptor.colorAttachments[0].clearColor = MTLClearColor(
+            red: Double(clearColor.x),
+            green: Double(clearColor.y),
+            blue: Double(clearColor.z),
+            alpha: 1.0
+        )
+        descriptor.depthAttachment.texture = depthTexture
+        descriptor.depthAttachment.loadAction = .clear
+        descriptor.depthAttachment.storeAction = .dontCare
+        descriptor.depthAttachment.clearDepth = 1.0
+        return descriptor
+    }
+
+    private static func makeShadowRenderPassDescriptor(texture: MTLTexture) -> MTLRenderPassDescriptor? {
+        let descriptor = MTLRenderPassDescriptor()
+        descriptor.depthAttachment.texture = texture
+        descriptor.depthAttachment.loadAction = .clear
+        descriptor.depthAttachment.storeAction = .store
+        descriptor.depthAttachment.clearDepth = 1.0
+        return descriptor
+    }
+
+    private static func loadMaterialTextures(
+        for drawables: [SceneDrawable],
         with loader: MTKTextureLoader,
         assetRoot: URL
-    ) -> [SceneTextureKey: MTLTexture] {
-        let textureDirectory = assetRoot.appendingPathComponent("Textures/Final", isDirectory: true)
-        var textures: [SceneTextureKey: MTLTexture] = [:]
+    ) -> [SceneMaterialTextureKey: MTLTexture] {
+        var requestedTextures: Set<SceneMaterialTextureKey> = []
 
-        for textureKey in SceneTextureKey.allCases {
-            let textureURL = textureDirectory.appendingPathComponent(textureKey.rawValue)
+        for drawable in drawables {
+            if let reference = drawable.material.albedoTexture {
+                requestedTextures.insert(SceneMaterialTextureKey(reference: reference, semantic: .albedo))
+            }
+            if let reference = drawable.material.normalTexture {
+                requestedTextures.insert(SceneMaterialTextureKey(reference: reference, semantic: .normal))
+            }
+            if let reference = drawable.material.roughnessTexture {
+                requestedTextures.insert(SceneMaterialTextureKey(reference: reference, semantic: .roughness))
+            }
+            if let reference = drawable.material.ambientOcclusionTexture {
+                requestedTextures.insert(SceneMaterialTextureKey(reference: reference, semantic: .ambientOcclusion))
+            }
+        }
+
+        var textures: [SceneMaterialTextureKey: MTLTexture] = [:]
+
+        for textureKey in requestedTextures {
+            let textureURL = textureURL(for: textureKey.reference, assetRoot: assetRoot)
             guard FileManager.default.fileExists(atPath: textureURL.path) else {
-                print("[Renderer] Missing scene texture at \(textureURL.path)")
+                print("[Renderer] Missing material texture at \(textureURL.path)")
                 continue
             }
 
@@ -443,11 +1122,11 @@ final class GameRenderer: NSObject, MTKViewDelegate {
                 let texture = try loader.newTexture(
                     URL: textureURL,
                     options: [
-                        MTKTextureLoader.Option.SRGB: false,
+                        MTKTextureLoader.Option.SRGB: textureKey.semantic == .albedo,
                         MTKTextureLoader.Option.generateMipmaps: true,
                     ]
                 )
-                texture.label = textureKey.rawValue
+                texture.label = textureURL.lastPathComponent
                 textures[textureKey] = texture
             } catch {
                 print("[Renderer] Failed to load texture \(textureURL.lastPathComponent): \(error)")
@@ -457,12 +1136,33 @@ final class GameRenderer: NSObject, MTKViewDelegate {
         return textures
     }
 
+    private static func textureURL(
+        for reference: SceneTextureReference,
+        assetRoot: URL
+    ) -> URL {
+        switch reference {
+        case .sceneKey(let textureKey):
+            return assetRoot
+                .appendingPathComponent("Textures", isDirectory: true)
+                .appendingPathComponent("Final", isDirectory: true)
+                .appendingPathComponent(textureKey.rawValue)
+        case .assetRelativePath(let relativePath):
+            return assetRoot.appendingPathComponent(relativePath)
+        }
+    }
+
     private static func mix(_ start: SIMD3<Float>, _ end: SIMD3<Float>, t: Float) -> SIMD3<Float> {
         start + (end - start) * simd_clamp(t, 0.0, 1.0)
     }
 }
 
 private final class JungleTerrainRenderer {
+    private struct TerrainFrameResources {
+        var uniformBuffer: MTLBuffer
+        var vertexBuffers: [MTLBuffer?]
+        var vertexCapacity = 0
+    }
+
     private struct TerrainVertex {
         var position: SIMD3<Float>
         var color: SIMD4<Float>
@@ -471,9 +1171,11 @@ private final class JungleTerrainRenderer {
 
     private struct TerrainUniforms {
         var viewProjectionMatrix: simd_float4x4
+        var shadowViewProjectionMatrix: simd_float4x4
         var cameraPositionAndTime: SIMD4<Float>
         var skyColorAndVisibility: SIMD4<Float>
         var atmosphereControls: SIMD4<Float>
+        var shadowParameters: SIMD4<Float>
     }
 
     private enum TerrainLayerKind {
@@ -548,15 +1250,18 @@ private final class JungleTerrainRenderer {
 
     struct TerrainUniforms {
         float4x4 viewProjectionMatrix;
+        float4x4 shadowViewProjectionMatrix;
         float4 cameraPositionAndTime;
         float4 skyColorAndVisibility;
         float4 atmosphereControls;
+        float4 shadowParameters;
     };
 
     struct TerrainRasterizerData {
         float4 position [[position]];
         float4 color;
         float3 worldPosition;
+        float4 shadowPosition;
     };
 
     vertex TerrainRasterizerData jungleTerrainVertex(
@@ -571,12 +1276,62 @@ private final class JungleTerrainRenderer {
         out.position = uniforms.viewProjectionMatrix * float4(animatedPosition, 1.0f);
         out.color = in.color;
         out.worldPosition = animatedPosition;
+        out.shadowPosition = uniforms.shadowViewProjectionMatrix * float4(animatedPosition, 1.0f);
         return out;
+    }
+
+    vertex float4 jungleTerrainShadowVertex(
+        TerrainVertexIn in [[stage_in]],
+        constant TerrainUniforms &uniforms [[buffer(1)]]
+    ) {
+        float time = uniforms.cameraPositionAndTime.w;
+        float wind = sin((in.position.x * 0.05f) + (in.position.z * 0.04f) + time * 0.9f);
+        float3 animatedPosition = in.position;
+        animatedPosition.y += wind * in.motion * 0.06f;
+        return uniforms.shadowViewProjectionMatrix * float4(animatedPosition, 1.0f);
+    }
+
+    float sampleTerrainShadowVisibility(
+        float4 shadowPosition,
+        constant TerrainUniforms &uniforms,
+        depth2d<float> shadowTexture,
+        sampler shadowSampler
+    ) {
+        float shadowStrength = clamp(uniforms.shadowParameters.x, 0.0, 1.0);
+        if (shadowStrength <= 0.001 || shadowPosition.w <= 0.0001) {
+            return 1.0;
+        }
+
+        float3 projected = shadowPosition.xyz / shadowPosition.w;
+        float2 uv = projected.xy * 0.5 + 0.5;
+        float depth = projected.z * 0.5 + 0.5;
+        if (
+            uv.x <= 0.001 || uv.x >= 0.999 ||
+            uv.y <= 0.001 || uv.y >= 0.999 ||
+            depth <= 0.0 || depth >= 1.0
+        ) {
+            return 1.0;
+        }
+
+        float texelSize = max(uniforms.shadowParameters.z, 1.0 / 8192.0);
+        float receiverBias = max(uniforms.shadowParameters.y, 0.0);
+        float comparisonDepth = saturate(depth - receiverBias);
+
+        float visibility = 0.0;
+        visibility += shadowTexture.sample_compare(shadowSampler, uv, comparisonDepth);
+        visibility += shadowTexture.sample_compare(shadowSampler, uv + float2(texelSize, 0.0), comparisonDepth);
+        visibility += shadowTexture.sample_compare(shadowSampler, uv + float2(0.0, texelSize), comparisonDepth);
+        visibility += shadowTexture.sample_compare(shadowSampler, uv + float2(texelSize, texelSize), comparisonDepth);
+        visibility *= 0.25;
+
+        return 1.0 - ((1.0 - visibility) * shadowStrength);
     }
 
     fragment float4 jungleTerrainFragment(
         TerrainRasterizerData in [[stage_in]],
-        constant TerrainUniforms &uniforms [[buffer(0)]]
+        constant TerrainUniforms &uniforms [[buffer(0)]],
+        depth2d<float> shadowTexture [[texture(0)]],
+        sampler shadowSampler [[sampler(0)]]
     ) {
         float visibilityDistance = max(uniforms.skyColorAndVisibility.w, 1.0f);
         float distanceToCamera = distance(in.worldPosition, uniforms.cameraPositionAndTime.xyz);
@@ -594,6 +1349,12 @@ private final class JungleTerrainRenderer {
             saturate(uniforms.atmosphereControls.w)
         );
         float3 color = mix(contrasted, atmosphereColor, fog);
+        color *= sampleTerrainShadowVisibility(
+            in.shadowPosition,
+            uniforms,
+            shadowTexture,
+            shadowSampler
+        );
         float alpha = saturate(in.color.a * mix(1.0f, 0.74f, fogProgress));
         return float4(color, alpha);
     }
@@ -602,18 +1363,24 @@ private final class JungleTerrainRenderer {
     private let metalDevice: MTLDevice
     private let solidPipelineState: MTLRenderPipelineState
     private let alphaPipelineState: MTLRenderPipelineState
+    private let shadowPipelineState: MTLRenderPipelineState
     private let solidDepthStencilState: MTLDepthStencilState
     private let alphaDepthStencilState: MTLDepthStencilState
+    private let maxFramesInFlight: Int
     private var cachedIndexBuffers: [Int: (buffer: MTLBuffer, indexCount: Int)] = [:]
+    private var frameResources: [TerrainFrameResources] = []
 
     init?(
         device: MTLDevice,
         colorPixelFormat: MTLPixelFormat,
-        depthPixelFormat: MTLPixelFormat
+        depthPixelFormat: MTLPixelFormat,
+        shadowDepthPixelFormat: MTLPixelFormat,
+        maxFramesInFlight: Int
     ) {
         guard
             let library = try? device.makeLibrary(source: Self.shaderSource, options: nil),
             let vertexFunction = library.makeFunction(name: "jungleTerrainVertex"),
+            let shadowVertexFunction = library.makeFunction(name: "jungleTerrainShadowVertex"),
             let fragmentFunction = library.makeFunction(name: "jungleTerrainFragment")
         else {
             return nil
@@ -660,6 +1427,12 @@ private final class JungleTerrainRenderer {
                 device: device,
                 writeEnabled: false,
                 compareFunction: .lessEqual
+            ),
+            let shadowPipelineState = Self.makeShadowPipelineState(
+                device: device,
+                vertexFunction: shadowVertexFunction,
+                vertexDescriptor: vertexDescriptor,
+                depthPixelFormat: shadowDepthPixelFormat
             )
         else {
             return nil
@@ -668,21 +1441,51 @@ private final class JungleTerrainRenderer {
         self.metalDevice = device
         self.solidPipelineState = solidPipelineState
         self.alphaPipelineState = alphaPipelineState
+        self.shadowPipelineState = shadowPipelineState
         self.solidDepthStencilState = solidDepthStencilState
         self.alphaDepthStencilState = alphaDepthStencilState
+        self.maxFramesInFlight = max(maxFramesInFlight, 1)
+        self.frameResources.reserveCapacity(self.maxFramesInFlight)
+
+        for frameIndex in 0..<self.maxFramesInFlight {
+            guard let uniformBuffer = device.makeBuffer(
+                length: MemoryLayout<TerrainUniforms>.stride,
+                options: .storageModeShared
+            ) else {
+                return nil
+            }
+
+            uniformBuffer.label = "JungleTerrainUniformBuffer[\(frameIndex)]"
+            self.frameResources.append(
+                TerrainFrameResources(
+                    uniformBuffer: uniformBuffer,
+                    vertexBuffers: Array(repeating: nil, count: Self.terrainLayers.count)
+                )
+            )
+        }
     }
 
     func draw(
         in encoder: MTLRenderCommandEncoder,
         frame: JungleTerrainFrame,
+        shadowFrame: RendererShadowFrame,
+        shadowTexture: MTLTexture,
+        shadowSamplerState: MTLSamplerState,
+        frameResourceIndex: Int,
         solidObjectDrawer: (MTLRenderCommandEncoder) -> Void
     ) {
+        let resourceIndex = normalizedFrameResourceIndex(frameResourceIndex)
         guard
-            let terrainPayloads = makeTerrainPayloads(for: frame),
-            let uniformBuffer = makeUniformBuffer(
+            let terrainPayloads = makeTerrainPayloads(
+                for: frame,
+                frameResourceIndex: resourceIndex
+            ),
+            let uniformBuffer = updateUniformBuffer(
                 for: frame,
                 skyColor: skyColor(for: frame),
-                atmosphereControls: atmosphereControls(for: frame)
+                atmosphereControls: atmosphereControls(for: frame),
+                shadowFrame: shadowFrame,
+                frameResourceIndex: resourceIndex
             )
         else {
             solidObjectDrawer(encoder)
@@ -693,6 +1496,8 @@ private final class JungleTerrainRenderer {
             terrainPayloads.filter { $0.layer.isOpaque },
             encoder: encoder,
             uniformBuffer: uniformBuffer,
+            shadowTexture: shadowTexture,
+            shadowSamplerState: shadowSamplerState,
             opaque: true
         )
         solidObjectDrawer(encoder)
@@ -700,8 +1505,56 @@ private final class JungleTerrainRenderer {
             terrainPayloads.filter { !$0.layer.isOpaque },
             encoder: encoder,
             uniformBuffer: uniformBuffer,
+            shadowTexture: shadowTexture,
+            shadowSamplerState: shadowSamplerState,
             opaque: false
         )
+    }
+
+    func drawShadowPass(
+        in encoder: MTLRenderCommandEncoder,
+        frame: JungleTerrainFrame,
+        shadowFrame: RendererShadowFrame,
+        frameResourceIndex: Int
+    ) {
+        let resourceIndex = normalizedFrameResourceIndex(frameResourceIndex)
+        guard
+            let terrainPayloads = makeTerrainPayloads(
+                for: frame,
+                frameResourceIndex: resourceIndex
+            ),
+            let uniformBuffer = updateUniformBuffer(
+                for: frame,
+                skyColor: SIMD3<Float>(repeating: 0),
+                atmosphereControls: .zero,
+                shadowFrame: shadowFrame,
+                frameResourceIndex: resourceIndex
+            )
+        else {
+            return
+        }
+
+        let opaquePayloads = terrainPayloads.filter { $0.layer.isOpaque }
+        guard !opaquePayloads.isEmpty else {
+            return
+        }
+
+        encoder.setRenderPipelineState(shadowPipelineState)
+        encoder.setDepthStencilState(solidDepthStencilState)
+        encoder.setCullMode(.back)
+        encoder.setFrontFacing(.counterClockwise)
+        encoder.setVertexBuffer(uniformBuffer, offset: 0, index: 1)
+
+        for terrainPayload in opaquePayloads {
+            encoder.setVertexBuffer(terrainPayload.vertexBuffer, offset: 0, index: 0)
+            encoder.drawIndexedPrimitives(
+                type: .triangle,
+                indexCount: terrainPayload.indexCount,
+                indexType: .uint16,
+                indexBuffer: terrainPayload.indexBuffer,
+                indexBufferOffset: 0
+            )
+        }
     }
 
     func skyColor(for frame: JungleTerrainFrame) -> SIMD3<Float> {
@@ -786,6 +1639,8 @@ private final class JungleTerrainRenderer {
         _ payloads: [TerrainPayload],
         encoder: MTLRenderCommandEncoder,
         uniformBuffer: MTLBuffer,
+        shadowTexture: MTLTexture,
+        shadowSamplerState: MTLSamplerState,
         opaque: Bool
     ) {
         guard !payloads.isEmpty else {
@@ -796,6 +1651,8 @@ private final class JungleTerrainRenderer {
         encoder.setFrontFacing(.counterClockwise)
         encoder.setVertexBuffer(uniformBuffer, offset: 0, index: 1)
         encoder.setFragmentBuffer(uniformBuffer, offset: 0, index: 0)
+        encoder.setFragmentTexture(shadowTexture, index: 0)
+        encoder.setFragmentSamplerState(shadowSamplerState, index: 0)
 
         for terrainPayload in payloads {
             if opaque {
@@ -817,7 +1674,10 @@ private final class JungleTerrainRenderer {
         }
     }
 
-    private func makeTerrainPayloads(for frame: JungleTerrainFrame) -> [TerrainPayload]? {
+    private func makeTerrainPayloads(
+        for frame: JungleTerrainFrame,
+        frameResourceIndex: Int
+    ) -> [TerrainPayload]? {
         let patch = frame.terrainPatch
         guard
             patch.sampleSide >= 2,
@@ -829,20 +1689,22 @@ private final class JungleTerrainRenderer {
 
         var payloads: [TerrainPayload] = []
         payloads.reserveCapacity(Self.terrainLayers.count)
+        let vertexBufferLength = patch.samples.count * MemoryLayout<TerrainVertex>.stride
 
-        for layer in Self.terrainLayers {
+        guard ensureVertexBufferCapacity(
+            frameResourceIndex: frameResourceIndex,
+            requiredLength: vertexBufferLength
+        ) else {
+            return nil
+        }
+
+        for (layerIndex, layer) in Self.terrainLayers.enumerated() {
             let vertices = buildVertices(from: patch, layer: layer, frame: frame)
-            guard let vertexBuffer = vertices.withUnsafeBytes({ bytes -> MTLBuffer? in
-                guard let baseAddress = bytes.baseAddress else {
-                    return nil
-                }
-
-                return metalDevice.makeBuffer(
-                    bytes: baseAddress,
-                    length: bytes.count,
-                    options: .storageModeShared
-                )
-            }) else {
+            guard let vertexBuffer = updateVertexBuffer(
+                with: vertices,
+                frameResourceIndex: frameResourceIndex,
+                layerIndex: layerIndex
+            ) else {
                 return nil
             }
 
@@ -1384,13 +2246,16 @@ private final class JungleTerrainRenderer {
         )
     }
 
-    private func makeUniformBuffer(
+    private func updateUniformBuffer(
         for frame: JungleTerrainFrame,
         skyColor: SIMD3<Float>,
-        atmosphereControls: SIMD4<Float>
+        atmosphereControls: SIMD4<Float>,
+        shadowFrame: RendererShadowFrame,
+        frameResourceIndex: Int
     ) -> MTLBuffer? {
         var uniforms = TerrainUniforms(
             viewProjectionMatrix: frame.viewProjectionMatrix,
+            shadowViewProjectionMatrix: shadowFrame.viewProjectionMatrix,
             cameraPositionAndTime: SIMD4<Float>(
                 frame.cameraPosition.x,
                 frame.cameraPosition.y,
@@ -1403,20 +2268,90 @@ private final class JungleTerrainRenderer {
                 skyColor.z,
                 frame.visibilityDistance
             ),
-            atmosphereControls: atmosphereControls
+            atmosphereControls: atmosphereControls,
+            shadowParameters: SIMD4<Float>(
+                shadowFrame.strength,
+                shadowFrame.normalBias,
+                shadowFrame.texelSize,
+                0
+            )
         )
 
-        return withUnsafeBytes(of: &uniforms) { bytes in
+        let uniformBuffer = frameResources[frameResourceIndex].uniformBuffer
+        withUnsafeBytes(of: &uniforms) { bytes in
             guard let baseAddress = bytes.baseAddress else {
-                return nil
+                return
             }
 
-            return metalDevice.makeBuffer(
-                bytes: baseAddress,
-                length: bytes.count,
-                options: .storageModeShared
-            )
+            uniformBuffer.contents().copyMemory(from: baseAddress, byteCount: bytes.count)
         }
+
+        return uniformBuffer
+    }
+
+    private func updateVertexBuffer(
+        with vertices: [TerrainVertex],
+        frameResourceIndex: Int,
+        layerIndex: Int
+    ) -> MTLBuffer? {
+        guard let vertexBuffer = frameResources[frameResourceIndex].vertexBuffers[layerIndex] else {
+            return nil
+        }
+
+        let byteCount = vertices.count * MemoryLayout<TerrainVertex>.stride
+        guard byteCount <= vertexBuffer.length else {
+            return nil
+        }
+
+        vertices.withUnsafeBytes { bytes in
+            guard let baseAddress = bytes.baseAddress else {
+                return
+            }
+
+            vertexBuffer.contents().copyMemory(from: baseAddress, byteCount: bytes.count)
+        }
+
+        return vertexBuffer
+    }
+
+    private func ensureVertexBufferCapacity(
+        frameResourceIndex: Int,
+        requiredLength: Int
+    ) -> Bool {
+        guard requiredLength > 0 else {
+            return true
+        }
+
+        if frameResources[frameResourceIndex].vertexCapacity >= requiredLength {
+            return true
+        }
+
+        var buffers: [MTLBuffer?] = []
+        buffers.reserveCapacity(Self.terrainLayers.count)
+
+        for layerIndex in Self.terrainLayers.indices {
+            guard let buffer = metalDevice.makeBuffer(
+                length: requiredLength,
+                options: .storageModeShared
+            ) else {
+                return false
+            }
+
+            buffer.label = "JungleTerrainVertexBuffer[\(frameResourceIndex):\(layerIndex)]"
+            buffers.append(buffer)
+        }
+
+        frameResources[frameResourceIndex].vertexBuffers = buffers
+        frameResources[frameResourceIndex].vertexCapacity = requiredLength
+        return true
+    }
+
+    private func normalizedFrameResourceIndex(_ frameResourceIndex: Int) -> Int {
+        guard maxFramesInFlight > 0 else {
+            return 0
+        }
+
+        return ((frameResourceIndex % maxFramesInFlight) + maxFramesInFlight) % maxFramesInFlight
     }
 
     private func indexBuffer(for sampleSide: Int) -> (buffer: MTLBuffer, indexCount: Int)? {
@@ -1508,6 +2443,21 @@ private final class JungleTerrainRenderer {
             attachment?.destinationAlphaBlendFactor = .oneMinusSourceAlpha
         }
 
+        return try? device.makeRenderPipelineState(descriptor: descriptor)
+    }
+
+    private static func makeShadowPipelineState(
+        device: MTLDevice,
+        vertexFunction: MTLFunction,
+        vertexDescriptor: MTLVertexDescriptor,
+        depthPixelFormat: MTLPixelFormat
+    ) -> MTLRenderPipelineState? {
+        let descriptor = MTLRenderPipelineDescriptor()
+        descriptor.label = "JungleTerrainShadowPipeline"
+        descriptor.vertexFunction = vertexFunction
+        descriptor.fragmentFunction = nil
+        descriptor.vertexDescriptor = vertexDescriptor
+        descriptor.depthAttachmentPixelFormat = depthPixelFormat
         return try? device.makeRenderPipelineState(descriptor: descriptor)
     }
 
