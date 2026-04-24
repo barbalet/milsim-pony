@@ -10,6 +10,7 @@ protocol InputTrackingMetalViewDelegate: AnyObject {
         isRepeat: Bool
     )
     func inputView(_ view: InputTrackingMetalView, mouseDidMove deltaX: CGFloat, deltaY: CGFloat)
+    func inputViewDidRequestPrimaryFire(_ view: InputTrackingMetalView)
     func inputViewDidBecomeActive(_ view: InputTrackingMetalView)
 }
 
@@ -79,6 +80,10 @@ struct MetalGameView: NSViewRepresentable {
             session.handleMouseDelta(x: deltaX, y: deltaY)
         }
 
+        func inputViewDidRequestPrimaryFire(_ view: InputTrackingMetalView) {
+            session.handlePrimaryFireRequest()
+        }
+
         func inputViewDidBecomeActive(_ view: InputTrackingMetalView) {
             session.noteViewActivation()
         }
@@ -98,15 +103,30 @@ final class InputTrackingMetalView: MTKView {
     weak var inputDelegate: InputTrackingMetalViewDelegate?
     private var localTrackingArea: NSTrackingArea?
     private var localKeyMonitor: Any?
+    private var keyWindowObserver: NSObjectProtocol?
+    private var appDidBecomeActiveObserver: NSObjectProtocol?
+    private weak var observedWindow: NSWindow?
 
     deinit {
         if let localKeyMonitor {
             NSEvent.removeMonitor(localKeyMonitor)
         }
+        removeWindowObservers()
     }
 
     override var acceptsFirstResponder: Bool {
         true
+    }
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
+        true
+    }
+
+    override func viewWillMove(toWindow newWindow: NSWindow?) {
+        if observedWindow !== newWindow {
+            removeWindowObservers()
+        }
+        super.viewWillMove(toWindow: newWindow)
     }
 
     override func viewDidMoveToWindow() {
@@ -114,6 +134,7 @@ final class InputTrackingMetalView: MTKView {
         window?.acceptsMouseMovedEvents = true
         window?.makeFirstResponder(self)
         installLocalKeyMonitorIfNeeded()
+        installWindowObserversIfNeeded()
         DispatchQueue.main.async { [weak self] in
             guard let self else {
                 return
@@ -144,7 +165,11 @@ final class InputTrackingMetalView: MTKView {
     }
 
     override func mouseDown(with event: NSEvent) {
+        let canFireImmediately = window?.isKeyWindow == true && window?.firstResponder === self
         captureInputFocus()
+        if canFireImmediately {
+            inputDelegate?.inputViewDidRequestPrimaryFire(self)
+        }
         super.mouseDown(with: event)
     }
 
@@ -159,6 +184,47 @@ final class InputTrackingMetalView: MTKView {
         window.acceptsMouseMovedEvents = true
         window.makeFirstResponder(self)
         inputDelegate?.inputViewDidBecomeActive(self)
+    }
+
+    private func installWindowObserversIfNeeded() {
+        guard let window, observedWindow !== window else {
+            return
+        }
+
+        removeWindowObservers()
+        observedWindow = window
+        keyWindowObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.didBecomeKeyNotification,
+            object: window,
+            queue: .main
+        ) { [weak self] _ in
+            self?.captureInputFocus()
+        }
+        appDidBecomeActiveObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self, self.window?.isKeyWindow == true else {
+                return
+            }
+
+            self.captureInputFocus()
+        }
+    }
+
+    private func removeWindowObservers() {
+        if let keyWindowObserver {
+            NotificationCenter.default.removeObserver(keyWindowObserver)
+            self.keyWindowObserver = nil
+        }
+
+        if let appDidBecomeActiveObserver {
+            NotificationCenter.default.removeObserver(appDidBecomeActiveObserver)
+            self.appDidBecomeActiveObserver = nil
+        }
+
+        observedWindow = nil
     }
 
     override func keyDown(with event: NSEvent) {

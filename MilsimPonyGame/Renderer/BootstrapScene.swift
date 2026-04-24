@@ -84,6 +84,23 @@ struct ScenePostProcessSettings {
     let vignetteStrength: Float
 }
 
+struct SceneBallisticsSettings {
+    let muzzleVelocityMetersPerSecond: Float
+    let gravityMetersPerSecondSquared: Float
+    let maxSimulationTimeSeconds: Float
+    let simulationStepSeconds: Float
+    let launchHeightOffsetMeters: Float
+    let scopedSpreadDegrees: Float
+    let hipSpreadDegrees: Float
+    let movementSpreadDegrees: Float
+    let sprintSpreadDegrees: Float
+    let settleDurationSeconds: Float
+    let breathCycleSeconds: Float
+    let breathAmplitudeDegrees: Float
+    let holdBreathDurationSeconds: Float
+    let holdBreathRecoverySeconds: Float
+}
+
 struct SceneDrawable {
     let name: String
     let vertexBuffer: MTLBuffer
@@ -191,6 +208,7 @@ struct SceneMapThreatObserver: Identifiable {
     let id: String
     let label: String
     let point: SceneMapPoint
+    let yawDegrees: Float
     let range: Float
     let fieldOfViewDegrees: Float
     let markerColor: SIMD4<Float>
@@ -425,6 +443,8 @@ final class BootstrapScene {
     private(set) var debugInfo: SceneDebugInfo
     let environment: SceneEnvironment
     let scopeConfiguration: ScopeConfiguration
+    let ballisticsSettings: SceneBallisticsSettings
+    let detectionFailThreshold: Float
     private(set) var mapConfiguration: SceneMapConfiguration
 
     private let sectors: [SceneSectorRuntime]
@@ -454,6 +474,8 @@ final class BootstrapScene {
             debugInfoTemplate = buildResult.debugInfo
             environment = buildResult.environment
             scopeConfiguration = buildResult.scopeConfiguration
+            ballisticsSettings = buildResult.ballisticsSettings
+            detectionFailThreshold = buildResult.evasionInfo.failThreshold
             mapConfiguration = buildResult.mapConfiguration
             mapConfigurationTemplate = buildResult.mapConfiguration
             sectors = buildResult.sectors
@@ -477,6 +499,8 @@ final class BootstrapScene {
             debugInfoTemplate = fallbackResult.debugInfo
             environment = fallbackResult.environment
             scopeConfiguration = fallbackResult.scopeConfiguration
+            ballisticsSettings = fallbackResult.ballisticsSettings
+            detectionFailThreshold = fallbackResult.evasionInfo.failThreshold
             mapConfiguration = fallbackResult.mapConfiguration
             mapConfigurationTemplate = fallbackResult.mapConfiguration
             sectors = fallbackResult.sectors
@@ -527,6 +551,25 @@ final class BootstrapScene {
             traversalTuning.sprintSpeed,
             traversalTuning.lookSensitivity
         )
+
+            GameCoreConfigureBallistics(
+                GameBallisticsConfiguration(
+                    muzzleVelocityMetersPerSecond: ballisticsSettings.muzzleVelocityMetersPerSecond,
+                    gravityMetersPerSecondSquared: ballisticsSettings.gravityMetersPerSecondSquared,
+                    maxSimulationTimeSeconds: ballisticsSettings.maxSimulationTimeSeconds,
+                    simulationStepSeconds: ballisticsSettings.simulationStepSeconds,
+                    launchHeightOffsetMeters: ballisticsSettings.launchHeightOffsetMeters,
+                    scopedSpreadDegrees: ballisticsSettings.scopedSpreadDegrees,
+                    hipSpreadDegrees: ballisticsSettings.hipSpreadDegrees,
+                    movementSpreadDegrees: ballisticsSettings.movementSpreadDegrees,
+                    sprintSpreadDegrees: ballisticsSettings.sprintSpreadDegrees,
+                    settleDurationSeconds: ballisticsSettings.settleDurationSeconds,
+                    breathCycleSeconds: ballisticsSettings.breathCycleSeconds,
+                    breathAmplitudeDegrees: ballisticsSettings.breathAmplitudeDegrees,
+                    holdBreathDurationSeconds: ballisticsSettings.holdBreathDurationSeconds,
+                    holdBreathRecoverySeconds: ballisticsSettings.holdBreathRecoverySeconds
+                )
+            )
     }
 
     func prepareFreshRun() {
@@ -690,6 +733,7 @@ final class BootstrapScene {
                     ),
                     "Review Pack: \(mapConfiguration.reviewPackTitle) / \(mapConfiguration.comparisonStops.count) comparison stops / \(mapConfiguration.openRisks.count) open risks",
                     "Combat Rehearsal: \(mapConfiguration.combatRehearsalTitle) / \(mapConfiguration.contactStops.count) contact lanes / \(mapConfiguration.threatObservers.count) observers",
+                    "Contacts: \(snapshot.neutralizedObserverCount) neutralized / \(max(snapshot.totalObserverCount - snapshot.neutralizedObserverCount, 0)) live",
                     String(
                         format: "Run: %.1fs / %.0fm / %d restarts",
                         snapshot.elapsedSeconds,
@@ -772,6 +816,7 @@ final class BootstrapScene {
         let cameraPosition = SIMD3<Float>(snapshot.cameraX, snapshot.cameraY, snapshot.cameraZ)
         var details: [String] = [
             String(format: "Watchers: %d seeing / %d in range", snapshot.seeingObserverCount, snapshot.activeObserverCount),
+            "Contacts: \(snapshot.neutralizedObserverCount) neutralized / \(max(snapshot.totalObserverCount - snapshot.neutralizedObserverCount, 0)) live",
         ]
 
         if let nearestCover = nearestGuidancePoint(from: evasionInfo.coverPoints, to: cameraPosition) {
@@ -848,6 +893,10 @@ final class BootstrapScene {
         if let nextCombatStop = combatStop(for: nextCheckpoint.id) {
             details.append("Contact: \(nextCombatStop.lane) / \(nextCombatStop.exposure)")
             details.append("Cover: \(nextCombatStop.coverHint)")
+        }
+
+        if snapshot.neutralizedObserverCount > 0 {
+            details.append("Threats: \(snapshot.neutralizedObserverCount) observers neutralized on the current rehearsal run")
         }
 
         if let nextComparisonStop = comparisonStop(for: nextCheckpoint.id) {
@@ -1351,6 +1400,7 @@ private struct SceneBuildResult {
     let debugInfo: SceneDebugInfo
     let environment: SceneEnvironment
     let scopeConfiguration: ScopeConfiguration
+    let ballisticsSettings: SceneBallisticsSettings
     let mapConfiguration: SceneMapConfiguration
     let sectors: [SceneSectorRuntime]
     let groundModel: WorldGroundModel
@@ -1478,6 +1528,7 @@ private final class ScenePackageBuilder {
         let scopeConfiguration = sceneConfiguration.scope ?? ScopeConfiguration()
         let shadowConfiguration = sceneConfiguration.shadow ?? ShadowConfiguration()
         let postProcessConfiguration = sceneConfiguration.postProcess ?? PostProcessConfiguration()
+        let ballisticsConfiguration = sceneConfiguration.ballistics ?? BallisticsConfiguration()
         let traversalTuning = SceneTraversalTuning(
             walkSpeed: max(playerConfiguration.walkSpeed ?? 4.2, 1.0),
             sprintSpeed: max(playerConfiguration.sprintSpeed ?? 6.8, max(playerConfiguration.walkSpeed ?? 4.2, 1.0) + 0.6),
@@ -1501,6 +1552,22 @@ private final class ScenePackageBuilder {
             highlightTint: postProcessConfiguration.highlightTintVector,
             shadowBalance: simd_clamp(postProcessConfiguration.shadowBalance ?? 0.44, 0.05, 0.95),
             vignetteStrength: simd_clamp(postProcessConfiguration.vignetteStrength ?? 0.08, 0.0, 1.0)
+        )
+        let ballisticsSettings = SceneBallisticsSettings(
+            muzzleVelocityMetersPerSecond: max(ballisticsConfiguration.muzzleVelocityMetersPerSecond ?? 820.0, 40.0),
+            gravityMetersPerSecondSquared: max(ballisticsConfiguration.gravityMetersPerSecondSquared ?? 9.81, 0.1),
+            maxSimulationTimeSeconds: simd_clamp(ballisticsConfiguration.maxSimulationTimeSeconds ?? 2.4, 0.25, 8.0),
+            simulationStepSeconds: simd_clamp(ballisticsConfiguration.simulationStepSeconds ?? (1.0 / 120.0), 1.0 / 480.0, 0.05),
+            launchHeightOffsetMeters: ballisticsConfiguration.launchHeightOffsetMeters ?? 0.0,
+            scopedSpreadDegrees: simd_clamp(ballisticsConfiguration.scopedSpreadDegrees ?? 0.10, 0.01, 4.0),
+            hipSpreadDegrees: simd_clamp(ballisticsConfiguration.hipSpreadDegrees ?? 0.65, 0.05, 8.0),
+            movementSpreadDegrees: simd_clamp(ballisticsConfiguration.movementSpreadDegrees ?? 1.10, 0.0, 8.0),
+            sprintSpreadDegrees: simd_clamp(ballisticsConfiguration.sprintSpreadDegrees ?? 1.80, 0.0, 12.0),
+            settleDurationSeconds: simd_clamp(ballisticsConfiguration.settleDurationSeconds ?? 0.60, 0.0, 4.0),
+            breathCycleSeconds: simd_clamp(ballisticsConfiguration.breathCycleSeconds ?? 3.40, 0.5, 12.0),
+            breathAmplitudeDegrees: simd_clamp(ballisticsConfiguration.breathAmplitudeDegrees ?? 0.16, 0.01, 2.0),
+            holdBreathDurationSeconds: simd_clamp(ballisticsConfiguration.holdBreathDurationSeconds ?? 2.60, 0.25, 10.0),
+            holdBreathRecoverySeconds: simd_clamp(ballisticsConfiguration.holdBreathRecoverySeconds ?? 3.60, 0.25, 12.0)
         )
 
         var sceneDrawables: [SceneDrawable] = []
@@ -1741,6 +1808,13 @@ private final class ScenePackageBuilder {
                 postProcessSettings.contrast,
                 postProcessSettings.saturation
             ),
+            String(
+                format: "Ballistics: %.0f m/s / %.2f m/s2 / %.2fs window / %.0f Hz",
+                ballisticsSettings.muzzleVelocityMetersPerSecond,
+                ballisticsSettings.gravityMetersPerSecondSquared,
+                ballisticsSettings.maxSimulationTimeSeconds,
+                1.0 / ballisticsSettings.simulationStepSeconds
+            ),
             "Telemetry: \((sceneConfiguration.randomSpawns?.count ?? 1)) starts / \(sceneConfiguration.route.checkpoints.count) route markers / \(guidanceConfiguration.signposts.count) signposts",
             "Threats: \(detectionConfiguration.observers.count) observers / \(guidanceConfiguration.coverPoints.count) cover / \(guidanceConfiguration.signposts.count) signs",
             String(
@@ -1780,6 +1854,7 @@ private final class ScenePackageBuilder {
                 postProcess: postProcessSettings
             ),
             scopeConfiguration: scopeConfiguration,
+            ballisticsSettings: ballisticsSettings,
             mapConfiguration: buildMapConfiguration(
                 sceneName: sceneConfiguration.sceneName,
                 loadedSectors: loadedSectors,
@@ -1921,6 +1996,7 @@ private final class ScenePackageBuilder {
                     x: observer.positionVector.x,
                     z: observer.positionVector.z
                 ),
+                yawDegrees: observer.yawDegrees,
                 range: observer.range,
                 fieldOfViewDegrees: observer.fieldOfViewDegrees,
                 markerColor: observer.markerColorVector
@@ -2966,6 +3042,22 @@ private enum FallbackSceneFactory {
                 )
             ),
             scopeConfiguration: ScopeConfiguration(),
+            ballisticsSettings: SceneBallisticsSettings(
+                muzzleVelocityMetersPerSecond: 820.0,
+                gravityMetersPerSecondSquared: 9.81,
+                maxSimulationTimeSeconds: 2.4,
+                simulationStepSeconds: 1.0 / 120.0,
+                launchHeightOffsetMeters: 0.0,
+                scopedSpreadDegrees: 0.10,
+                hipSpreadDegrees: 0.65,
+                movementSpreadDegrees: 1.10,
+                sprintSpreadDegrees: 1.80,
+                settleDurationSeconds: 0.60,
+                breathCycleSeconds: 3.40,
+                breathAmplitudeDegrees: 0.16,
+                holdBreathDurationSeconds: 2.60,
+                holdBreathRecoverySeconds: 3.60
+            ),
             mapConfiguration: SceneMapConfiguration(
                 sceneName: "Fallback Bootstrap Scene",
                 minX: -60,

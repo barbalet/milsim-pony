@@ -31,6 +31,7 @@ struct SceneConfiguration: Decodable {
     let scope: ScopeConfiguration?
     let shadow: ShadowConfiguration?
     let postProcess: PostProcessConfiguration?
+    let ballistics: BallisticsConfiguration?
     let route: RouteConfiguration
     let reviewPack: ReviewPackConfiguration?
     let combatRehearsal: CombatRehearsalConfiguration?
@@ -181,6 +182,55 @@ struct PostProcessConfiguration: Decodable {
     }
 }
 
+struct BallisticsConfiguration: Decodable {
+    let muzzleVelocityMetersPerSecond: Float?
+    let gravityMetersPerSecondSquared: Float?
+    let maxSimulationTimeSeconds: Float?
+    let simulationStepSeconds: Float?
+    let launchHeightOffsetMeters: Float?
+    let scopedSpreadDegrees: Float?
+    let hipSpreadDegrees: Float?
+    let movementSpreadDegrees: Float?
+    let sprintSpreadDegrees: Float?
+    let settleDurationSeconds: Float?
+    let breathCycleSeconds: Float?
+    let breathAmplitudeDegrees: Float?
+    let holdBreathDurationSeconds: Float?
+    let holdBreathRecoverySeconds: Float?
+
+    init(
+        muzzleVelocityMetersPerSecond: Float? = 820.0,
+        gravityMetersPerSecondSquared: Float? = 9.81,
+        maxSimulationTimeSeconds: Float? = 2.4,
+        simulationStepSeconds: Float? = (1.0 / 120.0),
+        launchHeightOffsetMeters: Float? = 0.0,
+        scopedSpreadDegrees: Float? = 0.10,
+        hipSpreadDegrees: Float? = 0.65,
+        movementSpreadDegrees: Float? = 1.10,
+        sprintSpreadDegrees: Float? = 1.80,
+        settleDurationSeconds: Float? = 0.60,
+        breathCycleSeconds: Float? = 3.40,
+        breathAmplitudeDegrees: Float? = 0.16,
+        holdBreathDurationSeconds: Float? = 2.60,
+        holdBreathRecoverySeconds: Float? = 3.60
+    ) {
+        self.muzzleVelocityMetersPerSecond = muzzleVelocityMetersPerSecond
+        self.gravityMetersPerSecondSquared = gravityMetersPerSecondSquared
+        self.maxSimulationTimeSeconds = maxSimulationTimeSeconds
+        self.simulationStepSeconds = simulationStepSeconds
+        self.launchHeightOffsetMeters = launchHeightOffsetMeters
+        self.scopedSpreadDegrees = scopedSpreadDegrees
+        self.hipSpreadDegrees = hipSpreadDegrees
+        self.movementSpreadDegrees = movementSpreadDegrees
+        self.sprintSpreadDegrees = sprintSpreadDegrees
+        self.settleDurationSeconds = settleDurationSeconds
+        self.breathCycleSeconds = breathCycleSeconds
+        self.breathAmplitudeDegrees = breathAmplitudeDegrees
+        self.holdBreathDurationSeconds = holdBreathDurationSeconds
+        self.holdBreathRecoverySeconds = holdBreathRecoverySeconds
+    }
+}
+
 struct DetectionConfiguration: Decodable {
     let suspicionDecayPerSecond: Float
     let failThreshold: Float
@@ -206,7 +256,44 @@ struct ThreatObserverConfiguration: Decodable {
     let range: Float
     let fieldOfViewDegrees: Float
     let suspicionPerSecond: Float
+    let groupID: String?
+    let groupRelayRangeMeters: Float?
+    let alertMemorySeconds: Float?
+    let alertedFieldOfViewDegrees: Float?
+    let turnRateDegreesPerSecond: Float?
     let markerColor: [Float]?
+
+    init(
+        id: String,
+        label: String,
+        position: [Float],
+        yawDegrees: Float,
+        pitchDegrees: Float? = nil,
+        range: Float,
+        fieldOfViewDegrees: Float,
+        suspicionPerSecond: Float,
+        groupID: String? = nil,
+        groupRelayRangeMeters: Float? = nil,
+        alertMemorySeconds: Float? = 2.4,
+        alertedFieldOfViewDegrees: Float? = 74.0,
+        turnRateDegreesPerSecond: Float? = 78.0,
+        markerColor: [Float]? = nil
+    ) {
+        self.id = id
+        self.label = label
+        self.position = position
+        self.yawDegrees = yawDegrees
+        self.pitchDegrees = pitchDegrees
+        self.range = range
+        self.fieldOfViewDegrees = fieldOfViewDegrees
+        self.suspicionPerSecond = suspicionPerSecond
+        self.groupID = groupID
+        self.groupRelayRangeMeters = groupRelayRangeMeters
+        self.alertMemorySeconds = alertMemorySeconds
+        self.alertedFieldOfViewDegrees = alertedFieldOfViewDegrees
+        self.turnRateDegreesPerSecond = turnRateDegreesPerSecond
+        self.markerColor = markerColor
+    }
 
     var positionVector: SIMD3<Float> {
         position.simd3(or: SIMD3<Float>(0, 1.8, 0))
@@ -869,8 +956,26 @@ enum WorldRuntimeConversions {
     }
 
     static func threatObservers(from observers: [ThreatObserverConfiguration]) -> [GameThreatObserver] {
-        observers.map { observer in
-            GameThreatObserver(
+        var groupIndices: [String: Int32] = [:]
+        var nextGroupIndex: Int32 = 1
+
+        return observers.map { observer in
+            let trimmedGroupID = observer.groupID?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let resolvedGroupIndex: Int32
+            if let trimmedGroupID, !trimmedGroupID.isEmpty {
+                if let existingIndex = groupIndices[trimmedGroupID] {
+                    resolvedGroupIndex = existingIndex
+                } else {
+                    resolvedGroupIndex = nextGroupIndex
+                    groupIndices[trimmedGroupID] = resolvedGroupIndex
+                    nextGroupIndex += 1
+                }
+            } else {
+                resolvedGroupIndex = 0
+            }
+
+            return GameThreatObserver(
                 positionX: observer.positionVector.x,
                 positionY: observer.positionVector.y,
                 positionZ: observer.positionVector.z,
@@ -878,7 +983,19 @@ enum WorldRuntimeConversions {
                 pitchDegrees: observer.pitchDegrees ?? 0,
                 range: observer.range,
                 fieldOfViewDegrees: observer.fieldOfViewDegrees,
-                suspicionPerSecond: observer.suspicionPerSecond
+                suspicionPerSecond: observer.suspicionPerSecond,
+                groupIndex: resolvedGroupIndex,
+                groupRelayRangeMeters: max(
+                    observer.groupRelayRangeMeters
+                        ?? (resolvedGroupIndex > 0 ? 28.0 : 0.0),
+                    0.0
+                ),
+                alertMemorySeconds: max(observer.alertMemorySeconds ?? 2.4, 0.0),
+                alertedFieldOfViewDegrees: max(
+                    observer.alertedFieldOfViewDegrees ?? 74.0,
+                    observer.fieldOfViewDegrees
+                ),
+                turnRateDegreesPerSecond: max(observer.turnRateDegreesPerSecond ?? 78.0, 0.0)
             )
         }
     }

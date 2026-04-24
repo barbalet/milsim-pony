@@ -28,6 +28,8 @@ final class GameRenderer: NSObject, MTKViewDelegate {
 
     private struct SessionOverlayUpdate {
         let snapshot: GameFrameSnapshot
+        let ballisticPrediction: GameBallisticPrediction
+        let profiling: GameProfilingSnapshot
         let drawableSize: CGSize
         let briefing: (summary: String, details: [String])
         let route: (summary: String, details: [String])
@@ -201,6 +203,8 @@ final class GameRenderer: NSObject, MTKViewDelegate {
         }
 
         let snapshot = GameCoreGetSnapshot()
+        let ballisticPrediction = GameCoreGetBallisticPrediction()
+        let profiling = GameCoreGetProfilingSnapshot()
         let cameraPosition = SIMD3<Float>(snapshot.cameraX, snapshot.cameraY, snapshot.cameraZ)
         let forwardVector = RenderMath.forwardVector(
             yawDegrees: snapshot.yawDegrees,
@@ -227,6 +231,8 @@ final class GameRenderer: NSObject, MTKViewDelegate {
             enqueueSessionOverlayUpdate(
                 SessionOverlayUpdate(
                     snapshot: snapshot,
+                    ballisticPrediction: ballisticPrediction,
+                    profiling: profiling,
                     drawableSize: view.drawableSize,
                     briefing: (summary: briefingState.summary, details: briefingState.details),
                     route: (summary: routeState.summary, details: routeState.details),
@@ -468,6 +474,8 @@ final class GameRenderer: NSObject, MTKViewDelegate {
         if let overlayUpdate {
             session?.applyRendererUpdate(
                 snapshot: overlayUpdate.snapshot,
+                ballisticPrediction: overlayUpdate.ballisticPrediction,
+                profiling: overlayUpdate.profiling,
                 drawableSize: overlayUpdate.drawableSize,
                 briefing: overlayUpdate.briefing,
                 route: overlayUpdate.route,
@@ -729,6 +737,8 @@ final class GameRenderer: NSObject, MTKViewDelegate {
 
         let debugInfo = scene.debugInfo
         let scopeConfiguration = scene.scopeConfiguration
+        let ballisticsSettings = scene.ballisticsSettings
+        let detectionFailThreshold = scene.detectionFailThreshold
         let mapConfiguration = scene.mapConfiguration
         DispatchQueue.main.async {
             session.noteSceneBootstrap(
@@ -737,6 +747,8 @@ final class GameRenderer: NSObject, MTKViewDelegate {
                 details: debugInfo.details,
                 overlayTitle: debugInfo.cycleLabel,
                 scopeConfiguration: scopeConfiguration,
+                ballisticsSettings: ballisticsSettings,
+                detectionFailThreshold: detectionFailThreshold,
                 mapConfiguration: mapConfiguration
             )
         }

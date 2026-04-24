@@ -1,10 +1,10 @@
 {
-  "cycleLabel": "Cycle 21 Combat-Lane Rehearsal",
-  "sceneName": "Canberra Combat-Lane Rehearsal",
+  "cycleLabel": "Cycle 28 Group Observer Relay And Alert Memory",
+  "sceneName": "Canberra Group Observer Pressure Validation",
   "planningNotes": [
-    "Plan: cycle 21 turns the locked Woden-to-Belconnen review pack into a live combat-lane rehearsal rather than another atlas-only pass.",
-    "Breakdown: keep the cross-district route stable, add basin-scale observer pressure, and surface the next contact lane plus its cover cues in the HUD and map.",
-    "Reference: carry the review pack, texture library, smoke coverage, and lane notes forward as the baseline for the first combat-focused Canberra run."
+    "Plan: cycle 28 turns the solo-watcher route into the first group-observer pass by adding alert memory, peer relays, and paired lookout pressure over the existing rifle, minimap, and LOS-debug baseline.",
+    "Breakdown: keep the Woden-to-Belconnen combat lane locked, author a handful of paired hotspots, and make the shared-alert state visible enough in the HUD and Canberra map to tune without guesswork.",
+    "Reference: carry the review pack, texture library, threat-map validation, and rifle-stability baseline forward as the foundation for later mission scripting, route expansion, and wider AI behavior."
   ],
   "spawn": {
     "label": "Woden Town Centre Staging",
@@ -141,9 +141,25 @@
     "shadowTint": [0.95, 0.99, 1.04],
     "highlightTint": [1.05, 1.01, 0.94]
   },
+  "ballistics": {
+    "muzzleVelocityMetersPerSecond": 820.0,
+    "gravityMetersPerSecondSquared": 9.81,
+    "maxSimulationTimeSeconds": 2.4,
+    "simulationStepSeconds": 0.008333334,
+    "launchHeightOffsetMeters": 0.0,
+    "scopedSpreadDegrees": 0.14,
+    "hipSpreadDegrees": 2.4,
+    "movementSpreadDegrees": 0.55,
+    "sprintSpreadDegrees": 1.65,
+    "settleDurationSeconds": 0.72,
+    "breathCycleSeconds": 4.8,
+    "breathAmplitudeDegrees": 0.075,
+    "holdBreathDurationSeconds": 3.6,
+    "holdBreathRecoverySeconds": 5.4
+  },
   "route": {
     "name": "Canberra Combat-Lane Rehearsal",
-    "summary": "Follow one authored line from Woden to Belconnen while observer pressure, contact-lane cues, and cover hints validate that the atlas can now carry a real combat rehearsal without losing Canberra readability.",
+    "summary": "Follow one authored line from Woden to Belconnen while scoped rifle drift, grouped observer relays, alert memory, and contact-lane cues validate that the atlas can now carry a real combat rehearsal without losing Canberra readability.",
     "checkpoints": [
       {
         "id": "woden_town_centre_staging",
@@ -292,7 +308,7 @@
   },
   "reviewPack": {
     "title": "Canberra Review Pack Baseline",
-    "summary": "Reference-backed Woden-to-Belconnen atlas baseline carried forward into the first combat-lane rehearsal.",
+    "summary": "Reference-backed Woden-to-Belconnen atlas baseline carried forward into the group-observer relay and alert-memory pass.",
     "referenceGallery": "CanberraReferenceGallery",
     "textureLibrary": "Canberra Texture Library",
     "captureFormat": "Open the map on district handoffs, raise the 4x scope on skyline stops, and use the pause shell for route-proof captures.",
@@ -368,8 +384,8 @@
     ]
   },
   "combatRehearsal": {
-    "title": "Canberra Cycle 21 Contact Rehearsal",
-    "summary": "Live Woden-to-Belconnen contact pass with observer pressure, cover cues, and recovery notes anchored to the full atlas route.",
+    "title": "Canberra Cycle 28 Group Observer Relay And Alert Memory",
+    "summary": "Live Woden-to-Belconnen contact pass with paired observer relays, cover cues, recovery notes, persistent field-difficulty tuning, and authored rifle stability layered over the full atlas route.",
     "exposureGuide": "Open ground is intentional; move between named cover screens before raising the optic on skyline-heavy checkpoints.",
     "recoveryRule": "If suspicion spikes, break line of sight, re-anchor on the nearest cover screen, and retry the current lane from the latest checkpoint rather than freelancing a shortcut.",
     "contactStops": [
@@ -378,7 +394,7 @@
         "district": "Woden",
         "lane": "Southern basin overwatch lane",
         "exposure": "medium",
-        "expectedObservers": 1,
+        "expectedObservers": 2,
         "coverHint": "Use Woden Interchange Screen, then settle behind Woden Scope Wall before raising the optic.",
         "recoveryNote": "Reset behind Woden Scope Wall if the towers stay exposed."
       },
@@ -405,7 +421,7 @@
         "district": "East Basin",
         "lane": "East-basin shoreline lane",
         "exposure": "high",
-        "expectedObservers": 1,
+        "expectedObservers": 2,
         "coverHint": "Use East Basin Survey Wall before holding the shoreline and ridge in scope.",
         "recoveryNote": "Reset to East Basin Survey Wall if the lookout stays hot."
       },
@@ -423,7 +439,7 @@
         "district": "Civic",
         "lane": "City-centre response lane",
         "exposure": "high",
-        "expectedObservers": 1,
+        "expectedObservers": 2,
         "coverHint": "Use Civic Interchange Screen before checking the Northbourne and Alinga read.",
         "recoveryNote": "Let the grid cool from Civic Interchange Screen before another peek."
       },
@@ -450,7 +466,7 @@
         "district": "Belconnen",
         "lane": "Belconnen town-centre lane",
         "exposure": "medium",
-        "expectedObservers": 1,
+        "expectedObservers": 2,
         "coverHint": "Belconnen Median Screen is the safe pause before the interchange towers.",
         "recoveryNote": "Reset to Belconnen Median Screen before re-entering the town-centre lane."
       },
@@ -478,7 +494,28 @@
         "range": 24.0,
         "fieldOfViewDegrees": 54.0,
         "suspicionPerSecond": 0.20,
+        "groupID": "woden_pair",
+        "groupRelayRangeMeters": 20.0,
+        "alertMemorySeconds": 2.8,
+        "alertedFieldOfViewDegrees": 80.0,
+        "turnRateDegreesPerSecond": 92.0,
         "markerColor": [0.92, 0.46, 0.30, 0.94]
+      },
+      {
+        "id": "woden_tower_support_watch",
+        "label": "Woden Tower Support Watch",
+        "position": [4.0, 2.1, 150.0],
+        "yawDegrees": 344.0,
+        "pitchDegrees": -5.0,
+        "range": 22.0,
+        "fieldOfViewDegrees": 52.0,
+        "suspicionPerSecond": 0.16,
+        "groupID": "woden_pair",
+        "groupRelayRangeMeters": 20.0,
+        "alertMemorySeconds": 2.8,
+        "alertedFieldOfViewDegrees": 80.0,
+        "turnRateDegreesPerSecond": 92.0,
+        "markerColor": [0.94, 0.50, 0.34, 0.94]
       },
       {
         "id": "state_circle_watch",
@@ -500,7 +537,28 @@
         "range": 38.0,
         "fieldOfViewDegrees": 50.0,
         "suspicionPerSecond": 0.19,
+        "groupID": "east_basin_pair",
+        "groupRelayRangeMeters": 24.0,
+        "alertMemorySeconds": 3.0,
+        "alertedFieldOfViewDegrees": 78.0,
+        "turnRateDegreesPerSecond": 88.0,
         "markerColor": [0.94, 0.50, 0.34, 0.94]
+      },
+      {
+        "id": "east_basin_axis_support_watch",
+        "label": "East Basin Axis Support Watch",
+        "position": [80.0, 2.4, -18.0],
+        "yawDegrees": 308.0,
+        "pitchDegrees": -5.0,
+        "range": 32.0,
+        "fieldOfViewDegrees": 48.0,
+        "suspicionPerSecond": 0.17,
+        "groupID": "east_basin_pair",
+        "groupRelayRangeMeters": 24.0,
+        "alertMemorySeconds": 3.0,
+        "alertedFieldOfViewDegrees": 78.0,
+        "turnRateDegreesPerSecond": 88.0,
+        "markerColor": [0.94, 0.52, 0.36, 0.94]
       },
       {
         "id": "constitution_axis_watch",
@@ -522,7 +580,28 @@
         "range": 24.0,
         "fieldOfViewDegrees": 50.0,
         "suspicionPerSecond": 0.21,
+        "groupID": "civic_pair",
+        "groupRelayRangeMeters": 20.0,
+        "alertMemorySeconds": 2.6,
+        "alertedFieldOfViewDegrees": 82.0,
+        "turnRateDegreesPerSecond": 96.0,
         "markerColor": [0.96, 0.54, 0.34, 0.94]
+      },
+      {
+        "id": "civic_northbourne_support_watch",
+        "label": "Civic Northbourne Support Watch",
+        "position": [42.0, 2.2, -118.0],
+        "yawDegrees": 32.0,
+        "pitchDegrees": -4.0,
+        "range": 23.0,
+        "fieldOfViewDegrees": 50.0,
+        "suspicionPerSecond": 0.18,
+        "groupID": "civic_pair",
+        "groupRelayRangeMeters": 20.0,
+        "alertMemorySeconds": 2.6,
+        "alertedFieldOfViewDegrees": 82.0,
+        "turnRateDegreesPerSecond": 96.0,
+        "markerColor": [0.96, 0.58, 0.36, 0.94]
       },
       {
         "id": "west_basin_watch",
@@ -555,7 +634,28 @@
         "range": 24.0,
         "fieldOfViewDegrees": 50.0,
         "suspicionPerSecond": 0.20,
+        "groupID": "belconnen_pair",
+        "groupRelayRangeMeters": 22.0,
+        "alertMemorySeconds": 2.8,
+        "alertedFieldOfViewDegrees": 78.0,
+        "turnRateDegreesPerSecond": 90.0,
         "markerColor": [0.94, 0.50, 0.32, 0.94]
+      },
+      {
+        "id": "belconnen_interchange_support_watch",
+        "label": "Belconnen Interchange Support Watch",
+        "position": [-140.0, 2.1, -174.0],
+        "yawDegrees": 36.0,
+        "pitchDegrees": -4.0,
+        "range": 24.0,
+        "fieldOfViewDegrees": 48.0,
+        "suspicionPerSecond": 0.17,
+        "groupID": "belconnen_pair",
+        "groupRelayRangeMeters": 22.0,
+        "alertMemorySeconds": 2.8,
+        "alertedFieldOfViewDegrees": 78.0,
+        "turnRateDegreesPerSecond": 90.0,
+        "markerColor": [0.94, 0.54, 0.34, 0.94]
       },
       {
         "id": "ginninderra_exit_watch",

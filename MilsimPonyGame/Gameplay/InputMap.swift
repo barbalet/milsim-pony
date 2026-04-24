@@ -6,6 +6,8 @@ enum InputCommand: String, CaseIterable, Hashable {
     case strafeLeft
     case strafeRight
     case sprint
+    case steadyAim
+    case fire
     case interact
     case toggleMap
     case restart
@@ -23,6 +25,10 @@ enum InputCommand: String, CaseIterable, Hashable {
             return "Strafe Right"
         case .sprint:
             return "Sprint"
+        case .steadyAim:
+            return "Steady Aim"
+        case .fire:
+            return "Fire"
         case .interact:
             return "Interact"
         case .toggleMap:
@@ -36,9 +42,9 @@ enum InputCommand: String, CaseIterable, Hashable {
 
     var isContinuous: Bool {
         switch self {
-        case .forward, .backward, .strafeLeft, .strafeRight, .sprint:
+        case .forward, .backward, .strafeLeft, .strafeRight, .sprint, .steadyAim:
             return true
-        case .interact, .toggleMap, .restart, .pause:
+        case .fire, .interact, .toggleMap, .restart, .pause:
             return false
         }
     }
@@ -52,6 +58,8 @@ enum InputBindings {
         2: .strafeRight,
         56: .sprint,
         60: .sprint,
+        14: .steadyAim,
+        3: .fire,
         49: .interact,
         36: .interact,
         76: .interact,
@@ -65,6 +73,8 @@ enum InputBindings {
         "s": .backward,
         "a": .strafeLeft,
         "d": .strafeRight,
+        "f": .fire,
+        "e": .steadyAim,
         "m": .toggleMap,
         "r": .restart,
         " ": .interact,
@@ -73,7 +83,9 @@ enum InputBindings {
     static let launchHints: [String] = [
         "W A S D: grounded movement",
         "Shift: sprint",
+        "E: steady scoped aim and hold breath",
         "Mouse move: look",
+        "Click / F: fire the current rifle cue",
         "Space / Return: deploy, confirm, or toggle 4x scope",
         "M: toggle the Canberra map",
         "R: restart or retry from last checkpoint",

@@ -40,7 +40,9 @@ struct GameRootView: View {
         ScopeOverlay(
             statusText: session.scopeStatusText,
             instructionText: session.scopeInstructionText,
-            reticleColor: Color(nsColor: session.scopeReticleColor)
+            reticleColor: Color(nsColor: session.scopeReticleColor),
+            reticleOffset: session.scopeReticleOffset,
+            reticleBloomScale: session.scopeReticleBloomScale
         )
     }
 }
@@ -77,6 +79,9 @@ private struct AuxiliaryWindowBridge: View {
             openWindow(id: AuxiliaryWindowID.menu.rawValue)
         } else {
             dismissWindow(id: AuxiliaryWindowID.menu.rawValue)
+            session.enqueueStateChange { state in
+                state.scheduleGameplayInputFocusRecovery()
+            }
         }
     }
 
@@ -85,6 +90,9 @@ private struct AuxiliaryWindowBridge: View {
             openWindow(id: AuxiliaryWindowID.map.rawValue)
         } else {
             dismissWindow(id: AuxiliaryWindowID.map.rawValue)
+            session.enqueueStateChange { state in
+                state.scheduleGameplayInputFocusRecovery()
+            }
         }
     }
 }
@@ -192,6 +200,24 @@ private struct WindowActionButton: View {
     }
 }
 
+private struct HostingWindowReader: NSViewRepresentable {
+    let onResolve: (NSWindow?) -> Void
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView(frame: .zero)
+        DispatchQueue.main.async { [weak view] in
+            onResolve(view?.window)
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        DispatchQueue.main.async { [weak nsView] in
+            onResolve(nsView?.window)
+        }
+    }
+}
+
 struct MissionOverlayWindow: View {
     @ObservedObject var session: GameSession
 
@@ -250,6 +276,8 @@ struct ControlDeckWindow: View {
 
 struct MenuPanelWindow: View {
     @ObservedObject var session: GameSession
+    @Environment(\.dismiss) private var dismiss
+    @State private var hostingWindow: NSWindow?
 
     var body: some View {
         ZStack {
@@ -289,12 +317,50 @@ struct MenuPanelWindow: View {
                 .padding(18)
             }
         }
+        .background(
+            HostingWindowReader { window in
+                bindHostingWindow(window)
+            }
+        )
         .frame(minWidth: 520, minHeight: 420)
+        .onAppear {
+            reconcileWindowState()
+        }
+        .onChange(of: session.menuPanel != nil) { _, _ in
+            reconcileWindowState()
+        }
+    }
+
+    private func reconcileWindowState() {
+        guard session.menuPanel == nil else {
+            return
+        }
+
+        if let hostingWindow {
+            hostingWindow.close()
+        } else {
+            dismiss()
+        }
+        session.enqueueStateChange { state in
+            state.scheduleGameplayInputFocusRecovery()
+        }
+    }
+
+    private func bindHostingWindow(_ window: NSWindow?) {
+        guard hostingWindow !== window else {
+            return
+        }
+
+        hostingWindow = window
+        hostingWindow?.isRestorable = false
+        reconcileWindowState()
     }
 }
 
 struct CanberraMapWindow: View {
     @ObservedObject var session: GameSession
+    @Environment(\.dismiss) private var dismiss
+    @State private var hostingWindow: NSWindow?
 
     var body: some View {
         ZStack {
@@ -334,7 +400,18 @@ struct CanberraMapWindow: View {
                 .padding(18)
             }
         }
+        .background(
+            HostingWindowReader { window in
+                bindHostingWindow(window)
+            }
+        )
         .frame(minWidth: 760, minHeight: 620)
+        .onAppear {
+            reconcileWindowState()
+        }
+        .onChange(of: session.isMapPresented) { _, _ in
+            reconcileWindowState()
+        }
         .onDisappear {
             guard session.isMapPresented else {
                 return
@@ -344,6 +421,30 @@ struct CanberraMapWindow: View {
                 state.setMapPresented(false)
             }
         }
+    }
+
+    private func reconcileWindowState() {
+        guard session.isMapPresented else {
+            if let hostingWindow {
+                hostingWindow.close()
+            } else {
+                dismiss()
+            }
+            session.enqueueStateChange { state in
+                state.scheduleGameplayInputFocusRecovery()
+            }
+            return
+        }
+    }
+
+    private func bindHostingWindow(_ window: NSWindow?) {
+        guard hostingWindow !== window else {
+            return
+        }
+
+        hostingWindow = window
+        hostingWindow?.isRestorable = false
+        reconcileWindowState()
     }
 
     private func mapSubtitle(for snapshot: OverheadMapSnapshot) -> String {
@@ -368,6 +469,34 @@ private struct SettingsControlsPane: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Field Difficulty")
+                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.92))
+
+                Picker(
+                    "Field Difficulty",
+                    selection: Binding(
+                        get: { session.difficultyPreset },
+                        set: { value in
+                            session.enqueueStateChange { state in
+                                state.setDifficultyPreset(value)
+                            }
+                        }
+                    )
+                ) {
+                    ForEach(RehearsalDifficultyPreset.allCases) { preset in
+                        Text(preset.displayName).tag(preset)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                Text(session.difficultySummaryText)
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.60))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             VStack(alignment: .leading, spacing: 6) {
                 Text(String(format: "Look Sensitivity %.2fx", session.lookSensitivityScale))
                     .font(.system(size: 12, weight: .semibold, design: .monospaced))
@@ -587,6 +716,19 @@ private struct ControlDeck: View {
                         detail: menuPanel == .title ? "Start or confirm the current shell selection" : "Raise or lower the observation optic",
                         active: scopeActive,
                         accent: Color(red: 0.94, green: 0.86, blue: 0.44)
+                    )
+                    ControlLegendRow(
+                        keycaps: ["Click", "F"],
+                        title: "Fire",
+                        detail: "Break the current rifle shot and confirm scoped hits plus cadence feedback",
+                        accent: Color(red: 0.94, green: 0.46, blue: 0.34)
+                    )
+                    ControlLegendRow(
+                        keycaps: ["E"],
+                        title: "Steady Aim",
+                        detail: "Hold breath and tighten the scoped rifle while you are settled",
+                        active: activeCommands.contains(.steadyAim),
+                        accent: Color(red: 0.56, green: 0.88, blue: 0.78)
                     )
                     ControlLegendRow(
                         keycaps: ["M"],
@@ -818,7 +960,11 @@ private struct OverheadMapCanvas: View {
         let id: String
         let center: CGPoint
         let rangeRect: CGRect
-        let color: Color
+        let coveragePath: Path
+        let coverageFillColor: Color
+        let coverageStrokeColor: Color
+        let markerFillColor: Color
+        let markerStrokeColor: Color
         let markerSize: CGFloat
     }
 
@@ -916,6 +1062,96 @@ private struct OverheadMapCanvas: View {
                 )
             }
 
+            func threatPalette(
+                for observer: SceneMapThreatObserver,
+                state: OverheadMapThreatState?
+            ) -> (
+                fill: Color,
+                stroke: Color,
+                markerFill: Color,
+                markerStroke: Color,
+                markerSize: CGFloat
+            ) {
+                let authoredColor = threatColor(for: observer)
+                if state?.neutralized == true {
+                    let neutralized = Color(red: 0.36, green: 0.86, blue: 0.58)
+                    return (
+                        fill: neutralized.opacity(0.07),
+                        stroke: neutralized.opacity(0.34),
+                        markerFill: neutralized,
+                        markerStroke: .white.opacity(0.22),
+                        markerSize: 8.2 * markerScale
+                    )
+                }
+                if state?.seeingPlayer == true {
+                    let seeing = Color(red: 1.0, green: 0.36, blue: 0.30)
+                    return (
+                        fill: seeing.opacity(0.14),
+                        stroke: seeing.opacity(0.72),
+                        markerFill: seeing,
+                        markerStroke: .white.opacity(0.34),
+                        markerSize: 10.6 * markerScale
+                    )
+                }
+                if state?.isAlerted == true {
+                    let alerted = Color(red: 0.98, green: 0.86, blue: 0.34)
+                    return (
+                        fill: alerted.opacity(0.09),
+                        stroke: alerted.opacity(0.46),
+                        markerFill: alerted,
+                        markerStroke: .black.opacity(0.24),
+                        markerSize: 9.8 * markerScale
+                    )
+                }
+                if state?.isMasked == true {
+                    let masked = Color(red: 0.98, green: 0.68, blue: 0.28)
+                    return (
+                        fill: masked.opacity(0.09),
+                        stroke: masked.opacity(0.44),
+                        markerFill: masked,
+                        markerStroke: .black.opacity(0.22),
+                        markerSize: 9.6 * markerScale
+                    )
+                }
+
+                return (
+                    fill: authoredColor.opacity(0.05),
+                    stroke: authoredColor.opacity(0.20),
+                    markerFill: authoredColor,
+                    markerStroke: .black.opacity(0.28),
+                    markerSize: 9.0 * markerScale
+                )
+            }
+
+            func threatCoveragePath(for observer: SceneMapThreatObserver, center: CGPoint) -> Path {
+                let halfFieldOfView = max(observer.fieldOfViewDegrees * 0.5, 4)
+                if observer.fieldOfViewDegrees >= 340 {
+                    return Path(ellipseIn: Self.centeredRect(
+                        at: center,
+                        size: CGSize(
+                            width: max(CGFloat(observer.range * 2) * scaleX, 10),
+                            height: max(CGFloat(observer.range * 2) * scaleY, 10)
+                        )
+                    ))
+                }
+
+                let sampleCount = max(Int(observer.fieldOfViewDegrees / 10), 4)
+                return Path { path in
+                    path.move(to: center)
+                    for sampleIndex in 0...sampleCount {
+                        let t = Float(sampleIndex) / Float(sampleCount)
+                        let yawDegrees = observer.yawDegrees - halfFieldOfView + ((halfFieldOfView * 2) * t)
+                        let yawRadians = yawDegrees * (.pi / 180.0)
+                        let arcPoint = point(
+                            forX: observer.point.x + (sinf(yawRadians) * observer.range),
+                            z: observer.point.z + (-cosf(yawRadians) * observer.range)
+                        )
+                        path.addLine(to: arcPoint)
+                    }
+                    path.closeSubpath()
+                }
+            }
+
             func checkpointColor(for checkpoint: SceneMapCheckpoint, index: Int) -> Color {
                 if index < snapshot.completedCheckpointCount {
                     return Color(red: 0.36, green: 0.86, blue: 0.58)
@@ -983,19 +1219,25 @@ private struct OverheadMapCanvas: View {
                 )
             }
 
-            threatVisuals = configuration.threatObservers.map { observer in
+            threatVisuals = configuration.threatObservers.enumerated().map { index, observer in
                 let observerPoint = point(forX: observer.point.x, z: observer.point.z)
                 let rangeSize = CGSize(
                     width: max(CGFloat(observer.range * 2) * scaleX, 10),
                     height: max(CGFloat(observer.range * 2) * scaleY, 10)
                 )
+                let threatState = index < snapshot.threatStates.count ? snapshot.threatStates[index] : nil
+                let palette = threatPalette(for: observer, state: threatState)
 
                 return ThreatVisual(
                     id: observer.id,
                     center: observerPoint,
                     rangeRect: Self.centeredRect(at: observerPoint, size: rangeSize),
-                    color: threatColor(for: observer),
-                    markerSize: 9 * markerScale
+                    coveragePath: threatCoveragePath(for: observer, center: observerPoint),
+                    coverageFillColor: palette.fill,
+                    coverageStrokeColor: palette.stroke,
+                    markerFillColor: palette.markerFill,
+                    markerStrokeColor: palette.markerStroke,
+                    markerSize: palette.markerSize
                 )
             }
 
@@ -1156,12 +1398,21 @@ private struct OverheadMapCanvas: View {
                             let threatRangePath = Path(ellipseIn: threat.rangeRect)
                             context.fill(
                                 threatRangePath,
-                                with: .color(threat.color.opacity(0.05))
+                                with: .color(threat.coverageFillColor.opacity(0.30))
                             )
                             context.stroke(
                                 threatRangePath,
-                                with: .color(threat.color.opacity(0.18)),
+                                with: .color(threat.coverageStrokeColor.opacity(0.50)),
                                 style: StrokeStyle(lineWidth: 1.1, dash: [4, 4])
+                            )
+                            context.fill(
+                                threat.coveragePath,
+                                with: .color(threat.coverageFillColor)
+                            )
+                            context.stroke(
+                                threat.coveragePath,
+                                with: .color(threat.coverageStrokeColor),
+                                style: StrokeStyle(lineWidth: 1.2, lineJoin: .round)
                             )
                         }
 
@@ -1217,10 +1468,10 @@ private struct OverheadMapCanvas: View {
                                 center: threat.center,
                                 size: threat.markerSize
                             )
-                            context.fill(threatPath, with: .color(threat.color))
+                            context.fill(threatPath, with: .color(threat.markerFillColor))
                             context.stroke(
                                 threatPath,
-                                with: .color(.black.opacity(0.28)),
+                                with: .color(threat.markerStrokeColor),
                                 lineWidth: 1
                             )
                         }
@@ -1284,12 +1535,19 @@ private struct OverheadMapCanvas: View {
             }
             .frame(height: canvasHeight)
 
-            HStack(spacing: 12) {
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: 92), spacing: 12, alignment: .leading)],
+                alignment: .leading,
+                spacing: 10
+            ) {
                 legendItem(color: .white.opacity(0.92), label: "Spawn")
                 legendItem(color: Color(red: 0.84, green: 0.86, blue: 0.90), label: "Roads")
                 legendItem(color: Color(red: 0.36, green: 0.86, blue: 0.58), label: "Cleared")
                 legendItem(color: Color(red: 0.94, green: 0.84, blue: 0.40), label: "Route")
-                legendItem(color: Color(red: 0.94, green: 0.46, blue: 0.34), label: "Threat")
+                legendItem(color: Color(red: 1.0, green: 0.36, blue: 0.30), label: "Seeing")
+                legendItem(color: Color(red: 0.98, green: 0.86, blue: 0.34), label: "Alerted")
+                legendItem(color: Color(red: 0.98, green: 0.68, blue: 0.28), label: "Masked")
+                legendItem(color: Color(red: 0.36, green: 0.86, blue: 0.58), label: "Neutralized")
                 legendItem(color: Color(red: 0.34, green: 0.82, blue: 0.98), label: "You")
             }
 
@@ -1323,6 +1581,11 @@ private struct OverheadMapCanvas: View {
             Text(contactLine)
                 .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.60))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(threatMapLine)
+                .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.62))
                 .fixedSize(horizontal: false, vertical: true)
 
             Text(pressureLine)
@@ -1374,12 +1637,20 @@ private struct OverheadMapCanvas: View {
         return "Contact: rehearsal complete • \(snapshot.configuration.recoveryRule)"
     }
 
+    private var threatMapLine: String {
+        "Map Threats: \(snapshot.seeingObserverCount) seeing • \(snapshot.alertedThreatCount) alerted • \(snapshot.maskedThreatCount) masked • \(snapshot.offAxisThreatCount) off-axis • \(snapshot.neutralizedObserverCount) neutralized • \(snapshot.idleThreatCount) idle"
+    }
+
     private var pressureLine: String {
         String(
-            format: "Threat: %.2f suspicion • %d seeing • %d in range • %d fails",
+            format: "Threat: %@ • %.2f / %.2f fail • %d alerted • %d seeing • %d in range • %d neutralized • %d fails",
+            snapshot.difficultyLabel,
             snapshot.suspicionLevel,
+            snapshot.effectiveFailThreshold,
+            snapshot.alertedObserverCount,
             snapshot.seeingObserverCount,
             snapshot.activeObserverCount,
+            snapshot.neutralizedObserverCount,
             snapshot.failCount
         )
     }
@@ -1409,6 +1680,8 @@ private struct ScopeOverlay: View {
     let statusText: String
     let instructionText: String
     let reticleColor: Color
+    let reticleOffset: CGSize
+    let reticleBloomScale: CGFloat
 
     var body: some View {
         GeometryReader { geometry in
@@ -1426,6 +1699,10 @@ private struct ScopeOverlay: View {
             let reticleInset = diameter * 0.05
             let armLength = max((diameter * 0.5) - reticleInset - (centerGap * 0.5), 24)
             let armThickness = max(diameter * 0.0028, 1.4)
+            let maxReticleTravel = diameter * 0.12
+            let reticleCenterX = centerX + (reticleOffset.width * maxReticleTravel)
+            let reticleCenterY = centerY + (reticleOffset.height * maxReticleTravel)
+            let bloomDiameter = max(centerGap * (1.0 + (reticleBloomScale * 3.0)), 10)
             let labelY = min(apertureRect.maxY + 52, size.height - 38)
 
             ZStack {
@@ -1447,24 +1724,29 @@ private struct ScopeOverlay: View {
                     .frame(width: diameter * 0.64, height: diameter * 0.64)
                     .position(x: centerX, y: centerY)
 
-                reticleArm(length: armLength, thickness: armThickness)
-                    .position(x: centerX - ((centerGap + armLength) * 0.5), y: centerY)
+                Circle()
+                    .stroke(reticleColor.opacity(0.22), lineWidth: 1)
+                    .frame(width: bloomDiameter, height: bloomDiameter)
+                    .position(x: reticleCenterX, y: reticleCenterY)
 
                 reticleArm(length: armLength, thickness: armThickness)
-                    .position(x: centerX + ((centerGap + armLength) * 0.5), y: centerY)
+                    .position(x: reticleCenterX - ((centerGap + armLength) * 0.5), y: reticleCenterY)
+
+                reticleArm(length: armLength, thickness: armThickness)
+                    .position(x: reticleCenterX + ((centerGap + armLength) * 0.5), y: reticleCenterY)
 
                 reticleArm(length: armLength, thickness: armThickness)
                     .rotationEffect(.degrees(90))
-                    .position(x: centerX, y: centerY - ((centerGap + armLength) * 0.5))
+                    .position(x: reticleCenterX, y: reticleCenterY - ((centerGap + armLength) * 0.5))
 
                 reticleArm(length: armLength, thickness: armThickness)
                     .rotationEffect(.degrees(90))
-                    .position(x: centerX, y: centerY + ((centerGap + armLength) * 0.5))
+                    .position(x: reticleCenterX, y: reticleCenterY + ((centerGap + armLength) * 0.5))
 
                 Circle()
                     .fill(reticleColor.opacity(0.96))
                     .frame(width: 6, height: 6)
-                    .position(x: centerX, y: centerY)
+                    .position(x: reticleCenterX, y: reticleCenterY)
 
                 VStack(spacing: 6) {
                     Text(statusText)

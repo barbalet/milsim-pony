@@ -155,6 +155,10 @@ Exit criteria:
 | `20` | Reference-backed review pack | Lock data interfaces for capture automation, comparison notes, regression review, and final drawable texture validation | Polish review overlays, capture framing, atlas presentation, and the final per-drawable texture pass for release candidates | Finalize the first reference-backed Canberra package with curated Google Maps, in-game gallery assets, and the complete Canberra texture library in `MilsimPonyGame/Assets/Textures/` | Ship a review pack, smoke test, and capture notes that connect atlas work to future combat lanes | Reviewers can compare the in-game Canberra atlas against source references and confirm that every shipped scene drawable has a Canberra-sourced texture assignment |
 | `21` | Combat-lane rehearsal | Promote review-pack lane notes into live checkpoint metadata, threat overlays, and basin-scale observer pressure | Surface next-contact cues, threat rings, recovery lines, and rehearsal summaries directly in the HUD and overhead map | Reuse the full Woden-to-Belconnen atlas route as the first combat rehearsal with live observers, cover guidance, and checkpoint recovery notes | Ship a combat rehearsal brief, smoke test, and updated lane documentation | One route proves Canberra readability, observer pressure, and checkpoint recovery together without losing the atlas framing |
 
+## Post-Cycle 21 Extension
+
+Cycle `21` closes the original roadmap. The maintained extension for cycles `22` to `81`, including the integrated April 23, 2026 external review backlog, now lives in [Docs/DEVELOPMENT_BACKLOG.md](Docs/DEVELOPMENT_BACKLOG.md).
+
 ## Standard Cycle Cadence
 
 - `Week 1`: lock Canberra references, extents, acceptance criteria, texture-source needs, and the exact Woden-to-Belconnen coverage gain required for the cycle.
