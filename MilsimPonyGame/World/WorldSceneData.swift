@@ -36,6 +36,7 @@ struct SceneConfiguration: Decodable {
     let reviewPack: ReviewPackConfiguration?
     let combatRehearsal: CombatRehearsalConfiguration?
     let missionScript: MissionScriptConfiguration?
+    let routeSelection: RouteSelectionConfiguration?
     let alternateRoutes: [AlternateRouteConfiguration]?
     let detection: DetectionConfiguration?
     let guidance: GuidanceConfiguration?
@@ -486,6 +487,19 @@ struct MissionPhaseConfiguration: Decodable {
     let mapCode: String?
 }
 
+struct RouteSelectionConfiguration: Decodable {
+    let activeRouteID: String
+    let activeRouteLabel: String
+    let selectedAlternateRouteID: String?
+    let selectedAlternateRouteLabel: String?
+    let bindingStatus: String
+    let loaderStatus: String
+    let validationStatus: String
+    let validationRule: String
+    let handoffStatus: String
+    let handoffRule: String
+}
+
 struct AlternateRouteConfiguration: Decodable {
     let id: String
     let name: String
@@ -495,6 +509,12 @@ struct AlternateRouteConfiguration: Decodable {
     let checkpointIDs: [String]
     let routeType: String
     let authoringStatus: String
+    let selectionMode: String?
+    let selectionStatus: String?
+    let activationRule: String?
+    let checkpointOwnershipStatus: String?
+    let sharedCheckpointIDs: [String]?
+    let exclusiveCheckpointIDs: [String]?
 }
 
 struct RouteCheckpointConfiguration: Decodable {

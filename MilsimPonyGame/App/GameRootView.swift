@@ -20,6 +20,7 @@ struct GameRootView: View {
             Color.black
                 .opacity(session.menuPanel == .title ? 0.14 : 0)
                 .ignoresSafeArea()
+                .allowsHitTesting(false)
 
             if session.isScopeActive && session.menuPanel == nil {
                 scopeOverlay
@@ -982,6 +983,7 @@ private struct OverheadMapCanvas: View {
         let sectorVisuals: [SectorVisual]
         let roadVisuals: [RoadVisual]
         let threatVisuals: [ThreatVisual]
+        let alternateRoutePath: Path
         let routePath: Path
         let clearedRoutePath: Path
         let spawnRect: CGRect
@@ -1246,6 +1248,15 @@ private struct OverheadMapCanvas: View {
             }
             routePath = Self.polylinePath(from: checkpointPoints)
 
+            if let alternateRoute = configuration.alternateRoutes.first {
+                let alternateRoutePoints = alternateRoute.checkpointPoints.map { checkpointPoint in
+                    point(forX: checkpointPoint.x, z: checkpointPoint.z)
+                }
+                alternateRoutePath = Self.polylinePath(from: alternateRoutePoints)
+            } else {
+                alternateRoutePath = Path()
+            }
+
             let clearedCheckpointCount = min(snapshot.completedCheckpointCount, configuration.checkpoints.count)
             clearedRoutePath = clearedCheckpointCount > 1
                 ? Self.polylinePath(from: Array(checkpointPoints.prefix(clearedCheckpointCount)))
@@ -1422,6 +1433,11 @@ private struct OverheadMapCanvas: View {
                             style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round, dash: [6, 4])
                         )
                         context.stroke(
+                            renderModel.alternateRoutePath,
+                            with: .color(Color(red: 0.34, green: 0.78, blue: 0.96).opacity(0.62)),
+                            style: StrokeStyle(lineWidth: 2.1, lineCap: .round, lineJoin: .round, dash: [2, 5])
+                        )
+                        context.stroke(
                             renderModel.clearedRoutePath,
                             with: .color(Color(red: 0.36, green: 0.86, blue: 0.58).opacity(0.90)),
                             style: StrokeStyle(lineWidth: 3.2, lineCap: .round, lineJoin: .round)
@@ -1544,6 +1560,7 @@ private struct OverheadMapCanvas: View {
                 legendItem(color: Color(red: 0.84, green: 0.86, blue: 0.90), label: "Roads")
                 legendItem(color: Color(red: 0.36, green: 0.86, blue: 0.58), label: "Cleared")
                 legendItem(color: Color(red: 0.94, green: 0.84, blue: 0.40), label: "Route")
+                legendItem(color: Color(red: 0.34, green: 0.78, blue: 0.96), label: "Alt Preview")
                 legendItem(color: Color(red: 1.0, green: 0.36, blue: 0.30), label: "Seeing")
                 legendItem(color: Color(red: 0.98, green: 0.86, blue: 0.34), label: "Alerted")
                 legendItem(color: Color(red: 0.98, green: 0.68, blue: 0.28), label: "Masked")
@@ -1561,6 +1578,21 @@ private struct OverheadMapCanvas: View {
             Text(routeFootprintLine)
                 .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.66))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(activeRouteLine)
+                .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.65))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(routeValidationLine)
+                .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.64))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(routeHandoffLine)
+                .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.63))
                 .fixedSize(horizontal: false, vertical: true)
 
             Text("Review Pack: \(snapshot.configuration.reviewPackTitle) • refs \(snapshot.configuration.referenceGallery) • \(snapshot.configuration.openRisks.count) risks")
@@ -1631,6 +1663,19 @@ private struct OverheadMapCanvas: View {
         return "Footprint: \(footprint) sectors • \(snapshot.configuration.routeStartLabel) -> \(snapshot.configuration.routeGoalLabel)"
     }
 
+    private var activeRouteLine: String {
+        let staged = snapshot.configuration.selectedAlternateRouteLabel ?? "no alternate staged"
+        return "Active Route: \(snapshot.configuration.activeRouteLabel) • staged \(staged) • \(snapshot.configuration.routeBindingStatus) • \(snapshot.configuration.routeLoaderStatus)"
+    }
+
+    private var routeValidationLine: String {
+        "Route Validation: \(snapshot.configuration.routeValidationStatus) • \(snapshot.configuration.routeValidationRule)"
+    }
+
+    private var routeHandoffLine: String {
+        "Route Handoff: \(snapshot.configuration.routeHandoffStatus) • \(snapshot.configuration.routeHandoffRule)"
+    }
+
     private var comparisonLine: String {
         if let nextComparisonStop = snapshot.nextComparisonStop {
             return "Compare: \(nextComparisonStop.district) • \(nextComparisonStop.sourceFocus) • lane \(nextComparisonStop.combatLane)"
@@ -1661,7 +1706,8 @@ private struct OverheadMapCanvas: View {
             return "Alt Routes: no second rehearsal route authored"
         }
 
-        return "Alt Route: \(route.name) • \(route.routeType) • \(route.authoringStatus) • \(route.startCheckpointLabel) -> \(route.goalCheckpointLabel)"
+        let previewCount = route.checkpointPoints.count
+        return "Alt Preview: \(route.name) • \(route.routeType) • \(previewCount) markers • \(Int(route.plannedDistanceMeters.rounded()))m • \(route.sectorNames.count) sectors • \(route.startCheckpointLabel) -> \(route.goalCheckpointLabel) • \(route.selectionMode) • \(route.selectionStatus) • \(route.checkpointOwnershipStatus) • shared \(route.sharedCheckpointLabels.count) / owned \(route.exclusiveCheckpointLabels.count) • \(route.activationRule)"
     }
 
     private var threatMapLine: String {

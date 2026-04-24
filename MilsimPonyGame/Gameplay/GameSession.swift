@@ -1501,6 +1501,14 @@ final class GameSession: ObservableObject {
         GameCoreAddLookDelta(Float(x), Float(adjustedY))
     }
 
+    func refreshContinuousInputForSimulation() {
+        guard menuPanel == nil else {
+            return
+        }
+
+        synchronizeMovementIntent()
+    }
+
     func updateViewport(size: CGSize) {
         viewportSize = size
         rebuildOverlay()
@@ -1914,6 +1922,27 @@ final class GameSession: ObservableObject {
         if sceneReady {
             lines.append("Route: \(routeSummary)")
             lines.append(briefingDetails.first ?? routeSummary)
+            if let activeRouteLine = routeDetails.first(where: { $0.hasPrefix("Active Route:") }) {
+                lines.append(activeRouteLine)
+            }
+            if let validationLine = routeDetails.first(where: { $0.hasPrefix("Route Validation:") }) {
+                lines.append(validationLine)
+            }
+            if let handoffLine = routeDetails.first(where: { $0.hasPrefix("Route Handoff:") }) {
+                lines.append(handoffLine)
+            }
+            if let selectionLine = routeDetails.first(where: { $0.hasPrefix("Selection:") }) {
+                lines.append(selectionLine)
+            }
+            if let ownershipLine = routeDetails.first(where: { $0.hasPrefix("Ownership:") }) {
+                lines.append(ownershipLine)
+            }
+            if let stagedRouteLine = routeDetails.first(where: { $0.hasPrefix("Staged Route:") }) {
+                lines.append(stagedRouteLine)
+            }
+            if let bindingGateLine = routeDetails.first(where: { $0.hasPrefix("Binding Gate:") }) {
+                lines.append(bindingGateLine)
+            }
             if let contactLine = routeDetails.first(where: { $0.hasPrefix("Contact:") || $0.hasPrefix("Compare:") || $0.hasPrefix("Capture:") }) {
                 lines.append(contactLine)
             } else if briefingDetails.count > 1 {

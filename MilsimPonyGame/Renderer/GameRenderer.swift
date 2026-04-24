@@ -111,6 +111,7 @@ final class GameRenderer: NSObject, MTKViewDelegate {
                 vertexFunction: fullScreenVertexFunction,
                 fragmentFunction: postProcessFragmentFunction,
                 colorPixelFormat: view.colorPixelFormat,
+                depthPixelFormat: view.depthStencilPixelFormat,
                 sampleCount: max(view.sampleCount, 1)
             ),
             let objectShadowPipelineState = Self.makeShadowPipelineState(
@@ -199,6 +200,7 @@ final class GameRenderer: NSObject, MTKViewDelegate {
         accumulatedFrameCount += 1
 
         if session?.shouldAdvanceSimulation ?? false {
+            session?.refreshContinuousInputForSimulation()
             GameCoreTick(deltaTime)
         }
 
@@ -899,6 +901,7 @@ final class GameRenderer: NSObject, MTKViewDelegate {
         vertexFunction: MTLFunction,
         fragmentFunction: MTLFunction,
         colorPixelFormat: MTLPixelFormat,
+        depthPixelFormat: MTLPixelFormat,
         sampleCount: Int
     ) -> MTLRenderPipelineState? {
         let descriptor = MTLRenderPipelineDescriptor()
@@ -906,6 +909,7 @@ final class GameRenderer: NSObject, MTKViewDelegate {
         descriptor.vertexFunction = vertexFunction
         descriptor.fragmentFunction = fragmentFunction
         descriptor.colorAttachments[0].pixelFormat = colorPixelFormat
+        descriptor.depthAttachmentPixelFormat = depthPixelFormat
         descriptor.rasterSampleCount = sampleCount
         return try? device.makeRenderPipelineState(descriptor: descriptor)
     }

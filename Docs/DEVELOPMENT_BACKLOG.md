@@ -243,5 +243,12 @@ If work starts from the current Cycle 21 state, the next ten cycles should empha
 8. `29`: audio expansion and observer-state feedback polish.
 9. `30`: mission scripting hooks and checkpoint trigger expansion.
 10. `31`: second rehearsal route authoring start.
+11. `32`: alternate-route preview path in the overhead map before live route selection.
+12. `33`: alternate-route selection readiness metadata before checkpoint ownership is split.
+13. `34`: alternate-route checkpoint ownership split before the live route loader can switch routes.
+14. `35`: active-route loader staging before the alternate route can become the bound playable route.
+15. `36`: staged alternate-route metrics before loader binding can validate route length and footprint.
+16. `37`: alternate-route binding gate validation before the live route loader can switch the playable route.
+17. `38`: alternate-route handoff planning before the loader can safely swap checkpoint order.
 
 Those cycles bring the most reviewer-critical missing systems online without abandoning the existing Canberra and rendering work already underway.

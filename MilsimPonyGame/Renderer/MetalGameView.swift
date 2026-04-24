@@ -103,6 +103,7 @@ final class InputTrackingMetalView: MTKView {
     weak var inputDelegate: InputTrackingMetalViewDelegate?
     private var localTrackingArea: NSTrackingArea?
     private var localKeyMonitor: Any?
+    private var localMouseMonitor: Any?
     private var keyWindowObserver: NSObjectProtocol?
     private var appDidBecomeActiveObserver: NSObjectProtocol?
     private weak var observedWindow: NSWindow?
@@ -110,6 +111,9 @@ final class InputTrackingMetalView: MTKView {
     deinit {
         if let localKeyMonitor {
             NSEvent.removeMonitor(localKeyMonitor)
+        }
+        if let localMouseMonitor {
+            NSEvent.removeMonitor(localMouseMonitor)
         }
         removeWindowObservers()
     }
@@ -132,15 +136,15 @@ final class InputTrackingMetalView: MTKView {
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         window?.acceptsMouseMovedEvents = true
-        window?.makeFirstResponder(self)
         installLocalKeyMonitorIfNeeded()
+        installLocalMouseMonitorIfNeeded()
         installWindowObserversIfNeeded()
         DispatchQueue.main.async { [weak self] in
             guard let self else {
                 return
             }
 
-            self.inputDelegate?.inputViewDidBecomeActive(self)
+            self.captureInputFocus()
         }
     }
 
@@ -152,7 +156,7 @@ final class InputTrackingMetalView: MTKView {
         }
 
         let options: NSTrackingArea.Options = [
-            .activeInKeyWindow,
+            .activeInActiveApp,
             .inVisibleRect,
             .mouseMoved,
             .mouseEnteredAndExited,
@@ -228,7 +232,7 @@ final class InputTrackingMetalView: MTKView {
     }
 
     override func keyDown(with event: NSEvent) {
-        if localKeyMonitor == nil, dispatchInputEventIfHandled(event) {
+        if dispatchInputEventIfHandled(event) {
             return
         }
 
@@ -236,7 +240,7 @@ final class InputTrackingMetalView: MTKView {
     }
 
     override func keyUp(with event: NSEvent) {
-        if localKeyMonitor == nil, dispatchInputEventIfHandled(event) {
+        if dispatchInputEventIfHandled(event) {
             return
         }
 
@@ -244,7 +248,7 @@ final class InputTrackingMetalView: MTKView {
     }
 
     override func flagsChanged(with event: NSEvent) {
-        if localKeyMonitor == nil, dispatchInputEventIfHandled(event) {
+        if dispatchInputEventIfHandled(event) {
             return
         }
 
@@ -255,15 +259,15 @@ final class InputTrackingMetalView: MTKView {
     }
 
     override func mouseMoved(with event: NSEvent) {
-        inputDelegate?.inputView(self, mouseDidMove: event.deltaX, deltaY: event.deltaY)
+        dispatchMouseEventIfHandled(event)
     }
 
     override func mouseDragged(with event: NSEvent) {
-        inputDelegate?.inputView(self, mouseDidMove: event.deltaX, deltaY: event.deltaY)
+        dispatchMouseEventIfHandled(event)
     }
 
     override func rightMouseDragged(with event: NSEvent) {
-        inputDelegate?.inputView(self, mouseDidMove: event.deltaX, deltaY: event.deltaY)
+        dispatchMouseEventIfHandled(event)
     }
 
     private func installLocalKeyMonitorIfNeeded() {
@@ -278,12 +282,75 @@ final class InputTrackingMetalView: MTKView {
                 return event
             }
 
+            guard self.shouldHandleLocalKeyEvent(event) else {
+                return event
+            }
+
             if self.dispatchInputEventIfHandled(event) {
                 return nil
             }
 
             return event
         }
+    }
+
+    private func installLocalMouseMonitorIfNeeded() {
+        guard localMouseMonitor == nil else {
+            return
+        }
+
+        localMouseMonitor = NSEvent.addLocalMonitorForEvents(
+            matching: [.mouseMoved, .leftMouseDragged, .rightMouseDragged]
+        ) { [weak self] event in
+            guard let self else {
+                return event
+            }
+
+            guard self.shouldHandleLocalEvent(event), self.isEventInsideView(event) else {
+                return event
+            }
+
+            self.dispatchMouseEventIfHandled(event)
+            return nil
+        }
+    }
+
+    private func shouldHandleLocalEvent(_ event: NSEvent) -> Bool {
+        guard let window, event.window === window else {
+            return false
+        }
+
+        return window.isVisible
+    }
+
+    private func shouldHandleLocalKeyEvent(_ event: NSEvent) -> Bool {
+        guard NSApp.isActive, event.modifierFlags.intersection([.command, .option, .control]).isEmpty else {
+            return false
+        }
+
+        return InputBindings.command(
+            for: event.keyCode,
+            characters: event.charactersIgnoringModifiers
+        ) != nil
+    }
+
+    private func isEventInsideView(_ event: NSEvent) -> Bool {
+        guard event.window === window else {
+            return false
+        }
+
+        let point = convert(event.locationInWindow, from: nil)
+        return bounds.contains(point)
+    }
+
+    @discardableResult
+    private func dispatchMouseEventIfHandled(_ event: NSEvent) -> Bool {
+        guard event.deltaX != 0 || event.deltaY != 0 else {
+            return false
+        }
+
+        inputDelegate?.inputView(self, mouseDidMove: event.deltaX, deltaY: event.deltaY)
+        return true
     }
 
     private func dispatchInputEventIfHandled(_ event: NSEvent) -> Bool {
@@ -304,6 +371,10 @@ final class InputTrackingMetalView: MTKView {
             return true
 
         case .keyDown, .keyUp:
+            guard event.modifierFlags.intersection([.command, .option, .control]).isEmpty else {
+                return false
+            }
+
             let characters = event.charactersIgnoringModifiers
             guard InputBindings.command(for: event.keyCode, characters: characters) != nil else {
                 return false

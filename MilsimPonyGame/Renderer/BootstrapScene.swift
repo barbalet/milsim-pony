@@ -223,8 +223,17 @@ struct SceneMapAlternateRoute: Identifiable {
     let startCheckpointLabel: String
     let goalCheckpointLabel: String
     let checkpointLabels: [String]
+    let checkpointPoints: [SceneMapPoint]
+    let plannedDistanceMeters: Float
+    let sectorNames: [String]
     let routeType: String
     let authoringStatus: String
+    let selectionMode: String
+    let selectionStatus: String
+    let activationRule: String
+    let checkpointOwnershipStatus: String
+    let sharedCheckpointLabels: [String]
+    let exclusiveCheckpointLabels: [String]
 }
 
 struct SceneMapThreatObserver: Identifiable {
@@ -380,6 +389,16 @@ struct SceneMapConfiguration {
     let routeGoalLabel: String
     let routePlannedDistanceMeters: Float
     let routeSectorNames: [String]
+    let activeRouteID: String
+    let activeRouteLabel: String
+    let selectedAlternateRouteID: String?
+    let selectedAlternateRouteLabel: String?
+    let routeBindingStatus: String
+    let routeLoaderStatus: String
+    let routeValidationStatus: String
+    let routeValidationRule: String
+    let routeHandoffStatus: String
+    let routeHandoffRule: String
     let reviewPackTitle: String
     let reviewPackSummary: String
     let referenceGallery: String
@@ -429,6 +448,7 @@ struct SceneRouteInfo {
     let missionTitle: String
     let missionSummary: String
     let missionPhases: [MissionPhaseConfiguration]
+    let routeSelection: RouteSelectionConfiguration
     let alternateRoutes: [AlternateRouteConfiguration]
 }
 
@@ -765,7 +785,10 @@ final class BootstrapScene {
                     "Review Pack: \(mapConfiguration.reviewPackTitle) / \(mapConfiguration.comparisonStops.count) comparison stops / \(mapConfiguration.openRisks.count) open risks",
                     "Combat Rehearsal: \(mapConfiguration.combatRehearsalTitle) / \(mapConfiguration.contactStops.count) contact lanes / \(mapConfiguration.threatObservers.count) observers",
                     "Mission Script: \(mapConfiguration.missionScriptTitle) / \(mapConfiguration.missionPhases.count) checkpoint hooks",
-                    "Alternate Routes: \(mapConfiguration.alternateRoutes.count) authored starts ready for route expansion",
+                    activeRouteLine(),
+                    routeValidationLine(),
+                    routeHandoffLine(),
+                    alternateRouteCompletionLine(),
                     "Contacts: \(snapshot.neutralizedObserverCount) neutralized / \(max(snapshot.totalObserverCount - snapshot.neutralizedObserverCount, 0)) live",
                     String(
                         format: "Run: %.1fs / %.0fm / %d restarts",
@@ -785,7 +808,10 @@ final class BootstrapScene {
         var details = [
             "Objective: \(routeInfo.summary)",
             "Mission Script: \(routeInfo.missionTitle) / \(routeInfo.missionPhases.count) checkpoint hooks",
-            "Alternate Routes: \(routeInfo.alternateRoutes.count) authoring candidates / active route remains \(routeInfo.name)",
+            activeRouteLine(),
+            routeValidationLine(),
+            routeHandoffLine(),
+            "Alternate Routes: \(routeInfo.alternateRoutes.count) candidates / active route remains \(routeInfo.name)",
             String(
                 format: "Footprint: %@ -> %@ / %d sectors / %.0fm planned",
                 routeInfo.startLabel,
@@ -807,6 +833,10 @@ final class BootstrapScene {
 
         if let alternateRoute = routeInfo.alternateRoutes.first {
             details.append("Alt Route: \(alternateRoute.name) / \(alternateRoute.authoringStatus)")
+            details.append(alternateRouteSelectionLine(for: alternateRoute))
+            details.append(alternateRouteOwnershipLine(for: alternateRoute))
+            details.append(alternateRouteMetricsLine(for: alternateRoute))
+            details.append(alternateRouteBindingGateLine(for: alternateRoute))
         }
 
         if let nextComparisonStop {
@@ -949,6 +979,10 @@ final class BootstrapScene {
 
         if let alternateRoute = routeInfo.alternateRoutes.first {
             details.append("Alt Route: \(alternateRoute.name) / \(alternateRoute.routeType) / \(alternateRoute.authoringStatus)")
+            details.append(alternateRouteSelectionLine(for: alternateRoute))
+            details.append(alternateRouteOwnershipLine(for: alternateRoute))
+            details.append(alternateRouteMetricsLine(for: alternateRoute))
+            details.append(alternateRouteBindingGateLine(for: alternateRoute))
         }
 
         if snapshot.neutralizedObserverCount > 0 {
@@ -988,6 +1022,101 @@ final class BootstrapScene {
         routeInfo.missionPhases.first { phase in
             phase.checkpointID == checkpointID
         }
+    }
+
+    private func alternateRouteCompletionLine() -> String {
+        guard let alternateRoute = mapConfiguration.alternateRoutes.first else {
+            return "Alternate Routes: no second rehearsal route authored"
+        }
+
+        return "Alternate Routes: \(mapConfiguration.alternateRoutes.count) candidate / \(alternateRoute.selectionStatus) / \(alternateRoute.activationRule)"
+    }
+
+    private func activeRouteLine() -> String {
+        let stagedLabel = routeInfo.routeSelection.selectedAlternateRouteLabel ?? "no alternate staged"
+        return "Active Route: \(routeInfo.routeSelection.activeRouteLabel) / staged \(stagedLabel) / \(routeInfo.routeSelection.bindingStatus) / \(routeInfo.routeSelection.loaderStatus)"
+    }
+
+    private func routeValidationLine() -> String {
+        "Route Validation: \(routeInfo.routeSelection.validationStatus) / \(routeInfo.routeSelection.validationRule)"
+    }
+
+    private func routeHandoffLine() -> String {
+        "Route Handoff: \(routeInfo.routeSelection.handoffStatus) / \(routeInfo.routeSelection.handoffRule)"
+    }
+
+    private func alternateRouteSelectionLine(for route: AlternateRouteConfiguration) -> String {
+        let mode = route.selectionMode ?? "preview-only"
+        let status = route.selectionStatus ?? route.authoringStatus
+        let activation = route.activationRule ?? "activation waits for route selection"
+        return "Selection: \(mode) / \(status) / \(activation)"
+    }
+
+    private func alternateRouteOwnershipLine(for route: AlternateRouteConfiguration) -> String {
+        let status = route.checkpointOwnershipStatus ?? "checkpoint ownership pending"
+        let sharedCount = route.sharedCheckpointIDs?.count ?? 0
+        let exclusiveCount = route.exclusiveCheckpointIDs?.count ?? 0
+        return "Ownership: \(status) / \(sharedCount) shared / \(exclusiveCount) alternate-owned"
+    }
+
+    private func alternateRouteMetricsLine(for route: AlternateRouteConfiguration) -> String {
+        let stagedCheckpoints = route.checkpointIDs.compactMap { checkpointID in
+            routeInfo.checkpoints.first { $0.id == checkpointID }
+        }
+        let plannedDistance = plannedDistance(for: stagedCheckpoints)
+        let sectorCount = routeSectorNames(for: stagedCheckpoints).count
+        return String(
+            format: "Staged Route: %d markers / %.0fm planned / %d sectors",
+            stagedCheckpoints.count,
+            plannedDistance,
+            sectorCount
+        )
+    }
+
+    private func alternateRouteBindingGateLine(for route: AlternateRouteConfiguration) -> String {
+        let stagedCheckpoints = route.checkpointIDs.compactMap { checkpointID in
+            routeInfo.checkpoints.first { $0.id == checkpointID }
+        }
+        let plannedDistance = plannedDistance(for: stagedCheckpoints)
+        let sectorCount = routeSectorNames(for: stagedCheckpoints).count
+        let status = stagedCheckpoints.count >= 3 && plannedDistance >= 100 && sectorCount >= 2
+            ? "loader gate eligible"
+            : "loader gate blocked"
+
+        return String(
+            format: "Binding Gate: %@ / %d markers / %.0fm planned / %d sectors",
+            status,
+            stagedCheckpoints.count,
+            plannedDistance,
+            sectorCount
+        )
+    }
+
+    private func plannedDistance(for checkpoints: [RouteCheckpointConfiguration]) -> Float {
+        zip(checkpoints, checkpoints.dropFirst()).reduce(0) { partialResult, segment in
+            partialResult + simd_distance(segment.0.positionVector, segment.1.positionVector)
+        }
+    }
+
+    private func routeSectorNames(for checkpoints: [RouteCheckpointConfiguration]) -> [String] {
+        var names: [String] = []
+
+        for checkpoint in checkpoints {
+            guard let sector = mapConfiguration.sectors
+                .filter({ $0.contains(x: checkpoint.positionVector.x, z: checkpoint.positionVector.z) })
+                .min(by: { lhs, rhs in
+                    ((lhs.maxX - lhs.minX) * (lhs.maxZ - lhs.minZ)) < ((rhs.maxX - rhs.minX) * (rhs.maxZ - rhs.minZ))
+                })
+            else {
+                continue
+            }
+
+            if !names.contains(sector.displayName) {
+                names.append(sector.displayName)
+            }
+        }
+
+        return names
     }
 
     private func activeSectorIndices(for cameraPosition: SIMD3<Float>) -> [Int] {
@@ -1084,6 +1213,16 @@ final class BootstrapScene {
             routeGoalLabel: mapConfigurationTemplate.routeGoalLabel,
             routePlannedDistanceMeters: mapConfigurationTemplate.routePlannedDistanceMeters,
             routeSectorNames: mapConfigurationTemplate.routeSectorNames,
+            activeRouteID: mapConfigurationTemplate.activeRouteID,
+            activeRouteLabel: mapConfigurationTemplate.activeRouteLabel,
+            selectedAlternateRouteID: mapConfigurationTemplate.selectedAlternateRouteID,
+            selectedAlternateRouteLabel: mapConfigurationTemplate.selectedAlternateRouteLabel,
+            routeBindingStatus: mapConfigurationTemplate.routeBindingStatus,
+            routeLoaderStatus: mapConfigurationTemplate.routeLoaderStatus,
+            routeValidationStatus: mapConfigurationTemplate.routeValidationStatus,
+            routeValidationRule: mapConfigurationTemplate.routeValidationRule,
+            routeHandoffStatus: mapConfigurationTemplate.routeHandoffStatus,
+            routeHandoffRule: mapConfigurationTemplate.routeHandoffRule,
             reviewPackTitle: mapConfigurationTemplate.reviewPackTitle,
             reviewPackSummary: mapConfigurationTemplate.reviewPackSummary,
             referenceGallery: mapConfigurationTemplate.referenceGallery,
@@ -1822,6 +1961,18 @@ private final class ScenePackageBuilder {
         let combatRehearsal = sceneConfiguration.combatRehearsal ?? CombatRehearsalConfiguration()
         let missionScript = sceneConfiguration.missionScript ?? MissionScriptConfiguration()
         let alternateRoutes = sceneConfiguration.alternateRoutes ?? []
+        let routeSelection = sceneConfiguration.routeSelection ?? RouteSelectionConfiguration(
+            activeRouteID: "primary",
+            activeRouteLabel: sceneConfiguration.route.name,
+            selectedAlternateRouteID: alternateRoutes.first?.id,
+            selectedAlternateRouteLabel: alternateRoutes.first?.name,
+            bindingStatus: "primary route bound",
+            loaderStatus: "alternate route loader pending",
+            validationStatus: "alternate route validation pending",
+            validationRule: "requires staged route metrics",
+            handoffStatus: "route handoff pending",
+            handoffRule: "requires eligible staged route and restart-safe checkpoint ownership"
+        )
         let routePlannedDistanceMeters = plannedRouteDistance(for: sceneConfiguration.route.checkpoints)
         let routeSectorNames = routeSectorNames(
             for: sceneConfiguration.route.checkpoints,
@@ -1884,6 +2035,7 @@ private final class ScenePackageBuilder {
                 1.0 / ballisticsSettings.simulationStepSeconds
             ),
             "Telemetry: \((sceneConfiguration.randomSpawns?.count ?? 1)) starts / \(sceneConfiguration.route.checkpoints.count) route markers / \(guidanceConfiguration.signposts.count) signposts",
+            "Route Loader: active \(routeSelection.activeRouteLabel) / staged \(routeSelection.selectedAlternateRouteLabel ?? "no alternate staged") / \(routeSelection.bindingStatus) / \(routeSelection.loaderStatus)",
             "Threats: \(detectionConfiguration.observers.count) observers / \(guidanceConfiguration.coverPoints.count) cover / \(guidanceConfiguration.signposts.count) signs",
             String(
                 format: "Traversal: %.1f walk / %.1f sprint / %.3f look",
@@ -1933,6 +2085,7 @@ private final class ScenePackageBuilder {
                 routeGoalLabel: sceneConfiguration.route.checkpoints.last?.label ?? "Final review marker",
                 routePlannedDistanceMeters: routePlannedDistanceMeters,
                 routeSectorNames: routeSectorNames,
+                routeSelection: routeSelection,
                 reviewPack: reviewPack,
                 combatRehearsal: combatRehearsal,
                 missionScript: missionScript,
@@ -1961,6 +2114,7 @@ private final class ScenePackageBuilder {
                 missionTitle: missionScript.title,
                 missionSummary: missionScript.summary,
                 missionPhases: missionScript.phases,
+                routeSelection: routeSelection,
                 alternateRoutes: alternateRoutes
             ),
             evasionInfo: SceneEvasionInfo(
@@ -1986,6 +2140,7 @@ private final class ScenePackageBuilder {
         routeGoalLabel: String,
         routePlannedDistanceMeters: Float,
         routeSectorNames: [String],
+        routeSelection: RouteSelectionConfiguration,
         reviewPack: ReviewPackConfiguration,
         combatRehearsal: CombatRehearsalConfiguration,
         missionScript: MissionScriptConfiguration,
@@ -2032,6 +2187,11 @@ private final class ScenePackageBuilder {
         let checkpointLabelsByID: [String: String] = Dictionary(uniqueKeysWithValues: checkpoints.map { checkpoint in
             (checkpoint.id, checkpoint.label)
         })
+        func checkpointLabels(for checkpointIDs: [String]?) -> [String] {
+            (checkpointIDs ?? []).map { checkpointID in
+                checkpointLabelsByID[checkpointID] ?? checkpointID
+            }
+        }
         let mapComparisonStops: [SceneMapComparisonStop] = reviewPack.comparisonStops.compactMap { comparisonStop -> SceneMapComparisonStop? in
             guard let checkpointLabel = checkpointLabelsByID[comparisonStop.checkpointID] else {
                 return nil
@@ -2081,8 +2241,12 @@ private final class ScenePackageBuilder {
                 mapCode: phase.mapCode
             )
         }
-        let mapAlternateRoutes = alternateRoutes.map { route in
-            SceneMapAlternateRoute(
+        let mapAlternateRoutes: [SceneMapAlternateRoute] = alternateRoutes.map { route in
+            let alternateCheckpoints = route.checkpointIDs.compactMap { checkpointID in
+                checkpoints.first { $0.id == checkpointID }
+            }
+
+            return SceneMapAlternateRoute(
                 id: route.id,
                 name: route.name,
                 summary: route.summary,
@@ -2091,8 +2255,29 @@ private final class ScenePackageBuilder {
                 checkpointLabels: route.checkpointIDs.map { checkpointID in
                     checkpointLabelsByID[checkpointID] ?? checkpointID
                 },
+                checkpointPoints: route.checkpointIDs.compactMap { checkpointID in
+                    guard let checkpoint = checkpoints.first(where: { $0.id == checkpointID }) else {
+                        return nil
+                    }
+
+                    return SceneMapPoint(
+                        x: checkpoint.positionVector.x,
+                        z: checkpoint.positionVector.z
+                    )
+                },
+                plannedDistanceMeters: plannedRouteDistance(for: alternateCheckpoints),
+                sectorNames: self.routeSectorNames(
+                    for: alternateCheckpoints,
+                    loadedSectors: loadedSectors
+                ),
                 routeType: route.routeType,
-                authoringStatus: route.authoringStatus
+                authoringStatus: route.authoringStatus,
+                selectionMode: route.selectionMode ?? "preview-only",
+                selectionStatus: route.selectionStatus ?? route.authoringStatus,
+                activationRule: route.activationRule ?? "activation waits for route selection",
+                checkpointOwnershipStatus: route.checkpointOwnershipStatus ?? "checkpoint ownership pending",
+                sharedCheckpointLabels: checkpointLabels(for: route.sharedCheckpointIDs),
+                exclusiveCheckpointLabels: checkpointLabels(for: route.exclusiveCheckpointIDs)
             )
         }
         let mapThreatObservers = threatObservers.map { observer in
@@ -2158,6 +2343,16 @@ private final class ScenePackageBuilder {
             routeGoalLabel: routeGoalLabel,
             routePlannedDistanceMeters: routePlannedDistanceMeters,
             routeSectorNames: routeSectorNames,
+            activeRouteID: routeSelection.activeRouteID,
+            activeRouteLabel: routeSelection.activeRouteLabel,
+            selectedAlternateRouteID: routeSelection.selectedAlternateRouteID,
+            selectedAlternateRouteLabel: routeSelection.selectedAlternateRouteLabel,
+            routeBindingStatus: routeSelection.bindingStatus,
+            routeLoaderStatus: routeSelection.loaderStatus,
+            routeValidationStatus: routeSelection.validationStatus,
+            routeValidationRule: routeSelection.validationRule,
+            routeHandoffStatus: routeSelection.handoffStatus,
+            routeHandoffRule: routeSelection.handoffRule,
             reviewPackTitle: reviewPack.title,
             reviewPackSummary: reviewPack.summary,
             referenceGallery: reviewPack.referenceGallery,
@@ -3185,6 +3380,16 @@ private enum FallbackSceneFactory {
                 routeGoalLabel: "Fallback goal",
                 routePlannedDistanceMeters: 0,
                 routeSectorNames: [],
+                activeRouteID: "fallback",
+                activeRouteLabel: "Fallback Route",
+                selectedAlternateRouteID: nil,
+                selectedAlternateRouteLabel: nil,
+                routeBindingStatus: "fallback route bound",
+                routeLoaderStatus: "alternate route loader unavailable",
+                routeValidationStatus: "route validation unavailable",
+                routeValidationRule: "fallback scene has no staged route",
+                routeHandoffStatus: "route handoff unavailable",
+                routeHandoffRule: "fallback scene has no staged route",
                 reviewPackTitle: "Fallback Review Pack",
                 reviewPackSummary: "Review pack data unavailable",
                 referenceGallery: "Unavailable",
@@ -3230,6 +3435,18 @@ private enum FallbackSceneFactory {
                 missionTitle: "Fallback Mission Script",
                 missionSummary: "Mission script data unavailable",
                 missionPhases: [],
+                routeSelection: RouteSelectionConfiguration(
+                    activeRouteID: "fallback",
+                    activeRouteLabel: "Fallback Route",
+                    selectedAlternateRouteID: nil,
+                    selectedAlternateRouteLabel: nil,
+                    bindingStatus: "fallback route bound",
+                    loaderStatus: "alternate route loader unavailable",
+                    validationStatus: "route validation unavailable",
+                    validationRule: "fallback scene has no staged route",
+                    handoffStatus: "route handoff unavailable",
+                    handoffRule: "fallback scene has no staged route"
+                ),
                 alternateRoutes: []
             ),
             evasionInfo: SceneEvasionInfo(

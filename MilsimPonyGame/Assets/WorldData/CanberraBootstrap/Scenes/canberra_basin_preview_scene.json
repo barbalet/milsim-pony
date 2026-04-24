@@ -1,10 +1,10 @@
 {
-  "cycleLabel": "Cycle 31 Second Rehearsal Route Authoring Start",
-  "sceneName": "Canberra Alternate Route Authoring Validation",
+  "cycleLabel": "Cycle 38 Alternate Route Handoff Plan",
+  "sceneName": "Canberra Alternate Route Handoff Plan Validation",
   "planningNotes": [
-    "Plan: cycle 31 starts second-route authoring by adding reviewable alternate route metadata while the live Woden-to-Belconnen route remains the stable playable baseline.",
-    "Breakdown: preserve the cycle 30 mission-script hooks, paired observer hotspots, and observer-audio feedback while exposing an east-basin-to-Belconnen route candidate in the HUD and Canberra map.",
-    "Reference: carry the cycle 28 group-observer baseline, cycle 29 observer-audio feedback, and cycle 30 mission hooks forward as the foundation for route expansion."
+    "Plan: cycle 38 adds the alternate-route handoff plan while the live Woden-to-Belconnen route remains the only bound playable route.",
+    "Breakdown: preserve the cycle 32 overhead-map preview path, cycle 33 selection readiness, cycle 34 checkpoint ownership, cycle 35 active-route staging, cycle 36 route metrics, and cycle 37 binding gate while surfacing the restart-safe handoff rule.",
+    "Reference: carry the cycle 28 group-observer baseline, cycle 29 observer-audio feedback, cycle 30 mission hooks, cycle 31 route authoring data, cycle 32 map preview, cycle 33 selection rules, cycle 34 ownership split, cycle 35 loader staging, cycle 36 metrics, and cycle 37 gate validation forward as the foundation for live route binding."
   ],
   "spawn": {
     "label": "Woden Town Centre Staging",
@@ -159,7 +159,7 @@
   },
   "route": {
     "name": "Canberra Combat-Lane Rehearsal",
-    "summary": "Follow one authored line from Woden to Belconnen while scoped rifle drift, grouped observer relays, alert memory, observer audio, mission-script hooks, alternate-route authoring metadata, and contact-lane cues validate that the atlas can carry route expansion without losing Canberra readability.",
+    "summary": "Follow one authored line from Woden to Belconnen while scoped rifle drift, grouped observer relays, alert memory, observer audio, mission-script hooks, active-route loader staging, alternate-route metrics, binding-gate validation, handoff planning, checkpoint ownership, and contact-lane cues validate that the atlas can carry route expansion without losing Canberra readability.",
     "checkpoints": [
       {
         "id": "woden_town_centre_staging",
@@ -308,7 +308,7 @@
   },
   "reviewPack": {
     "title": "Canberra Review Pack Baseline",
-    "summary": "Reference-backed Woden-to-Belconnen atlas baseline carried forward into the second-route authoring pass.",
+    "summary": "Reference-backed Woden-to-Belconnen atlas baseline carried forward into the alternate-route handoff-plan pass.",
     "referenceGallery": "CanberraReferenceGallery",
     "textureLibrary": "Canberra Texture Library",
     "captureFormat": "Open the map on district handoffs, raise the 4x scope on skyline stops, and use the pause shell for route-proof captures.",
@@ -384,8 +384,8 @@
     ]
   },
   "combatRehearsal": {
-    "title": "Canberra Cycle 31 Second Rehearsal Route Authoring Start",
-    "summary": "Live Woden-to-Belconnen contact pass with paired observer relays, expanded alert audio, mission-script checkpoint hooks, second-route authoring metadata, clearer observer-state HUD feedback, cover cues, recovery notes, persistent field-difficulty tuning, and authored rifle stability layered over the full atlas route.",
+    "title": "Canberra Cycle 38 Alternate Route Handoff Plan",
+    "summary": "Live Woden-to-Belconnen contact pass with paired observer relays, expanded alert audio, mission-script checkpoint hooks, active-route loader staging, staged alternate-route metrics, binding-gate validation, restart-safe handoff planning, alternate-route preview pathing, explicit selection readiness, checkpoint ownership metadata, clearer observer-state HUD feedback, cover cues, recovery notes, persistent field-difficulty tuning, and authored rifle stability layered over the full atlas route.",
     "exposureGuide": "Open ground is intentional; move between named cover screens before raising the optic on skyline-heavy checkpoints.",
     "recoveryRule": "If suspicion spikes, break line of sight, re-anchor on the nearest cover screen, and retry the current lane from the latest checkpoint rather than freelancing a shortcut.",
     "contactStops": [
@@ -553,11 +553,23 @@
         "phase": "Extract",
         "objective": "Complete the route with mission, contact, and atlas summaries still aligned.",
         "trigger": "Touch the final Ginninderra Drive Review marker.",
-        "successCue": "Mission hook route complete; ready for second-route authoring.",
+        "successCue": "Mission hook route complete; ready for alternate-route selection.",
         "failureCue": "Break contact at Ginninderra Access Screen and retry the final lane.",
         "mapCode": "MS-EXIT"
       }
     ]
+  },
+  "routeSelection": {
+    "activeRouteID": "canberra_combat_lane_rehearsal",
+    "activeRouteLabel": "Canberra Combat-Lane Rehearsal",
+    "selectedAlternateRouteID": "east_basin_to_belconnen_probe",
+    "selectedAlternateRouteLabel": "East Basin To Belconnen Probe",
+    "bindingStatus": "primary route bound",
+    "loaderStatus": "alternate route handoff plan staged",
+    "validationStatus": "staged alternate route eligible; live switch disabled",
+    "validationRule": "requires 3+ markers, 100m+ planned distance, and 2+ sectors",
+    "handoffStatus": "restart-safe handoff planned; checkpoint order unchanged",
+    "handoffRule": "bind alternate route only from briefing or restart boundary"
   },
   "alternateRoutes": [
     {
@@ -575,8 +587,23 @@
         "belconnen_town_centre_review",
         "ginninderra_drive_review"
       ],
-      "routeType": "authoring-candidate",
-      "authoringStatus": "metadata-only scaffold; activation waits for dedicated route selection and checkpoint ownership"
+      "routeType": "preview-candidate",
+      "authoringStatus": "map-preview ready; activation waits for dedicated route selection and checkpoint ownership",
+      "selectionMode": "briefing-locked preview",
+      "selectionStatus": "selection-ready metadata",
+      "activationRule": "selectable after live route loader can bind alternate checkpoint ownership",
+      "checkpointOwnershipStatus": "ownership split ready",
+      "sharedCheckpointIDs": [
+        "east_basin_lookout",
+        "ginninderra_drive_review"
+      ],
+      "exclusiveCheckpointIDs": [
+        "constitution_axis_review",
+        "civic_interchange_review",
+        "west_basin_promenade_review",
+        "black_mountain_scope_perch",
+        "belconnen_town_centre_review"
+      ]
     }
   ],
   "detection": {
