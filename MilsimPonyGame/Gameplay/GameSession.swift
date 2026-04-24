@@ -154,6 +154,8 @@ private final class ShotFeedbackAudioEngine {
     private let impactBuffer: AVAudioPCMBuffer
     private let alertAcquireBuffer: AVAudioPCMBuffer
     private let alertDangerBuffer: AVAudioPCMBuffer
+    private let alertRelayBuffer: AVAudioPCMBuffer
+    private let alertClearBuffer: AVAudioPCMBuffer
 
     private init() {
         shotBuffer = Self.makeBuffer(format: format, duration: 0.22) { time, noise in
@@ -201,6 +203,20 @@ private final class ShotFeedbackAudioEngine {
             let tone = (sin(2.0 * .pi * 620.0 * time * wobble) * 0.24) + (sin(2.0 * .pi * 410.0 * time) * 0.08)
             return tone * envelope
         }
+        alertRelayBuffer = Self.makeBuffer(format: format, duration: 0.18) { time, _ in
+            let first = sin(2.0 * .pi * 740.0 * time) * exp(-24.0 * time)
+            let secondTime = max(time - 0.065, 0)
+            let second = sin(2.0 * .pi * 980.0 * secondTime) * exp(-26.0 * secondTime)
+            let thirdTime = max(time - 0.118, 0)
+            let third = sin(2.0 * .pi * 820.0 * thirdTime) * exp(-34.0 * thirdTime)
+            return (first * 0.12) + (second * 0.15) + (third * 0.08)
+        }
+        alertClearBuffer = Self.makeBuffer(format: format, duration: 0.16) { time, _ in
+            let envelope = exp(-18.0 * time)
+            let glide = 1.0 - min(time / 0.16, 1.0) * 0.32
+            let tone = (sin(2.0 * .pi * 420.0 * time * glide) * 0.16) + (sin(2.0 * .pi * 315.0 * time) * 0.08)
+            return tone * envelope
+        }
 
         engine.attach(player)
         engine.connect(player, to: engine.mainMixerNode, format: format)
@@ -231,6 +247,14 @@ private final class ShotFeedbackAudioEngine {
 
     func playAlertDangerCue() {
         play(buffer: alertDangerBuffer)
+    }
+
+    func playAlertRelayCue() {
+        play(buffer: alertRelayBuffer)
+    }
+
+    func playAlertClearCue() {
+        play(buffer: alertClearBuffer)
     }
 
     private func play(buffer: AVAudioPCMBuffer, after delay: Double = 0) {
@@ -319,6 +343,7 @@ struct OverheadMapSnapshot {
     let nextCheckpointLabel: String?
     let nextComparisonStop: SceneMapComparisonStop?
     let nextCombatStop: SceneMapCombatStop?
+    let nextMissionPhase: SceneMapMissionPhase?
     let suspicionLevel: Float
     let activeObserverCount: Int
     let alertedObserverCount: Int
@@ -445,7 +470,7 @@ private struct ObserverLOSDebugState {
 final class GameSession: ObservableObject {
     @Published private(set) var statusLine = "Bootstrapping game session"
     @Published private(set) var overlayLines: [String] = []
-    @Published private(set) var overlayTitle = "Cycle 28 Group Observer Relay"
+    @Published private(set) var overlayTitle = "Cycle 30 Mission Script And Checkpoint Hooks"
     @Published private(set) var demoFlowState: DemoFlowState = .title
     @Published private(set) var isSettingsPresented = false
     @Published private(set) var isScopeActive = false
@@ -502,6 +527,8 @@ final class GameSession: ObservableObject {
     private var latestObserverDebugStates: [ObserverLOSDebugState] = []
     private var lastThreatSeeingCount = 0
     private var lastThreatAlertBand = 0
+    private var lastThreatSupportingCount = 0
+    private var lastThreatAudibleState = "quiet"
     private var lastThreatAudioElapsedSeconds: Double = -10
     private var freshRunHandler: (() -> Void)?
     private var pendingOverlayLines: [String]?
@@ -637,6 +664,15 @@ final class GameSession: ObservableObject {
                     breathStatus,
                     cycleStatus
                 )
+            } else if let alertedObserver = primaryAlertedObserver {
+                return String(
+                    format: "%.1fx scope active / %@ memory %.1fs / %@ / %@",
+                    scopeMagnification,
+                    alertedObserver.label,
+                    alertedObserver.alertSecondsRemaining,
+                    breathStatus,
+                    cycleStatus
+                )
             } else if
                 let snapshot = latestSnapshot,
                 snapshot.lastShotHitObserver,
@@ -680,6 +716,10 @@ final class GameSession: ObservableObject {
             return "Break line of sight from \(threatObserver.label) or fire / hold E to steady / Space lowers scope"
         }
 
+        if isScopeActive, let alertedObserver = primaryAlertedObserver {
+            return "Shared alert memory on \(alertedObserver.label) / hold cover or confirm target / Space lowers scope"
+        }
+
         return isScopeActive
             ? (steadyAimActive
                 ? "Click or press F to fire / release E to recover breath / Space lowers scope"
@@ -695,6 +735,9 @@ final class GameSession: ObservableObject {
         } else if isScopeActive, primarySeeingObserver != nil {
             let alertTint = SIMD4<Float>(1.0, 0.58, 0.44, 0.98)
             base += (alertTint - base) * 0.22
+        } else if isScopeActive, primaryAlertedObserver != nil {
+            let relayTint = SIMD4<Float>(1.0, 0.76, 0.48, 0.98)
+            base += (relayTint - base) * 0.14
         }
 
         let flashStrength: Float
@@ -871,11 +914,14 @@ final class GameSession: ObservableObject {
 
     private func resetThreatFeedbackState() {
         lastThreatSeeingCount = Int(latestSnapshot?.seeingObserverCount ?? 0)
+        lastThreatSupportingCount = latestObserverDebugStates.filter(\.supportingGroup).count
         if let latestSnapshot {
             lastThreatAlertBand = currentThreatAlertBand(for: latestSnapshot)
+            lastThreatAudibleState = threatAudibleState(for: latestSnapshot)
             lastThreatAudioElapsedSeconds = latestSnapshot.elapsedSeconds
         } else {
             lastThreatAlertBand = 0
+            lastThreatAudibleState = "quiet"
             lastThreatAudioElapsedSeconds = -10
         }
     }
@@ -883,11 +929,14 @@ final class GameSession: ObservableObject {
     private func applyThreatAudioFeedback(for snapshot: GameFrameSnapshot) {
         let seeingCount = Int(snapshot.seeingObserverCount)
         let alertBand = currentThreatAlertBand(for: snapshot)
+        let supportingCount = latestObserverDebugStates.filter(\.supportingGroup).count
+        let audibleState = threatAudibleState(for: snapshot)
 
         defer {
             lastThreatSeeingCount = seeingCount
             lastThreatAlertBand = alertBand
-            lastThreatAudioElapsedSeconds = snapshot.elapsedSeconds
+            lastThreatSupportingCount = supportingCount
+            lastThreatAudibleState = audibleState
         }
 
         guard sceneReady, demoFlowState == .playing, menuPanel == nil else {
@@ -895,8 +944,19 @@ final class GameSession: ObservableObject {
         }
 
         let timeSinceLastCue = snapshot.elapsedSeconds - lastThreatAudioElapsedSeconds
+        let noteCuePlayed = {
+            self.lastThreatAudioElapsedSeconds = snapshot.elapsedSeconds
+        }
+
         if seeingCount > 0, lastThreatSeeingCount == 0, timeSinceLastCue > 0.30 {
             ShotFeedbackAudioEngine.shared.playAlertAcquireCue()
+            noteCuePlayed()
+            return
+        }
+
+        if supportingCount > lastThreatSupportingCount, timeSinceLastCue > 0.35 {
+            ShotFeedbackAudioEngine.shared.playAlertRelayCue()
+            noteCuePlayed()
             return
         }
 
@@ -906,7 +966,33 @@ final class GameSession: ObservableObject {
             } else {
                 ShotFeedbackAudioEngine.shared.playAlertAcquireCue()
             }
+            noteCuePlayed()
+            return
         }
+
+        if audibleState == "clear", lastThreatAudibleState != "clear", timeSinceLastCue > 0.70 {
+            ShotFeedbackAudioEngine.shared.playAlertClearCue()
+            noteCuePlayed()
+        }
+    }
+
+    private func threatAudibleState(for snapshot: GameFrameSnapshot) -> String {
+        if snapshot.routeFailed {
+            return "compromised"
+        }
+        if snapshot.seeingObserverCount > 0 {
+            return "exposed"
+        }
+        if latestObserverDebugStates.contains(where: { $0.supportingGroup && !$0.neutralized }) {
+            return "relay"
+        }
+        if snapshot.alertedObserverCount > 0 {
+            return "memory"
+        }
+        if snapshot.suspicionLevel > 0.03 {
+            return "cooling"
+        }
+        return "clear"
     }
 
     var overheadMapSnapshot: OverheadMapSnapshot? {
@@ -945,6 +1031,11 @@ final class GameSession: ObservableObject {
                 contactStop.checkpointID == mapConfiguration.checkpoints[completedCheckpointCount].id
             }
             : nil
+        let nextMissionPhase = completedCheckpointCount < mapConfiguration.checkpoints.count
+            ? mapConfiguration.missionPhases.first { phase in
+                phase.checkpointID == mapConfiguration.checkpoints[completedCheckpointCount].id
+            }
+            : nil
         let currentSectorName = preferredSectorName(
             for: mapConfiguration.sectors,
             playerX: playerX,
@@ -977,6 +1068,7 @@ final class GameSession: ObservableObject {
             nextCheckpointLabel: nextCheckpointLabel,
             nextComparisonStop: nextComparisonStop,
             nextCombatStop: nextCombatStop,
+            nextMissionPhase: nextMissionPhase,
             suspicionLevel: snapshot?.suspicionLevel ?? 0,
             activeObserverCount: Int(snapshot?.activeObserverCount ?? 0),
             alertedObserverCount: Int(snapshot?.alertedObserverCount ?? 0),
@@ -2078,6 +2170,25 @@ final class GameSession: ObservableObject {
         )
     }
 
+    private func observerFeedbackLine() -> String {
+        guard let snapshot = latestSnapshot else {
+            return "Observer Feedback: waiting for audio-state telemetry"
+        }
+
+        let relayCount = latestObserverDebugStates.filter { $0.supportingGroup && !$0.neutralized }.count
+        let maskedCount = latestObserverDebugStates.filter {
+            !$0.neutralized && $0.inRange && $0.inViewCone && !$0.hasLineOfSight
+        }.count
+
+        return String(
+            format: "Observer Feedback: %@ audio / %d relay / %d masked / %.2f suspicion",
+            threatAudibleState(for: snapshot),
+            relayCount,
+            maskedCount,
+            snapshot.suspicionLevel
+        )
+    }
+
     private func difficultyTelemetryLine() -> String {
         String(
             format: "Difficulty: %@ / fail %.2f / obs x%.2f / decay x%.2f / cycle x%.2f",
@@ -2234,6 +2345,7 @@ final class GameSession: ObservableObject {
             String(format: "Uptime: %.2fs", snapshot?.elapsedSeconds ?? 0),
         ]
         metricLines.insert(contentsOf: lineOfSightDebugLines(limit: 3), at: 7)
+        metricLines.insert(observerFeedbackLine(), at: 7)
 
         publishOverlayLines(
             headerLines + sceneDetails + briefingDetails + routeDetails + evasionDetails + streamingDetails + metricLines

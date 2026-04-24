@@ -35,6 +35,8 @@ struct SceneConfiguration: Decodable {
     let route: RouteConfiguration
     let reviewPack: ReviewPackConfiguration?
     let combatRehearsal: CombatRehearsalConfiguration?
+    let missionScript: MissionScriptConfiguration?
+    let alternateRoutes: [AlternateRouteConfiguration]?
     let detection: DetectionConfiguration?
     let guidance: GuidanceConfiguration?
     let proceduralElements: [ProceduralElementConfiguration]
@@ -456,6 +458,43 @@ struct CombatContactStopConfiguration: Decodable {
     let expectedObservers: Int
     let coverHint: String
     let recoveryNote: String
+}
+
+struct MissionScriptConfiguration: Decodable {
+    let title: String
+    let summary: String
+    let phases: [MissionPhaseConfiguration]
+
+    init(
+        title: String = "Mission script unavailable",
+        summary: String = "Mission scripting hooks unavailable.",
+        phases: [MissionPhaseConfiguration] = []
+    ) {
+        self.title = title
+        self.summary = summary
+        self.phases = phases
+    }
+}
+
+struct MissionPhaseConfiguration: Decodable {
+    let checkpointID: String
+    let phase: String
+    let objective: String
+    let trigger: String
+    let successCue: String
+    let failureCue: String
+    let mapCode: String?
+}
+
+struct AlternateRouteConfiguration: Decodable {
+    let id: String
+    let name: String
+    let summary: String
+    let startCheckpointID: String
+    let goalCheckpointID: String
+    let checkpointIDs: [String]
+    let routeType: String
+    let authoringStatus: String
 }
 
 struct RouteCheckpointConfiguration: Decodable {

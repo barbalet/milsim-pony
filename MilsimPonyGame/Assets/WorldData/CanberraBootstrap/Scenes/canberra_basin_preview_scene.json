@@ -1,10 +1,10 @@
 {
-  "cycleLabel": "Cycle 28 Group Observer Relay And Alert Memory",
-  "sceneName": "Canberra Group Observer Pressure Validation",
+  "cycleLabel": "Cycle 31 Second Rehearsal Route Authoring Start",
+  "sceneName": "Canberra Alternate Route Authoring Validation",
   "planningNotes": [
-    "Plan: cycle 28 turns the solo-watcher route into the first group-observer pass by adding alert memory, peer relays, and paired lookout pressure over the existing rifle, minimap, and LOS-debug baseline.",
-    "Breakdown: keep the Woden-to-Belconnen combat lane locked, author a handful of paired hotspots, and make the shared-alert state visible enough in the HUD and Canberra map to tune without guesswork.",
-    "Reference: carry the review pack, texture library, threat-map validation, and rifle-stability baseline forward as the foundation for later mission scripting, route expansion, and wider AI behavior."
+    "Plan: cycle 31 starts second-route authoring by adding reviewable alternate route metadata while the live Woden-to-Belconnen route remains the stable playable baseline.",
+    "Breakdown: preserve the cycle 30 mission-script hooks, paired observer hotspots, and observer-audio feedback while exposing an east-basin-to-Belconnen route candidate in the HUD and Canberra map.",
+    "Reference: carry the cycle 28 group-observer baseline, cycle 29 observer-audio feedback, and cycle 30 mission hooks forward as the foundation for route expansion."
   ],
   "spawn": {
     "label": "Woden Town Centre Staging",
@@ -159,7 +159,7 @@
   },
   "route": {
     "name": "Canberra Combat-Lane Rehearsal",
-    "summary": "Follow one authored line from Woden to Belconnen while scoped rifle drift, grouped observer relays, alert memory, and contact-lane cues validate that the atlas can now carry a real combat rehearsal without losing Canberra readability.",
+    "summary": "Follow one authored line from Woden to Belconnen while scoped rifle drift, grouped observer relays, alert memory, observer audio, mission-script hooks, alternate-route authoring metadata, and contact-lane cues validate that the atlas can carry route expansion without losing Canberra readability.",
     "checkpoints": [
       {
         "id": "woden_town_centre_staging",
@@ -308,7 +308,7 @@
   },
   "reviewPack": {
     "title": "Canberra Review Pack Baseline",
-    "summary": "Reference-backed Woden-to-Belconnen atlas baseline carried forward into the group-observer relay and alert-memory pass.",
+    "summary": "Reference-backed Woden-to-Belconnen atlas baseline carried forward into the second-route authoring pass.",
     "referenceGallery": "CanberraReferenceGallery",
     "textureLibrary": "Canberra Texture Library",
     "captureFormat": "Open the map on district handoffs, raise the 4x scope on skyline stops, and use the pause shell for route-proof captures.",
@@ -384,8 +384,8 @@
     ]
   },
   "combatRehearsal": {
-    "title": "Canberra Cycle 28 Group Observer Relay And Alert Memory",
-    "summary": "Live Woden-to-Belconnen contact pass with paired observer relays, cover cues, recovery notes, persistent field-difficulty tuning, and authored rifle stability layered over the full atlas route.",
+    "title": "Canberra Cycle 31 Second Rehearsal Route Authoring Start",
+    "summary": "Live Woden-to-Belconnen contact pass with paired observer relays, expanded alert audio, mission-script checkpoint hooks, second-route authoring metadata, clearer observer-state HUD feedback, cover cues, recovery notes, persistent field-difficulty tuning, and authored rifle stability layered over the full atlas route.",
     "exposureGuide": "Open ground is intentional; move between named cover screens before raising the optic on skyline-heavy checkpoints.",
     "recoveryRule": "If suspicion spikes, break line of sight, re-anchor on the nearest cover screen, and retry the current lane from the latest checkpoint rather than freelancing a shortcut.",
     "contactStops": [
@@ -481,6 +481,104 @@
       }
     ]
   },
+  "missionScript": {
+    "title": "Cycle 30 Checkpoint Mission Hooks",
+    "summary": "Data-driven phase hooks annotate key Woden-to-Belconnen checkpoints with objective, trigger, success, and failure cues ahead of later mission scripting.",
+    "phases": [
+      {
+        "checkpointID": "woden_town_centre_staging",
+        "phase": "Deploy",
+        "objective": "Confirm the rehearsal start and orient on the southern basin lane.",
+        "trigger": "Start shell confirm or first checkpoint touch.",
+        "successCue": "Route handoff is live and the next contact lane is Woden Scope Perch.",
+        "failureCue": "If the route state is unclear, return to briefing and restart from the authored start.",
+        "mapCode": "MS-DEPLOY"
+      },
+      {
+        "checkpointID": "woden_scope_perch",
+        "phase": "Observe",
+        "objective": "Raise the scope behind cover and identify the paired Woden observers.",
+        "trigger": "Enter the perch radius with observer pressure active.",
+        "successCue": "Woden contact read is established; proceed toward State Circle after cover recovery.",
+        "failureCue": "If shared alert pressure rises, break sight behind Woden Scope Wall before retrying.",
+        "mapCode": "MS-WODEN"
+      },
+      {
+        "checkpointID": "state_circle_transfer",
+        "phase": "Transfer",
+        "objective": "Cross the Parliament south approach without losing the atlas line.",
+        "trigger": "Reach State Circle while suspicion is below the failure threshold.",
+        "successCue": "Parliament approach is clear enough to hand off toward Kings Avenue.",
+        "failureCue": "Recover to State Circle Median and re-enter the transfer after line of sight drops.",
+        "mapCode": "MS-STATE"
+      },
+      {
+        "checkpointID": "east_basin_lookout",
+        "phase": "Expose",
+        "objective": "Validate high-exposure shoreline observer audio and scoped skyline framing.",
+        "trigger": "Enter the East Basin lookout radius and hold a scope-ready stance.",
+        "successCue": "East Basin exposure and audio feedback are readable without collapsing route flow.",
+        "failureCue": "Reset to East Basin Survey Wall and wait for observer memory to cool.",
+        "mapCode": "MS-EAST"
+      },
+      {
+        "checkpointID": "civic_interchange_review",
+        "phase": "Relay",
+        "objective": "Confirm Civic observer-state feedback while preserving the named-road atlas read.",
+        "trigger": "Reach Civic after completing the Constitution Axis handoff.",
+        "successCue": "Civic relay state is visible in HUD and map; continue to West Basin.",
+        "failureCue": "Use the Civic Arcade Screen and retry once suspicion is cooling.",
+        "mapCode": "MS-CIVIC"
+      },
+      {
+        "checkpointID": "black_mountain_scope_perch",
+        "phase": "Overwatch",
+        "objective": "Use the 4x optic to frame Black Mountain while checking mission and threat overlays.",
+        "trigger": "Reach the scope perch and raise the optic on the north-west lane.",
+        "successCue": "Black Mountain overwatch remains readable with mission and observer feedback active.",
+        "failureCue": "Drop to Tower Footing Screen and reacquire the route from cover.",
+        "mapCode": "MS-BLACK"
+      },
+      {
+        "checkpointID": "belconnen_town_centre_review",
+        "phase": "Consolidate",
+        "objective": "Validate paired Belconnen observer pressure before the final exit lane.",
+        "trigger": "Enter Belconnen Town Centre Review after the Belconnen Way overlook.",
+        "successCue": "Belconnen town-centre pressure is staged and the final Ginninderra hook is armed.",
+        "failureCue": "Recover to Belconnen Median Screen before re-entering the town-centre lane.",
+        "mapCode": "MS-BELCO"
+      },
+      {
+        "checkpointID": "ginninderra_drive_review",
+        "phase": "Extract",
+        "objective": "Complete the route with mission, contact, and atlas summaries still aligned.",
+        "trigger": "Touch the final Ginninderra Drive Review marker.",
+        "successCue": "Mission hook route complete; ready for second-route authoring.",
+        "failureCue": "Break contact at Ginninderra Access Screen and retry the final lane.",
+        "mapCode": "MS-EXIT"
+      }
+    ]
+  },
+  "alternateRoutes": [
+    {
+      "id": "east_basin_to_belconnen_probe",
+      "name": "East Basin To Belconnen Probe",
+      "summary": "Second rehearsal route candidate that starts from the east-basin lookout, cuts through Civic and Black Mountain, then rejoins the Belconnen endgame without replacing the active Woden-to-Belconnen route.",
+      "startCheckpointID": "east_basin_lookout",
+      "goalCheckpointID": "ginninderra_drive_review",
+      "checkpointIDs": [
+        "east_basin_lookout",
+        "constitution_axis_review",
+        "civic_interchange_review",
+        "west_basin_promenade_review",
+        "black_mountain_scope_perch",
+        "belconnen_town_centre_review",
+        "ginninderra_drive_review"
+      ],
+      "routeType": "authoring-candidate",
+      "authoringStatus": "metadata-only scaffold; activation waits for dedicated route selection and checkpoint ownership"
+    }
+  ],
   "detection": {
     "suspicionDecayPerSecond": 0.30,
     "failThreshold": 1.15,

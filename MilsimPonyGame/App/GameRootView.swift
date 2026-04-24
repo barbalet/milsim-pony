@@ -1573,6 +1573,16 @@ private struct OverheadMapCanvas: View {
                 .foregroundStyle(.white.opacity(0.62))
                 .fixedSize(horizontal: false, vertical: true)
 
+            Text(missionLine)
+                .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.61))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(alternateRouteLine)
+                .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.60))
+                .fixedSize(horizontal: false, vertical: true)
+
             Text(comparisonLine)
                 .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.60))
@@ -1635,6 +1645,23 @@ private struct OverheadMapCanvas: View {
         }
 
         return "Contact: rehearsal complete • \(snapshot.configuration.recoveryRule)"
+    }
+
+    private var missionLine: String {
+        if let phase = snapshot.nextMissionPhase {
+            let code = phase.mapCode.map { " • code \($0)" } ?? ""
+            return "Mission: \(phase.phase) • \(phase.objective) • trigger \(phase.trigger)\(code)"
+        }
+
+        return "Mission: \(snapshot.configuration.missionScriptTitle) complete • \(snapshot.configuration.missionPhases.count) hooks"
+    }
+
+    private var alternateRouteLine: String {
+        guard let route = snapshot.configuration.alternateRoutes.first else {
+            return "Alt Routes: no second rehearsal route authored"
+        }
+
+        return "Alt Route: \(route.name) • \(route.routeType) • \(route.authoringStatus) • \(route.startCheckpointLabel) -> \(route.goalCheckpointLabel)"
     }
 
     private var threatMapLine: String {

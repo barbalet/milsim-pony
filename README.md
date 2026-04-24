@@ -4,7 +4,7 @@
 
 ## Game Overview
 
-The current default build launches into **Canberra Combat-Lane Rehearsal**, a cycle `21` pass that keeps the Woden-to-Belconnen route from cycle `20` but turns the locked review pack into a live contact rehearsal. The route is designed to prove that the world remains readable at distance through a 4x scope while the HUD, overhead map, cover cues, and observer pressure now expose the next combat lane without losing the named road and district read.
+The current default build launches into **Canberra Alternate Route Authoring Validation**, a cycle `31` pass that keeps the Woden-to-Belconnen route, paired-observer baseline, observer-audio feedback, and mission-script hooks locked while adding the first second-route authoring scaffold. The route is designed to prove that the world remains readable at distance through a 4x scope while the HUD, scoped reticle, overhead map, cover cues, observer audio, mission phase readouts, and alternate-route metadata now agree on route expansion without losing the named road and district read.
 
 At the moment, the game is still a rehearsal build rather than a complete combat sandbox. You move on foot through the authored route, use the scope to inspect distant landmarks, and open the overhead map to keep your bearings, confirm which sector of Canberra you are in, read the named road network, and see where the next threat lane and watcher pressure live. The HUD, route markers, pause flow, settings screen, checkpoint restarts, and completion shell are already implemented so the build can be used as a repeatable review demo.
 
@@ -47,7 +47,7 @@ This build is not about firefights yet. The player is acting as a field observer
 - Confirm that scoped rendering remains stable across distant terrain and skyline silhouettes.
 - Move between authored perches that test the Woden-to-Belconnen handoff instead of only isolated district slices.
 - Use the overhead map to understand current location, sector, road network, contact lane, and route progress.
-- Replay the route quickly to compare world-data, streaming, observer pressure, and rendering changes between cycles.
+- Replay the route quickly to compare world-data, streaming, observer pressure, audio feedback, mission hooks, alternate-route authoring, and rendering changes between cycles.
 
 ## Build And Run
 
@@ -82,4 +82,4 @@ You can also open [MilsimPonyGame.xcodeproj](/Users/barbalet/github/milsim-pony/
 
 ## Current Focus
 
-The active direction for the project is basin-scale Canberra coverage from Woden to Belconnen, with Lake Burley Griffin as a readable anchor, a district street atlas in the overhead map, and the 4x scope as the core validation tool. The live build is now on cycle `21`, using the locked review pack as the baseline for the first contact-lane rehearsal so the atlas, source gallery, texture library, cover cues, and live observer pressure can be reviewed in one pass.
+The active direction for the project is basin-scale Canberra coverage from Woden to Belconnen, with Lake Burley Griffin as a readable anchor, a district street atlas in the overhead map, and the 4x scope as the core validation tool. The live build is now on cycle `31`, using the paired-observer route as the stable baseline while the first alternate rehearsal route is authored as metadata for review before route selection and checkpoint ownership become live systems.

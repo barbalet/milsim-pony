@@ -204,6 +204,29 @@ struct SceneMapCombatStop: Identifiable {
     let recoveryNote: String
 }
 
+struct SceneMapMissionPhase: Identifiable {
+    let id: String
+    let checkpointID: String
+    let checkpointLabel: String
+    let phase: String
+    let objective: String
+    let trigger: String
+    let successCue: String
+    let failureCue: String
+    let mapCode: String?
+}
+
+struct SceneMapAlternateRoute: Identifiable {
+    let id: String
+    let name: String
+    let summary: String
+    let startCheckpointLabel: String
+    let goalCheckpointLabel: String
+    let checkpointLabels: [String]
+    let routeType: String
+    let authoringStatus: String
+}
+
 struct SceneMapThreatObserver: Identifiable {
     let id: String
     let label: String
@@ -369,6 +392,10 @@ struct SceneMapConfiguration {
     let exposureGuide: String
     let recoveryRule: String
     let contactStops: [SceneMapCombatStop]
+    let missionScriptTitle: String
+    let missionScriptSummary: String
+    let missionPhases: [SceneMapMissionPhase]
+    let alternateRoutes: [SceneMapAlternateRoute]
     let threatObservers: [SceneMapThreatObserver]
 
     var width: Float {
@@ -399,6 +426,10 @@ struct SceneRouteInfo {
     let goalLabel: String
     let plannedDistanceMeters: Float
     let sectorNames: [String]
+    let missionTitle: String
+    let missionSummary: String
+    let missionPhases: [MissionPhaseConfiguration]
+    let alternateRoutes: [AlternateRouteConfiguration]
 }
 
 struct SceneRouteState {
@@ -733,6 +764,8 @@ final class BootstrapScene {
                     ),
                     "Review Pack: \(mapConfiguration.reviewPackTitle) / \(mapConfiguration.comparisonStops.count) comparison stops / \(mapConfiguration.openRisks.count) open risks",
                     "Combat Rehearsal: \(mapConfiguration.combatRehearsalTitle) / \(mapConfiguration.contactStops.count) contact lanes / \(mapConfiguration.threatObservers.count) observers",
+                    "Mission Script: \(mapConfiguration.missionScriptTitle) / \(mapConfiguration.missionPhases.count) checkpoint hooks",
+                    "Alternate Routes: \(mapConfiguration.alternateRoutes.count) authored starts ready for route expansion",
                     "Contacts: \(snapshot.neutralizedObserverCount) neutralized / \(max(snapshot.totalObserverCount - snapshot.neutralizedObserverCount, 0)) live",
                     String(
                         format: "Run: %.1fs / %.0fm / %d restarts",
@@ -748,8 +781,11 @@ final class BootstrapScene {
         let nextCheckpoint = routeInfo.checkpoints[nextIndex]
         let nextComparisonStop = comparisonStop(for: nextCheckpoint.id)
         let nextCombatStop = combatStop(for: nextCheckpoint.id)
+        let nextMissionPhase = missionPhase(for: nextCheckpoint.id)
         var details = [
             "Objective: \(routeInfo.summary)",
+            "Mission Script: \(routeInfo.missionTitle) / \(routeInfo.missionPhases.count) checkpoint hooks",
+            "Alternate Routes: \(routeInfo.alternateRoutes.count) authoring candidates / active route remains \(routeInfo.name)",
             String(
                 format: "Footprint: %@ -> %@ / %d sectors / %.0fm planned",
                 routeInfo.startLabel,
@@ -762,6 +798,15 @@ final class BootstrapScene {
         if let nextCombatStop {
             details.append("Contact: \(nextCombatStop.lane) / \(nextCombatStop.exposure) / \(nextCombatStop.expectedObservers) watchers")
             details.append("Cover: \(nextCombatStop.coverHint)")
+        }
+
+        if let nextMissionPhase {
+            details.append("Mission: \(nextMissionPhase.phase) / \(nextMissionPhase.objective)")
+            details.append("Trigger: \(nextMissionPhase.trigger)")
+        }
+
+        if let alternateRoute = routeInfo.alternateRoutes.first {
+            details.append("Alt Route: \(alternateRoute.name) / \(alternateRoute.authoringStatus)")
         }
 
         if let nextComparisonStop {
@@ -864,6 +909,7 @@ final class BootstrapScene {
 
         let nextIndex = min(Int(snapshot.completedCheckpointCount), max(routeInfo.checkpoints.count - 1, 0))
         let nextCheckpoint = routeInfo.checkpoints[nextIndex]
+        let nextMissionPhase = missionPhase(for: nextCheckpoint.id)
         let originLabel = nextIndex == 0
             ? (debugInfo.spawn.label ?? "Assigned survey start")
             : routeInfo.checkpoints[nextIndex - 1].label
@@ -893,6 +939,16 @@ final class BootstrapScene {
         if let nextCombatStop = combatStop(for: nextCheckpoint.id) {
             details.append("Contact: \(nextCombatStop.lane) / \(nextCombatStop.exposure)")
             details.append("Cover: \(nextCombatStop.coverHint)")
+        }
+
+        if let nextMissionPhase {
+            details.append("Mission: \(nextMissionPhase.phase) / \(nextMissionPhase.objective)")
+            details.append("Trigger: \(nextMissionPhase.trigger)")
+            details.append("Success: \(nextMissionPhase.successCue)")
+        }
+
+        if let alternateRoute = routeInfo.alternateRoutes.first {
+            details.append("Alt Route: \(alternateRoute.name) / \(alternateRoute.routeType) / \(alternateRoute.authoringStatus)")
         }
 
         if snapshot.neutralizedObserverCount > 0 {
@@ -925,6 +981,12 @@ final class BootstrapScene {
     private func combatStop(for checkpointID: String) -> SceneMapCombatStop? {
         mapConfiguration.contactStops.first { combatStop in
             combatStop.checkpointID == checkpointID
+        }
+    }
+
+    private func missionPhase(for checkpointID: String) -> MissionPhaseConfiguration? {
+        routeInfo.missionPhases.first { phase in
+            phase.checkpointID == checkpointID
         }
     }
 
@@ -1034,6 +1096,10 @@ final class BootstrapScene {
             exposureGuide: mapConfigurationTemplate.exposureGuide,
             recoveryRule: mapConfigurationTemplate.recoveryRule,
             contactStops: mapConfigurationTemplate.contactStops,
+            missionScriptTitle: mapConfigurationTemplate.missionScriptTitle,
+            missionScriptSummary: mapConfigurationTemplate.missionScriptSummary,
+            missionPhases: mapConfigurationTemplate.missionPhases,
+            alternateRoutes: mapConfigurationTemplate.alternateRoutes,
             threatObservers: mapConfigurationTemplate.threatObservers
         )
     }
@@ -1754,6 +1820,8 @@ private final class ScenePackageBuilder {
 
         let reviewPack = sceneConfiguration.reviewPack ?? ReviewPackConfiguration()
         let combatRehearsal = sceneConfiguration.combatRehearsal ?? CombatRehearsalConfiguration()
+        let missionScript = sceneConfiguration.missionScript ?? MissionScriptConfiguration()
+        let alternateRoutes = sceneConfiguration.alternateRoutes ?? []
         let routePlannedDistanceMeters = plannedRouteDistance(for: sceneConfiguration.route.checkpoints)
         let routeSectorNames = routeSectorNames(
             for: sceneConfiguration.route.checkpoints,
@@ -1867,6 +1935,8 @@ private final class ScenePackageBuilder {
                 routeSectorNames: routeSectorNames,
                 reviewPack: reviewPack,
                 combatRehearsal: combatRehearsal,
+                missionScript: missionScript,
+                alternateRoutes: alternateRoutes,
                 threatObservers: detectionConfiguration.observers
             ),
             sectors: sceneSectors,
@@ -1887,7 +1957,11 @@ private final class ScenePackageBuilder {
                 startLabel: sceneConfiguration.route.checkpoints.first?.label ?? (sceneConfiguration.spawn.label ?? "Survey start"),
                 goalLabel: sceneConfiguration.route.checkpoints.last?.label ?? "Final review marker",
                 plannedDistanceMeters: routePlannedDistanceMeters,
-                sectorNames: routeSectorNames
+                sectorNames: routeSectorNames,
+                missionTitle: missionScript.title,
+                missionSummary: missionScript.summary,
+                missionPhases: missionScript.phases,
+                alternateRoutes: alternateRoutes
             ),
             evasionInfo: SceneEvasionInfo(
                 failThreshold: detectionConfiguration.failThreshold,
@@ -1914,6 +1988,8 @@ private final class ScenePackageBuilder {
         routeSectorNames: [String],
         reviewPack: ReviewPackConfiguration,
         combatRehearsal: CombatRehearsalConfiguration,
+        missionScript: MissionScriptConfiguration,
+        alternateRoutes: [AlternateRouteConfiguration],
         threatObservers: [ThreatObserverConfiguration]
     ) -> SceneMapConfiguration {
         let mapSectors = loadedSectors.map { sector in
@@ -1986,6 +2062,37 @@ private final class ScenePackageBuilder {
                 expectedObservers: contactStop.expectedObservers,
                 coverHint: contactStop.coverHint,
                 recoveryNote: contactStop.recoveryNote
+            )
+        }
+        let mapMissionPhases: [SceneMapMissionPhase] = missionScript.phases.compactMap { phase -> SceneMapMissionPhase? in
+            guard let checkpointLabel = checkpointLabelsByID[phase.checkpointID] else {
+                return nil
+            }
+
+            return SceneMapMissionPhase(
+                id: phase.checkpointID,
+                checkpointID: phase.checkpointID,
+                checkpointLabel: checkpointLabel,
+                phase: phase.phase,
+                objective: phase.objective,
+                trigger: phase.trigger,
+                successCue: phase.successCue,
+                failureCue: phase.failureCue,
+                mapCode: phase.mapCode
+            )
+        }
+        let mapAlternateRoutes = alternateRoutes.map { route in
+            SceneMapAlternateRoute(
+                id: route.id,
+                name: route.name,
+                summary: route.summary,
+                startCheckpointLabel: checkpointLabelsByID[route.startCheckpointID] ?? route.startCheckpointID,
+                goalCheckpointLabel: checkpointLabelsByID[route.goalCheckpointID] ?? route.goalCheckpointID,
+                checkpointLabels: route.checkpointIDs.map { checkpointID in
+                    checkpointLabelsByID[checkpointID] ?? checkpointID
+                },
+                routeType: route.routeType,
+                authoringStatus: route.authoringStatus
             )
         }
         let mapThreatObservers = threatObservers.map { observer in
@@ -2063,6 +2170,10 @@ private final class ScenePackageBuilder {
             exposureGuide: combatRehearsal.exposureGuide,
             recoveryRule: combatRehearsal.recoveryRule,
             contactStops: mapCombatStops,
+            missionScriptTitle: missionScript.title,
+            missionScriptSummary: missionScript.summary,
+            missionPhases: mapMissionPhases,
+            alternateRoutes: mapAlternateRoutes,
             threatObservers: mapThreatObservers
         )
     }
@@ -3086,6 +3197,10 @@ private enum FallbackSceneFactory {
                 exposureGuide: "Unavailable",
                 recoveryRule: "Unavailable",
                 contactStops: [],
+                missionScriptTitle: "Fallback Mission Script",
+                missionScriptSummary: "Mission script data unavailable",
+                missionPhases: [],
+                alternateRoutes: [],
                 threatObservers: []
             ),
             sectors: [],
@@ -3111,7 +3226,11 @@ private enum FallbackSceneFactory {
                 startLabel: "Fallback start",
                 goalLabel: "Fallback goal",
                 plannedDistanceMeters: 0,
-                sectorNames: []
+                sectorNames: [],
+                missionTitle: "Fallback Mission Script",
+                missionSummary: "Mission script data unavailable",
+                missionPhases: [],
+                alternateRoutes: []
             ),
             evasionInfo: SceneEvasionInfo(
                 failThreshold: 1.0,
