@@ -1,10 +1,10 @@
 {
-  "cycleLabel": "Cycle 98 Time-Of-Day And Lighting Architecture Decision",
-  "sceneName": "Canberra Lighting Architecture Decision",
+  "cycleLabel": "Cycle 116 Save Resume Closeout",
+  "sceneName": "Canberra Save Resume Closeout",
   "planningNotes": [
-    "Plan: cycle 98 locks the time-of-day and lighting architecture decision with a data-authored daylight scenario, measured prerequisites, clustered-lighting deferral, and render-graph modernization gate.",
-    "Breakdown: preserve the cycle 85 through 97 route, map, material, collision-preview, restore-execution, session-audio, scope-calibration, concealment, CSM-profile, LOD, reflection-probe, packaging-validation, and tester-delivery state while surfacing lighting architecture readiness in the live readouts.",
-    "Reference: carry the cycle 28 group-observer baseline, cycle 29 observer-audio feedback, cycle 30 mission hooks, cycles 31 through 50 alternate-route staging, cycle 51 collision-authoring readiness, cycles 52 through 57 environmental fidelity work, cycle 58 persistence-readiness reporting, cycle 59 last-review persistence, cycle 60 resume-card context, cycle 61 guardrails, cycle 62 restore-target preview, cycle 63 readiness report, cycle 64 manual arming, cycle 65 prompt contract, cycle 66 execution gate, cycle 67 audit trail, cycle 68 freshness policy, cycle 69 retention policy, cycle 70 cleanup preview, cycle 71 stale-card cleanup execution, cycle 72 restore-choice preview, cycle 73 restore-selection audit, cycle 74 fresh-start guard, cycle 75 boundary reset, cycle 76 review expiry, cycle 77 review scope, cycle 78 review intent, cycle 79 weapon-feel profiling, cycle 80 scoped-rifle presentation, cycle 81 patrol-pair foundation, cycle 82 LOS debug, cycle 83 scan-halt-resume behavior, cycle 84 audio bed, cycle 85 alternate live binding, cycle 86 map accuracy, cycle 87 Black Mountain closeout, cycle 88 West Basin closeout, cycle 89 third-route authoring, cycle 90 collision preview, cycle 91 restore execution design, cycle 92 guarded manual restore, cycle 93 scope/concealment polish, cycle 94 CSM profiling, cycle 95 LOD/reflection evidence, cycle 96 packaging automation, and cycle 97 tester distribution forward as the basis for lighting architecture."
+    "Plan: cycle 116 closes the REVIEW.md save/resume priority with an explicit saved-run resume UX, route-bound checkpoint restore, and persisted checkpoint-performance evidence.",
+    "Breakdown: preserve the cycle 85 through 115 route, map, material-breakup, collision-authoring, restore-execution, session-audio, scope-calibration, concealment, CSM-profile, reflection-probe, packaging-validation, tester-delivery, lighting-architecture, automated-capture, LOD-switching, time-of-day, Forward+ start, scoped-safe AA, physical-atmosphere, shadow indirect rendering, SDF UI, SSR/IBL, render graph, authored audio mix, firing feedback, group-NPC patrol state, district texture closeout, multi-route binding, scope optics, and collision workflow while promoting the review card into a resume-safe saved session.",
+    "Reference: carry the cycle 28 group-observer baseline, cycle 29 observer-audio feedback, cycle 30 mission hooks, cycles 31 through 50 alternate-route staging, cycle 51 collision-authoring readiness, cycles 52 through 57 environmental fidelity work, cycles 58 through 78 restore safety work, cycles 79 through 115 weapon, route, material, profiling, packaging, tester, lighting, capture, LOD, time-of-day, Forward+, AA, atmosphere, indirect-rendering, SDF UI, SSR, render-graph, audio-mix, firing-feedback, group-NPC, texture, multi-route, scope-optics, and collision-authoring decisions, then add cycle 116 save/resume as the eighth next-priority recovery cycle."
   ],
   "spawn": {
     "label": "Woden Town Centre Staging",
@@ -102,6 +102,24 @@
     "ambientIntensity": 0.42,
     "diffuseIntensity": 0.90
   },
+  "timeOfDay": {
+    "enabled": true,
+    "status": "scenario time-of-day lighting active",
+    "rule": "derive renderer sun direction, sky colors, fog tint, haze, ambient/diffuse intensity, and shadow coverage from authored scenario time",
+    "label": "16:45 late-summer low sun",
+    "hour": 16.75,
+    "sunAzimuthDegrees": 266.0,
+    "sunElevationDegrees": 23.0,
+    "horizonColor": [0.90, 0.66, 0.48, 1.0],
+    "zenithColor": [0.18, 0.30, 0.50, 1.0],
+    "sunColor": [1.0, 0.78, 0.52],
+    "fogColor": [0.78, 0.70, 0.64, 1.0],
+    "ambientIntensity": 0.34,
+    "diffuseIntensity": 0.78,
+    "shadowStrength": 0.76,
+    "shadowCoverageMultiplier": 1.32,
+    "hazeStrength": 0.13
+  },
   "atmosphere": {
     "fogColor": [0.71, 0.77, 0.82, 1.0],
     "fogNear": 250.0,
@@ -120,7 +138,12 @@
     "lookSensitivityMultiplier": 0.24,
     "drawDistanceMultiplier": 2.9,
     "farPlaneMultiplier": 1.55,
-    "reticleColor": [0.94, 0.86, 0.44, 0.96]
+    "reticleColor": [0.94, 0.86, 0.44, 0.96],
+    "lensDirtStrength": 0.34,
+    "edgeAberrationStrength": 0.42,
+    "parallaxCompensation": 0.72,
+    "milDotSpacingMils": 1.0,
+    "calibrationRangeMeters": 400.0
   },
   "shadow": {
     "mapResolution": 2048,
@@ -147,6 +170,105 @@
     "ssaoBias": 0.0007,
     "shadowTint": [0.95, 0.99, 1.04],
     "highlightTint": [1.05, 1.01, 0.94]
+  },
+  "antiAliasing": {
+    "status": "scoped-safe anti-aliasing active",
+    "rule": "smooth high-contrast scene edges in postprocess while rejecting blends across depth discontinuities",
+    "mode": "depth-aware post edge AA",
+    "edgeThreshold": 0.052,
+    "blendStrength": 0.36,
+    "depthRejection": 0.0016,
+    "scopeStabilityRule": "avoid temporal history and reject cross-depth blends so scoped skyline silhouettes do not ghost"
+  },
+  "physicalAtmosphere": {
+    "status": "physical atmosphere baseline active",
+    "rule": "derive sky color, horizon lift, and distance haze from time-of-day sun elevation plus scene-authored Rayleigh/Mie controls",
+    "model": "rayleigh-mie-ozone approximation",
+    "rayleighStrength": 0.64,
+    "mieStrength": 0.30,
+    "mieAnisotropy": 0.76,
+    "ozoneAbsorption": 0.18,
+    "turbidity": 0.44,
+    "horizonLift": 0.20,
+    "densityFalloff": 1.28,
+    "scopeStabilityRule": "use deterministic camera and sun vectors so scoped sky silhouettes remain stable between frames"
+  },
+  "indirectRendering": {
+    "status": "shadow indirect rendering prototype active",
+    "rule": "encode shadow-caster object draw commands through a per-frame MTLIndirectCommandBuffer before expanding to material draws",
+    "mode": "CPU-filled Metal indirect command buffer",
+    "drawClass": "shadow casters",
+    "commandPath": "SunShadowPass object casters",
+    "capacity": 512,
+    "coverageNote": "covers shadow-casting scene drawables; terrain and material draws remain direct",
+    "fallbackRule": "fall back to direct draw loop if ICB allocation or capacity validation fails",
+    "measurementRule": "use frame timing, drawable count, and capture-review screenshots to compare scoped shadow stability before broader adoption"
+  },
+  "sdfUI": {
+    "status": "SDF UI rendering active for HUD, scope, and map labels",
+    "rule": "render critical text through a scalable signed-distance-style outline and shadow pass before a generated atlas is required",
+    "mode": "SwiftUI vector text with SDF-style outline pass",
+    "fontFamily": "monospaced system",
+    "coverage": [
+      "mission overlay status lines",
+      "scope status labels",
+      "map sector labels",
+      "map road labels",
+      "map north marker"
+    ],
+    "outlinePixels": 1.0,
+    "shadowPixels": 2.0,
+    "minimumScaleFactor": 0.55,
+    "mapLabelRule": "sector, road, and north labels keep outline contrast across canvas scale and route overlays",
+    "scopeRule": "scope status, instruction, presentation, and shot cadence labels keep outlined readability over aperture and reticle",
+    "fallbackRule": "system vector text remains the fallback until a generated MSDF atlas is introduced",
+    "measurementRule": "capture HUD, scope, and map text at desktop review size and verify no label clipping or blur regressions"
+  },
+  "renderGraph": {
+    "status": "render graph descriptor active",
+    "rule": "represent the current shadow, scene, and presentation passes as graph nodes with explicit resource reads and writes",
+    "mode": "manual frame graph descriptor",
+    "passOrder": [
+      "SunShadowPass",
+      "SceneGeometryPass",
+      "PresentationPostProcessPass"
+    ],
+    "importedResources": [
+      "Drawable",
+      "JungleTerrainBuffers",
+      "SceneDrawableBuffers"
+    ],
+    "transientResources": [
+      "ShadowMap",
+      "SceneColor",
+      "SceneDepth"
+    ],
+    "aliasingRule": "keep transient resources unaliased until graph lifetime validation is expanded",
+    "validationRule": "assert every pass reads only imported resources or resources written by earlier graph passes",
+    "expansionRule": "promote CSM, SSR material masks, SSAO, capture, and future volumetric passes into graph nodes before adding new manual sequencing"
+  },
+  "audioMix": {
+    "status": "authored audio mix active",
+    "rule": "route audio uses explicit category gains for ambience, footsteps, scope toggles, weapon feedback, and observer alerts",
+    "mode": "category-node procedural authored mix",
+    "masterGain": 0.84,
+    "ambienceGain": 0.46,
+    "movementGain": 0.78,
+    "scopeGain": 0.66,
+    "weaponGain": 0.94,
+    "observerGain": 0.88,
+    "footstepSurfaces": [
+      "dry grass",
+      "asphalt",
+      "concrete"
+    ],
+    "ambienceBeds": [
+      "basin wind",
+      "shoreline air",
+      "threat tension bed"
+    ],
+    "mixRule": "ambient bed stays below movement and observer cues; scope and weapon cues remain clear during review captures",
+    "smokeRule": "settings expose master audio gain, Session Audio reports cue state, and Audio Mix reports scene/user category levels"
   },
   "ballistics": {
     "muzzleVelocityMetersPerSecond": 820.0,
@@ -186,8 +308,8 @@
     "rule": "review scope range/drop/hold/parallax cues together with West Basin vegetation response, shoreline ripple, lake water material response, promenade hardscape, road decals, and district facade breakup"
   },
   "distantLOD": {
-    "status": "landmark LOD metadata active; renderer swap not enabled",
-    "rule": "track far-field impostor candidates before changing scoped drawables",
+    "status": "landmark LOD renderer switching active",
+    "rule": "switch configured landmark graybox drawables from full geometry to 6-vertex impostor cards past the authored threshold",
     "landmarkTargets": [
       "Woden towers",
       "Civic skyline",
@@ -197,38 +319,44 @@
       "West Basin shoreline massing"
     ],
     "impostorStartMeters": 430.0,
-    "scopeStabilityRule": "scope mode keeps full meshes until impostor cards pass skyline pop review"
+    "scopeStabilityRule": "scope mode uses the same measured impostor threshold so skyline pop can be captured and reviewed"
   },
   "waterReflection": {
-    "status": "reflection probe metadata active; SSR deferred",
-    "rule": "prototype West Basin water/glass reflection approach as probe metadata before screen-space reflections",
+    "status": "SSR with IBL probe fallback active",
+    "rule": "blend bounded screen-space reflection samples with a sky-probe fallback for West Basin water and glass readability",
     "probeTargets": [
       "West Basin lake surface",
       "Commonwealth Avenue west shoreline",
       "Yarralumla promenade hardscape",
       "Belconnen lake approach"
     ],
-    "approach": "static local reflection probe plus material roughness fallback before SSR",
-    "deferredReason": "SSR waits for stable LOD/impostor proof to avoid scoped shimmer",
-    "screenSpaceReflectionStatus": "SSR deferred with probe evidence"
+    "approach": "bounded postprocess SSR with static local sky-probe fallback",
+    "deferredReason": "full material-masked SSR waits for render graph and material ID buffers",
+    "screenSpaceReflectionStatus": "SSR active with IBL/probe fallback",
+    "ssrStrength": 0.24,
+    "ssrMaxDistancePixels": 42.0,
+    "ssrDepthThickness": 0.022,
+    "probeFallbackStrength": 0.18,
+    "reflectionHorizonY": 0.54,
+    "probeColor": [0.22, 0.38, 0.52, 1.0]
   },
   "packagingAutomation": {
-    "status": "cycle 98 packaging validation retained",
+    "status": "cycle 116 packaging validation retained",
     "rule": "release packages must pass manifest validation, version policy, archive naming, and package-content smoke checks before tester sharing",
-    "versionPolicy": "cycle build number 98 / marketing version 0.98.0",
-    "archivePattern": "MilsimPonyGame-v0.98.0-b98-cycle98-<utc>",
+    "versionPolicy": "cycle build number 116 / marketing version 1.16.0",
+    "archivePattern": "MilsimPonyGame-v1.16.0-b116-cycle116-<utc>",
     "manifestChecks": [
       "world manifest JSON lints",
       "coordinate system file resolves",
       "scene file resolves and lints",
       "all sector files resolve and lint",
-      "cycle 98 release docs exist"
+      "cycle 116 release docs exist"
     ],
     "smokeCommand": "Tools/package_release.sh --validate-only"
   },
   "testerDistribution": {
     "status": "tester distribution pipeline scripted; notarization remains credential-gated",
-    "rule": "tester builds require validation, current handoff docs, notarization readiness notes, and SDF UI scope before sharing",
+    "rule": "tester builds require validation, current handoff docs, notarization readiness notes, and SDF UI readability checks before sharing",
     "channel": "local-review zip with documented notarization handoff",
     "notarizationStatus": "notarytool check scripted; submission waits for Apple credentials and Metal release toolchain",
     "ciPlan": "CI gate runs validate-only and distribution check before package upload",
@@ -239,30 +367,85 @@
       "share zip plus tester distribution guide",
       "collect startup, route, scope, map, and packaging feedback"
     ],
-    "sdfUIPlan": "SDF font/UI migration scoped to HUD/map text crispness after tester pipeline is stable",
+    "sdfUIPlan": "Cycle 106 SDF-style UI path active for HUD, scope, and map label crispness",
     "smokeCommand": "Tools/package_release.sh --check-distribution"
   },
   "lightingArchitecture": {
-    "status": "lighting architecture decision locked; static daylight scenario remains shipping path",
-    "rule": "keep authored single-sun daylight while measuring pass count, dynamic-light need, atmosphere range, and scope stability before clustered lighting or render graph work",
-    "scenario": "Canberra fixed daylight review",
-    "timeOfDay": "13:40 clear late-summer review light",
-    "sunPolicy": "single authored sun drives sky, shadow, terrain, and material lighting for cycle 98",
-    "atmospherePolicy": "data-authored fog, haze, exposure, and sky colors remain the minimal time-of-day scenario path",
-    "clusteredLightingDecision": "Forward+ deferred until dynamic light count exceeds authored sun plus diagnostic markers",
-    "renderGraphDecision": "render graph deferred until CSM, postprocess, water reflections, and capture passes require explicit dependency scheduling",
+    "status": "Save/resume closeout active; collision authoring, scope optics, multi-route playability, district texture closeout, group NPC behavior, firing feedback, authored audio mix, render graph, SSR/IBL, SDF UI, shadow indirect rendering, physical atmosphere, and Forward+ retained",
+    "rule": "use authored scenario time for the renderer sun, apply physical atmosphere controls to sky/fog, keep bounded local diagnostic lights, execute shadow-caster object draws through the indirect command path, render critical UI text through the scalable SDF-style path, blend lake/glass reflections through SSR with probe fallback, validate renderer passes through a frame graph descriptor, mix route audio through scene-authored category gains, present scoped rifle shots with visible flash/recoil/result feedback, drive authored patrol pairs with runtime formation movement plus alert halt/resume behavior, keep Black Mountain/West Basin material reads source-backed through the shared Canberra texture library, bind any authored rehearsal route selected at briefing before live movement begins, render the 4x optic with lens dirt, edge aberration, calibrated mil spacing, parallax compensation, expose selectable collision blocker review with validation/export guidance, and resume saved checkpoint progress only through explicit guarded user action",
+    "scenario": "Canberra late-afternoon review",
+    "timeOfDay": "16:45 late-summer low sun",
+    "sunPolicy": "scenario time controls the single renderer sun while dynamic point lights layer local light contribution from cycle 102",
+    "atmospherePolicy": "time-of-day config feeds physical atmosphere sky color, horizon lift, fog tint, and distance haze from cycle 104",
+    "indirectRenderingPolicy": "cycle 105 uses a per-frame MTLIndirectCommandBuffer for shadow-casting object commands with direct-draw fallback",
+    "clusteredLightingDecision": "Forward+ start active: CPU-side drawable light selection feeds up to four local lights to the object shader",
+    "renderGraphDecision": "frame graph scaffold active for the current shadow, scene geometry, and presentation postprocess passes; resource aliasing and fuller scheduling remain expansion work",
     "measuredPrerequisites": [
       "frame timing line remains visible",
       "CSM profile reports cascade prerequisites",
       "LOD/reflection line reports shimmer blockers",
       "tester packaging gates remain scripted",
-      "scope skyline readability remains stable"
+      "scope skyline readability remains stable",
+      "time-of-day HUD line reports scenario hour, sun angle, ambient/diffuse light, and shadow multiplier",
+      "Forward+ lighting summary reports diagnostic light count and CPU cluster tags",
+      "anti-aliasing line reports edge threshold, blend strength, depth rejection, and scoped stability rule",
+      "physical atmosphere line reports Rayleigh, Mie, ozone, turbidity, and density controls",
+      "indirect rendering line reports ICB mode, draw class, capacity, coverage, and fallback scope",
+      "SDF UI line reports text mode, HUD/scope/map coverage, outline, shadow, and minimum scale",
+      "Water Reflection line reports active SSR strength and probe fallback strength",
+      "Render Graph line reports pass count, transient/imported resources, and graph pass order",
+      "Audio Mix line reports scene-authored category gains and persisted user master gain",
+      "Shot Feedback line reports visible recoil and hit, blocker, ground, or clear-miss result",
+      "Patrol Pairs line reports active formation members, moving count, route, roles, spacing, and live sweep offset",
+      "Black Mountain Materials and West Basin Materials lines report Cycle 112 source-backed acceptance framing",
+      "Route Selection line reports all three playable rehearsal routes can bind from briefing",
+      "Scope Calibration line reports calibrated mil spacing and compensated parallax",
+      "Collision Selection, Collision Validation, and Collision Export lines report selected blocker authoring workflow state",
+      "Last Session, Review Resume, and Checkpoint Performance lines report persisted route-bound resume state"
     ],
-    "smokeCommand": "Docs/CYCLE_98_SMOKE_TEST.md"
+    "smokeCommand": "Docs/CYCLE_116_SMOKE_TEST.md"
   },
+  "dynamicLights": [
+    {
+      "id": "woden_scope_work_light",
+      "label": "Woden scope work light",
+      "position": [12.0, 5.2, 158.0],
+      "color": [1.0, 0.80, 0.48],
+      "intensity": 0.72,
+      "radius": 58.0,
+      "clusterTag": "woden"
+    },
+    {
+      "id": "west_basin_promenade_light",
+      "label": "West Basin promenade light",
+      "position": [-92.0, 3.4, -24.0],
+      "color": [0.58, 0.78, 1.0],
+      "intensity": 0.64,
+      "radius": 64.0,
+      "clusterTag": "west-basin"
+    },
+    {
+      "id": "black_mountain_service_light",
+      "label": "Black Mountain service light",
+      "position": [-70.0, 19.5, -156.0],
+      "color": [0.82, 0.92, 1.0],
+      "intensity": 0.52,
+      "radius": 72.0,
+      "clusterTag": "black-mountain"
+    },
+    {
+      "id": "belconnen_review_light",
+      "label": "Belconnen review light",
+      "position": [-140.0, 5.0, -194.0],
+      "color": [1.0, 0.68, 0.42],
+      "intensity": 0.58,
+      "radius": 60.0,
+      "clusterTag": "belconnen"
+    }
+  ],
   "sessionPersistence": {
-    "status": "guarded manual restore execution active; session audio polish reporting live",
-    "rule": "allow checkpoint restore only after identity, freshness, target, and explicit user intent checks pass"
+    "status": "save resume closeout active",
+    "rule": "persist route identity, checkpoint progress, checkpoint performance, map/scope review state, and resume only after identity, freshness, target, and explicit user intent checks pass"
   },
   "route": {
     "name": "Canberra Combat-Lane Rehearsal",
@@ -415,15 +598,14 @@
   },
   "reviewPack": {
     "title": "Canberra Review Pack Baseline",
-    "summary": "Reference-backed Woden-to-Belconnen atlas baseline carried forward into the alternate-route dry-run pass.",
+    "summary": "Reference-backed Canberra atlas baseline with Cycle 116 save/resume closeout, Cycle 115 collision authoring workflow, Cycle 114 scope optics closeout, Cycle 113 primary and alternate rehearsal routes selectable from briefing, and Cycle 112 Black Mountain, Bruce, Belconnen, West Basin, Yarralumla, and shoreline material closeout coverage.",
     "referenceGallery": "CanberraReferenceGallery",
     "textureLibrary": "Canberra Texture Library",
-    "captureFormat": "Open the map on district handoffs, raise the 4x scope on skyline stops, and use the pause shell for route-proof captures.",
+    "captureFormat": "Use Tools/capture_review.sh for scripted title, live-route, overhead-map, scoped-view, and pause-shell captures; use --baseline to produce review diffs.",
     "openRisks": [
-      "Belconnen still needs the same explicit district material closeout now applied to Black Mountain and West Basin.",
-      "The third rehearsal route is authored and previewed, but it is not the selected live-bindable alternate until future route-selection UI can choose among candidates.",
+      "All three rehearsal routes are now selectable and live-bindable at fresh-run boundaries; Cycle 123 still needs formal minimap accuracy verification across every route.",
       "West Basin reflections remain material-and-motion based until the later reflection probe cycle.",
-      "Comparison capture flow is still checklist-driven rather than a scripted screenshot export."
+      "Comparison capture flow is scripted for the canonical review shell states; Cycle 112 adds district acceptance framing notes for Black Mountain and West Basin but does not automate camera steering to those exact viewpoints."
     ],
     "comparisonStops": [
       {
@@ -464,16 +646,16 @@
       {
         "checkpointID": "west_basin_promenade_review",
         "district": "West Basin",
-        "sourceFocus": "West Basin shoreline, water, and vegetation closeout",
+        "sourceFocus": "Cycle 112 source-backed West Basin shoreline, water, vegetation, road, and facade material closeout",
         "combatLane": "West-basin embankment lane",
-        "captureNote": "Capture Commonwealth Avenue west, West Basin water motion, promenade hardscape, and Yarralumla vegetation response in one frame."
+        "captureNote": "Capture Commonwealth Avenue west, West Basin water motion, promenade hardscape, Yarralumla vegetation response, asphalt texture, and facade breakup in one frame."
       },
       {
         "checkpointID": "black_mountain_scope_perch",
         "district": "Black Mountain",
-        "sourceFocus": "Black Mountain/Telstra/Bruce material closeout",
+        "sourceFocus": "Cycle 112 source-backed Black Mountain/Telstra/Bruce/Belconnen material closeout",
         "combatLane": "North-west overwatch lane",
-        "captureNote": "Raise the scope and frame Telstra concrete, Black Mountain dry-grass slopes, and Bruce/AIS facade breakup together."
+        "captureNote": "Raise the scope and frame Telstra concrete, Black Mountain dry-grass slopes, Bruce/AIS facade breakup, and Belconnen/Ginninderra support masses together."
       },
       {
         "checkpointID": "belconnen_town_centre_review",
@@ -673,47 +855,53 @@
     "selectedAlternateRouteID": "east_basin_to_belconnen_probe",
     "selectedAlternateRouteLabel": "East Basin To Belconnen Probe",
     "bindingStatus": "primary route bound",
-    "loaderStatus": "selected alternate route live binding available; third route preview authored",
-    "validationStatus": "two staged alternate routes eligible for map accuracy review",
+    "loaderStatus": "briefing route selector can bind primary plus two alternate routes",
+    "validationStatus": "three rehearsal routes eligible for live map accuracy review",
     "validationRule": "requires 3+ markers, 100m+ planned distance, and 2+ sectors",
-    "selectionStatus": "briefing selection can arm selected alternate",
+    "selectionStatus": "briefing selector cycles primary and both alternate routes",
     "selectionRule": "route choice may change only from briefing before a run starts",
-    "activationStatus": "fresh-run activation available",
-    "activationRule": "selected alternate route may activate only from the title briefing before live movement",
+    "activationStatus": "fresh-run activation available for all authored routes",
+    "activationRule": "selected route activates only from the title briefing before live movement",
     "rollbackStatus": "rollback guard armed; primary route remains recoverable",
     "rollbackRule": "failed alternate binding returns to the primary route before checkpoint order changes",
     "commitStatus": "commit gate live with route footer verification",
-    "commitRule": "commit selected alternate route only before live movement input begins, then verify map markers and route footer agree",
-    "dryRunStatus": "dry run staged; active route not mutated",
-    "dryRunRule": "compare selected alternate checkpoint order and preview-only third-route order against the active route before commit",
-    "promotionStatus": "promotion readiness staged; active route still locked",
-    "promotionRule": "promote selected alternate only after dry-run review passes and commit remains staged",
-    "auditStatus": "promotion audit passed for review; live binding unchanged",
-    "auditRule": "audit must confirm active route id, checkpoint count, and restart boundary before promotion",
-    "boundaryStatus": "restart boundary rehearsal staged; live route unchanged",
-    "boundaryRule": "handoff may arm only from briefing or checkpoint restart before first alternate checkpoint",
-    "armingStatus": "handoff arming staged; live route still primary",
-    "armingRule": "arming records selected alternate eligibility without rebinding active checkpoints",
-    "confirmationStatus": "handoff confirmation staged; primary route remains bound",
-    "confirmationRule": "confirm selected alternate handoff only as review metadata until live switch is implemented",
-    "releaseStatus": "release gate staged; live switch still disabled",
-    "releaseRule": "release alternate route only after future live-switch code exists and primary rollback is proven",
-    "preflightStatus": "live-switch preflight passed for selected alternate",
-    "preflightRule": "preflight validates selected alternate before checkpoint order is rebound",
-    "handoffStatus": "restart-safe handoff implemented for selected alternate",
-    "handoffRule": "bind alternate route only from briefing or restart boundary"
+    "commitRule": "commit selected route only before live movement input begins, then verify map markers and route footer agree",
+    "dryRunStatus": "dry run promoted into live selector",
+    "dryRunRule": "compare all three checkpoint orders through briefing selection without mutating mid-run",
+    "promotionStatus": "promotion complete for both authored alternates",
+    "promotionRule": "promoted alternates remain bounded to fresh-run route binding",
+    "auditStatus": "promotion audit passed for primary plus two alternate routes",
+    "auditRule": "audit must confirm active route id, checkpoint count, and restart boundary after each selection",
+    "boundaryStatus": "restart boundary route selection implemented",
+    "boundaryRule": "route changes remain locked to briefing or fresh-run restart boundaries",
+    "armingStatus": "briefing route selector live",
+    "armingRule": "selector records the next route without rebinding current live checkpoints",
+    "confirmationStatus": "route selection confirmation active",
+    "confirmationRule": "Start Demo confirms the selected route and binds its checkpoints before movement",
+    "releaseStatus": "multi-route playability released for local review",
+    "releaseRule": "release keeps primary rollback by returning to briefing and selecting the primary route",
+    "preflightStatus": "live-switch preflight passed for all authored routes",
+    "preflightRule": "preflight validates each route before checkpoint order is rebound",
+    "handoffStatus": "restart-safe handoff implemented for all authored routes",
+    "handoffRule": "bind selected route only from briefing or restart boundary"
   },
   "collisionAuthoring": {
-    "status": "collision preview active; active route unchanged",
-    "rule": "inspect blocker footprints on the overhead map before editing alternate-route checkpoint ownership",
-    "audit": "runtime blocker count and map footprints are surfaced beside route preflight metadata",
-    "blockerScope": "graybox blocker volumes and authored sector collision volumes"
+    "status": "collision authoring workflow active",
+    "rule": "select blocker footprints on the overhead map, review validation, and copy source IDs before JSON edit/export",
+    "audit": "selected blocker, sector ownership, dimensions, clearance, and export guidance are surfaced beside route preflight metadata",
+    "blockerScope": "graybox blocker volumes and authored sector collision volumes",
+    "selectedVolumeID": "black_mountain_scope_perch_sector.authored.NorthPerchWall",
+    "selectedVolumeLabel": "NorthPerchWall",
+    "validationStatus": "selected blocker reports dimensions, sector ownership, source tier, and minimum route clearance",
+    "exportStatus": "copy selected blocker source id before editing sector collision JSON",
+    "reviewGuidance": "cycle every blocker footprint, check selected highlight and dimensions, then update the owning sector JSON",
+    "minimumClearanceMeters": 1.5
   },
   "alternateRoutes": [
     {
       "id": "east_basin_to_belconnen_probe",
       "name": "East Basin To Belconnen Probe",
-      "summary": "Second rehearsal route candidate that starts from the east-basin lookout, cuts through Civic and Black Mountain, then rejoins the Belconnen endgame without replacing the active Woden-to-Belconnen route.",
+      "summary": "Second playable rehearsal route that starts from the east-basin lookout, cuts through Civic and Black Mountain, then rejoins the Belconnen endgame.",
       "startCheckpointID": "east_basin_lookout",
       "goalCheckpointID": "ginninderra_drive_review",
       "checkpointIDs": [
@@ -725,12 +913,12 @@
         "belconnen_town_centre_review",
         "ginninderra_drive_review"
       ],
-      "routeType": "preview-candidate",
-      "authoringStatus": "map-preview ready; first live binding can arm at briefing boundary",
-      "selectionMode": "briefing-locked candidate",
-      "selectionStatus": "live binding ready from briefing",
-      "activationRule": "selectable from briefing before Start Demo binds alternate checkpoint ownership",
-      "checkpointOwnershipStatus": "ownership split ready",
+      "routeType": "playable alternate",
+      "authoringStatus": "live binding selectable from briefing",
+      "selectionMode": "briefing route selector",
+      "selectionStatus": "playable from fresh-run boundary",
+      "activationRule": "select from briefing, then Start Demo binds this checkpoint order",
+      "checkpointOwnershipStatus": "ownership split live",
       "sharedCheckpointIDs": [
         "east_basin_lookout",
         "ginninderra_drive_review"
@@ -746,7 +934,7 @@
     {
       "id": "west_basin_to_ginninderra_shore_thread",
       "name": "West Basin To Ginninderra Shore Thread",
-      "summary": "Third rehearsal route candidate that starts at the West Basin promenade, threads the Black Mountain western shoulder, pressures the Belconnen Way handoff, and exits along Ginninderra with distinct north-west watcher coverage.",
+      "summary": "Third playable rehearsal route that starts at the West Basin promenade, threads the Black Mountain western shoulder, pressures the Belconnen Way handoff, and exits along Ginninderra with distinct north-west watcher coverage.",
       "startCheckpointID": "west_basin_promenade_review",
       "goalCheckpointID": "ginninderra_drive_review",
       "checkpointIDs": [
@@ -757,12 +945,12 @@
         "belconnen_town_centre_review",
         "ginninderra_drive_review"
       ],
-      "routeType": "third-route-authoring",
-      "authoringStatus": "authored preview ready; selection waits for multi-candidate route UI",
-      "selectionMode": "preview-only third candidate",
-      "selectionStatus": "ready for map and threat-geometry review",
-      "activationRule": "not live-bindable until route selection can choose between multiple alternate candidates",
-      "checkpointOwnershipStatus": "third-route ownership authored",
+      "routeType": "playable alternate",
+      "authoringStatus": "live binding selectable from briefing",
+      "selectionMode": "briefing route selector",
+      "selectionStatus": "playable from fresh-run boundary",
+      "activationRule": "select from briefing, then Start Demo binds this checkpoint order",
+      "checkpointOwnershipStatus": "third-route ownership live",
       "sharedCheckpointIDs": [
         "west_basin_promenade_review",
         "black_mountain_scope_perch",

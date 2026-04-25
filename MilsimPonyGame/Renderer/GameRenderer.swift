@@ -25,6 +25,7 @@ private struct SceneMaterialTextureKey: Hashable {
 final class GameRenderer: NSObject, MTKViewDelegate {
     private static let maxFramesInFlight = 3
     private static let sceneColorPixelFormat: MTLPixelFormat = .rgba16Float
+    private static let enableShadowIndirectCommands = false
 
     private struct SessionOverlayUpdate {
         let snapshot: GameFrameSnapshot
@@ -41,6 +42,48 @@ final class GameRenderer: NSObject, MTKViewDelegate {
         let milliseconds: Double
         let framesPerSecond: Double
         let drawableCount: Int
+    }
+
+    private struct ShadowIndirectFrameResources {
+        let uniformBuffer: MTLBuffer
+        let indirectCommandBuffer: MTLIndirectCommandBuffer
+        let capacity: Int
+        let uniformStride: Int
+    }
+
+    private struct FrameGraphPass {
+        let name: String
+        let reads: [String]
+        let writes: [String]
+    }
+
+    private struct FrameGraphPlan {
+        let passes: [FrameGraphPass]
+        let importedResources: Set<String>
+        let transientResources: Set<String>
+
+        var summary: String {
+            let passNames = passes.map(\.name).joined(separator: " -> ")
+            return "\(passes.count) passes / \(transientResources.count) transient / \(importedResources.count) imported / \(passNames)"
+        }
+
+        func validate() -> Bool {
+            var available = importedResources
+            for pass in passes {
+                guard pass.reads.allSatisfy({ available.contains($0) }) else {
+                    return false
+                }
+                available.formUnion(pass.writes)
+            }
+            return true
+        }
+
+        func passName(at index: Int, fallback: String) -> String {
+            guard passes.indices.contains(index) else {
+                return fallback
+            }
+            return passes[index].name
+        }
     }
 
     let deviceName: String
@@ -75,6 +118,8 @@ final class GameRenderer: NSObject, MTKViewDelegate {
     private var pendingSessionOverlayUpdate: SessionOverlayUpdate?
     private var pendingSessionPerformanceUpdate: SessionPerformanceUpdate?
     private var isSessionUpdateFlushScheduled = false
+    private var shadowIndirectFrameResources: [ShadowIndirectFrameResources] = []
+    private let frameGraphPlan: FrameGraphPlan
 
     init?(view: MTKView, session: GameSession) {
         guard
@@ -170,6 +215,7 @@ final class GameRenderer: NSObject, MTKViewDelegate {
         self.sceneDepthTexture = nil
         let textureLoader = MTKTextureLoader(device: device)
         self.scene = scene
+        self.frameGraphPlan = Self.makeFrameGraphPlan(scene: scene)
         self.materialTextures = Self.loadMaterialTextures(
             for: scene.drawables,
             with: textureLoader,
@@ -178,12 +224,17 @@ final class GameRenderer: NSObject, MTKViewDelegate {
 
         super.init()
 
-        session.setFreshRunHandler { [weak self, weak session] in
-            let activateSelectedAlternate = session?.consumeAlternateRouteActivationRequest() ?? false
-            self?.prepareFreshRun(activateSelectedAlternate: activateSelectedAlternate)
+        session.setFreshRunHandler { [weak self] activeRouteID in
+            self?.prepareFreshRun(activeRouteID: activeRouteID)
         }
 
         scene.configureGameCore()
+        self.shadowIndirectFrameResources = Self.makeShadowIndirectFrameResources(
+            device: device,
+            capacity: max(scene.drawables.filter(\.castsShadow).count, 1),
+            maxFramesInFlight: Self.maxFramesInFlight
+        )
+        assert(frameGraphPlan.validate(), "Frame graph has an unsatisfied pass resource dependency")
         configureSpawnFromScene()
         publishSceneMetadata()
         print("[Renderer] Jungle hybrid ready on \(device.name) with \(scene.debugInfo.summary)")
@@ -321,9 +372,17 @@ final class GameRenderer: NSObject, MTKViewDelegate {
             cameraRight: cameraRight,
             viewProjectionMatrix: viewProjectionMatrix
         )
-        let skyColor = terrainRenderer.skyColor(for: terrainFrame)
-        let atmosphereControls = terrainRenderer.atmosphereControls(for: terrainFrame)
-        let lightDirection = terrainRenderer.lightDirection(for: terrainFrame)
+        let baseSkyColor = terrainRenderer.skyColor(for: terrainFrame)
+        let baseAtmosphereControls = terrainRenderer.atmosphereControls(for: terrainFrame)
+        let skyColor = physicalSkyColor(
+            baseSkyColor: baseSkyColor,
+            cameraForward: forwardVector
+        )
+        let atmosphereControls = physicalAtmosphereControls(
+            baseControls: baseAtmosphereControls,
+            cameraForward: forwardVector
+        )
+        let lightDirection = simd_normalize(-scene.environment.sunDirection)
         let shadowFrame = makeShadowFrame(
             cameraPosition: cameraPosition,
             cameraForward: forwardVector,
@@ -334,10 +393,13 @@ final class GameRenderer: NSObject, MTKViewDelegate {
             for: cameraPosition,
             scopeActive: scopeActive
         )
+        let shadowPassName = frameGraphPlan.passName(at: 0, fallback: "SunShadowPass")
+        let scenePassName = frameGraphPlan.passName(at: 1, fallback: "SceneGeometryPass")
+        let postProcessPassName = frameGraphPlan.passName(at: 2, fallback: "PresentationPostProcessPass")
 
         if let shadowRenderPassDescriptor = Self.makeShadowRenderPassDescriptor(texture: shadowMapTexture),
            let shadowEncoder = commandBuffer.makeRenderCommandEncoder(descriptor: shadowRenderPassDescriptor) {
-            shadowEncoder.label = "SunShadowPass"
+            shadowEncoder.label = shadowPassName
             shadowEncoder.setDepthStencilState(shadowDepthStencilState)
             shadowEncoder.setCullMode(.back)
             shadowEncoder.setFrontFacing(.counterClockwise)
@@ -355,7 +417,8 @@ final class GameRenderer: NSObject, MTKViewDelegate {
             drawShadowCasters(
                 shadowCasters,
                 encoder: shadowEncoder,
-                shadowFrame: shadowFrame
+                shadowFrame: shadowFrame,
+                frameResourceIndex: frameResourceIndex
             )
             shadowEncoder.endEncoding()
         }
@@ -373,14 +436,16 @@ final class GameRenderer: NSObject, MTKViewDelegate {
             return
         }
 
-        encoder.label = "JungleTerrainAndSolidObjectsPass"
+        encoder.label = scenePassName
         terrainRenderer.draw(
             in: encoder,
             frame: terrainFrame,
             shadowFrame: shadowFrame,
             shadowTexture: shadowMapTexture,
             shadowSamplerState: shadowCompareSamplerState,
-            frameResourceIndex: frameResourceIndex
+            frameResourceIndex: frameResourceIndex,
+            skyColor: skyColor,
+            atmosphereControls: atmosphereControls
         ) { [weak self] encoder in
             guard let self else {
                 return
@@ -415,6 +480,7 @@ final class GameRenderer: NSObject, MTKViewDelegate {
             return
         }
 
+        postProcessEncoder.label = postProcessPassName
         drawPostProcessedScene(
             from: sceneColorTexture,
             depthTexture: sceneDepthTexture,
@@ -550,6 +616,7 @@ final class GameRenderer: NSObject, MTKViewDelegate {
         encoder.setFragmentSamplerState(shadowCompareSamplerState, index: 1)
 
         for drawable in drawables {
+            let dynamicLights = selectedDynamicLights(for: drawable)
             let waterSurfaceResponse = drawable.textureKey == .water ? max(terrainFrame.waterSurfaceResponse, 0) : 0
             let waterRippleStrength = min(
                 max(terrainFrame.shorelineRippleStrength * waterSurfaceResponse, 0),
@@ -591,7 +658,21 @@ final class GameRenderer: NSObject, MTKViewDelegate {
                     terrainFrame.windDirection.y,
                     waterRippleStrength,
                     Float(terrainFrame.simulatedTimeSeconds)
-                )
+                ),
+                dynamicLightParameters: SIMD4<Float>(
+                    Float(dynamicLights.count),
+                    Float(scene.environment.dynamicLights.count),
+                    4,
+                    0
+                ),
+                dynamicLightPosition0: dynamicLights.position[0],
+                dynamicLightColor0: dynamicLights.color[0],
+                dynamicLightPosition1: dynamicLights.position[1],
+                dynamicLightColor1: dynamicLights.color[1],
+                dynamicLightPosition2: dynamicLights.position[2],
+                dynamicLightColor2: dynamicLights.color[2],
+                dynamicLightPosition3: dynamicLights.position[3],
+                dynamicLightColor3: dynamicLights.color[3]
             )
             var materialUniforms = SceneMaterialUniforms(
                 baseColorFactor: drawable.material.baseColorFactor,
@@ -620,12 +701,34 @@ final class GameRenderer: NSObject, MTKViewDelegate {
         }
     }
 
+    private func selectedDynamicLights(for drawable: SceneDrawable) -> (count: Int, position: [SIMD4<Float>], color: [SIMD4<Float>]) {
+        let selected = scene.environment.dynamicLights
+            .filter { light in
+                simd_distance(light.position, drawable.worldCenter) <= (light.radius + drawable.boundingRadius)
+            }
+            .sorted { lhs, rhs in
+                simd_distance_squared(lhs.position, drawable.worldCenter) < simd_distance_squared(rhs.position, drawable.worldCenter)
+            }
+            .prefix(4)
+
+        var positions = Array(repeating: SIMD4<Float>(0, 0, 0, 0), count: 4)
+        var colors = Array(repeating: SIMD4<Float>(0, 0, 0, 0), count: 4)
+        for (index, light) in selected.enumerated() {
+            positions[index] = SIMD4<Float>(light.position.x, light.position.y, light.position.z, light.radius)
+            colors[index] = SIMD4<Float>(light.color.x, light.color.y, light.color.z, light.intensity)
+        }
+
+        return (selected.count, positions, colors)
+    }
+
     private func drawShadowCasters(
         _ drawables: [SceneDrawable],
         encoder: MTLRenderCommandEncoder,
-        shadowFrame: RendererShadowFrame
+        shadowFrame: RendererShadowFrame,
+        frameResourceIndex: Int
     ) {
-        guard !drawables.isEmpty else {
+        let shadowDrawables = drawables.filter(\.castsShadow)
+        guard !shadowDrawables.isEmpty else {
             return
         }
 
@@ -634,21 +737,17 @@ final class GameRenderer: NSObject, MTKViewDelegate {
         encoder.setCullMode(.back)
         encoder.setFrontFacing(.counterClockwise)
 
-        for drawable in drawables where drawable.castsShadow {
-            var uniforms = SceneUniforms(
-                viewProjectionMatrix: .identity(),
-                shadowViewProjectionMatrix: shadowFrame.viewProjectionMatrix,
-                modelMatrix: drawable.modelMatrix,
-                lightDirection: SIMD4<Float>(0, 0, 0, 0),
-                sunColor: SIMD4<Float>(0, 0, 0, 0),
-                cameraPosition: SIMD4<Float>(0, 0, 0, 0),
-                fogColor: SIMD4<Float>(0, 0, 0, 0),
-                lightingParameters: SIMD4<Float>(0, 0, 0, 0),
-                atmosphereParameters: SIMD4<Float>(0, 0, 0, 0),
-                shadowParameters: SIMD4<Float>(0, 0, 0, 0),
-                motionParameters: SIMD4<Float>(0, 0, 0, 0)
-            )
+        if drawShadowCastersIndirect(
+            shadowDrawables,
+            encoder: encoder,
+            shadowFrame: shadowFrame,
+            frameResourceIndex: frameResourceIndex
+        ) {
+            return
+        }
 
+        for drawable in shadowDrawables {
+            var uniforms = shadowUniforms(for: drawable, shadowFrame: shadowFrame)
             encoder.setVertexBuffer(drawable.vertexBuffer, offset: 0, index: 0)
             encoder.setVertexBytes(&uniforms, length: MemoryLayout<SceneUniforms>.stride, index: 1)
             encoder.drawPrimitives(
@@ -657,6 +756,90 @@ final class GameRenderer: NSObject, MTKViewDelegate {
                 vertexCount: drawable.vertexCount
             )
         }
+    }
+
+    private func drawShadowCastersIndirect(
+        _ drawables: [SceneDrawable],
+        encoder: MTLRenderCommandEncoder,
+        shadowFrame: RendererShadowFrame,
+        frameResourceIndex: Int
+    ) -> Bool {
+        guard Self.enableShadowIndirectCommands else {
+            return false
+        }
+
+        guard !shadowIndirectFrameResources.isEmpty else {
+            return false
+        }
+
+        let resourceIndex = frameResourceIndex % shadowIndirectFrameResources.count
+        let resources = shadowIndirectFrameResources[resourceIndex]
+        guard drawables.count <= resources.capacity else {
+            return false
+        }
+
+        resources.indirectCommandBuffer.reset(0..<resources.capacity)
+        let uniformPointer = resources.uniformBuffer.contents()
+        for (index, drawable) in drawables.enumerated() {
+            var uniforms = shadowUniforms(for: drawable, shadowFrame: shadowFrame)
+            let uniformOffset = index * resources.uniformStride
+            withUnsafeBytes(of: &uniforms) { bytes in
+                guard let baseAddress = bytes.baseAddress else {
+                    return
+                }
+                uniformPointer
+                    .advanced(by: uniformOffset)
+                    .copyMemory(from: baseAddress, byteCount: MemoryLayout<SceneUniforms>.stride)
+            }
+
+            let command = resources.indirectCommandBuffer.indirectRenderCommandAt(index)
+            command.setVertexBuffer(drawable.vertexBuffer, offset: 0, at: 0)
+            command.setVertexBuffer(resources.uniformBuffer, offset: uniformOffset, at: 1)
+            command.drawPrimitives(
+                .triangle,
+                vertexStart: 0,
+                vertexCount: drawable.vertexCount,
+                instanceCount: 1,
+                baseInstance: 0
+            )
+            encoder.useResource(drawable.vertexBuffer, usage: .read, stages: .vertex)
+        }
+
+        encoder.useResource(resources.uniformBuffer, usage: .read, stages: .vertex)
+        encoder.useResource(resources.indirectCommandBuffer, usage: .read, stages: .vertex)
+        encoder.executeCommandsInBuffer(
+            resources.indirectCommandBuffer,
+            range: 0..<drawables.count
+        )
+        return true
+    }
+
+    private func shadowUniforms(
+        for drawable: SceneDrawable,
+        shadowFrame: RendererShadowFrame
+    ) -> SceneUniforms {
+        SceneUniforms(
+            viewProjectionMatrix: .identity(),
+            shadowViewProjectionMatrix: shadowFrame.viewProjectionMatrix,
+            modelMatrix: drawable.modelMatrix,
+            lightDirection: SIMD4<Float>(0, 0, 0, 0),
+            sunColor: SIMD4<Float>(0, 0, 0, 0),
+            cameraPosition: SIMD4<Float>(0, 0, 0, 0),
+            fogColor: SIMD4<Float>(0, 0, 0, 0),
+            lightingParameters: SIMD4<Float>(0, 0, 0, 0),
+            atmosphereParameters: SIMD4<Float>(0, 0, 0, 0),
+            shadowParameters: SIMD4<Float>(0, 0, 0, 0),
+            motionParameters: SIMD4<Float>(0, 0, 0, 0),
+            dynamicLightParameters: SIMD4<Float>(0, 0, 0, 0),
+            dynamicLightPosition0: SIMD4<Float>(0, 0, 0, 0),
+            dynamicLightColor0: SIMD4<Float>(0, 0, 0, 0),
+            dynamicLightPosition1: SIMD4<Float>(0, 0, 0, 0),
+            dynamicLightColor1: SIMD4<Float>(0, 0, 0, 0),
+            dynamicLightPosition2: SIMD4<Float>(0, 0, 0, 0),
+            dynamicLightColor2: SIMD4<Float>(0, 0, 0, 0),
+            dynamicLightPosition3: SIMD4<Float>(0, 0, 0, 0),
+            dynamicLightColor3: SIMD4<Float>(0, 0, 0, 0)
+        )
     }
 
     private func drawPostProcessedScene(
@@ -684,6 +867,24 @@ final class GameRenderer: NSObject, MTKViewDelegate {
                 scene.environment.postProcess.ssaoRadius,
                 scene.environment.postProcess.ssaoBias,
                 0
+            ),
+            antiAliasingParameters: SIMD4<Float>(
+                scene.environment.postProcess.antiAliasing.edgeThreshold,
+                scene.environment.postProcess.antiAliasing.blendStrength,
+                scene.environment.postProcess.antiAliasing.depthRejection,
+                0
+            ),
+            reflectionParameters: SIMD4<Float>(
+                scene.environment.postProcess.reflection.ssrStrength,
+                scene.environment.postProcess.reflection.ssrMaxDistancePixels,
+                scene.environment.postProcess.reflection.ssrDepthThickness,
+                scene.environment.postProcess.reflection.probeFallbackStrength
+            ),
+            reflectionProbeColor: SIMD4<Float>(
+                scene.environment.postProcess.reflection.probeColor.x,
+                scene.environment.postProcess.reflection.probeColor.y,
+                scene.environment.postProcess.reflection.probeColor.z,
+                scene.environment.postProcess.reflection.reflectionHorizonY
             )
         )
 
@@ -726,6 +927,51 @@ final class GameRenderer: NSObject, MTKViewDelegate {
         return sceneColorTexture != nil && sceneDepthTexture != nil
     }
 
+    private static func makeFrameGraphPlan(scene: BootstrapScene) -> FrameGraphPlan {
+        let imported = Set([
+            "Drawable",
+            "JungleTerrainBuffers",
+            "SceneDrawableBuffers"
+        ])
+        let transient = Set([
+            "ShadowMap",
+            "SceneColor",
+            "SceneDepth"
+        ])
+        let passNames = scene.mapConfiguration.renderGraphSummary.contains("SunShadowPass")
+            ? scene.mapConfiguration.renderGraphSummary
+            : "SunShadowPass -> SceneGeometryPass -> PresentationPostProcessPass"
+        let configuredNames = passNames
+            .components(separatedBy: " / ")
+            .last?
+            .components(separatedBy: " -> ")
+            .filter { !$0.isEmpty } ?? []
+        let names = configuredNames.count >= 3
+            ? Array(configuredNames.prefix(3))
+            : ["SunShadowPass", "SceneGeometryPass", "PresentationPostProcessPass"]
+        return FrameGraphPlan(
+            passes: [
+                FrameGraphPass(
+                    name: names[0],
+                    reads: ["JungleTerrainBuffers", "SceneDrawableBuffers"],
+                    writes: ["ShadowMap"]
+                ),
+                FrameGraphPass(
+                    name: names[1],
+                    reads: ["JungleTerrainBuffers", "SceneDrawableBuffers", "ShadowMap"],
+                    writes: ["SceneColor", "SceneDepth"]
+                ),
+                FrameGraphPass(
+                    name: names[2],
+                    reads: ["SceneColor", "SceneDepth", "Drawable"],
+                    writes: ["Drawable"]
+                )
+            ],
+            importedResources: imported,
+            transientResources: transient
+        )
+    }
+
     private func materialTexture(
         for reference: SceneTextureReference?,
         semantic: SceneMaterialTextureSemantic
@@ -737,8 +983,8 @@ final class GameRenderer: NSObject, MTKViewDelegate {
         return materialTextures[SceneMaterialTextureKey(reference: reference, semantic: semantic)]
     }
 
-    private func prepareFreshRun(activateSelectedAlternate: Bool = false) {
-        scene.prepareFreshRun(activateSelectedAlternate: activateSelectedAlternate)
+    private func prepareFreshRun(activeRouteID: String? = nil) {
+        scene.prepareFreshRun(activeRouteID: activeRouteID)
         configureRouteFromScene()
         configureSpawnFromScene()
         publishSceneMetadata()
@@ -767,6 +1013,7 @@ final class GameRenderer: NSObject, MTKViewDelegate {
         let debugInfo = scene.debugInfo
         let scopeConfiguration = scene.scopeConfiguration
         let ballisticsSettings = scene.ballisticsSettings
+        let audioMixSettings = scene.audioMixSettings
         let detectionFailThreshold = scene.detectionFailThreshold
         let mapConfiguration = scene.mapConfiguration
         DispatchQueue.main.async {
@@ -777,6 +1024,7 @@ final class GameRenderer: NSObject, MTKViewDelegate {
                 overlayTitle: debugInfo.cycleLabel,
                 scopeConfiguration: scopeConfiguration,
                 ballisticsSettings: ballisticsSettings,
+                audioMixSettings: audioMixSettings,
                 detectionFailThreshold: detectionFailThreshold,
                 mapConfiguration: mapConfiguration
             )
@@ -791,6 +1039,150 @@ final class GameRenderer: NSObject, MTKViewDelegate {
         }
 
         return simd_normalize(horizontal)
+    }
+
+    private static func makeShadowIndirectFrameResources(
+        device: MTLDevice,
+        capacity: Int,
+        maxFramesInFlight: Int
+    ) -> [ShadowIndirectFrameResources] {
+        let descriptor = MTLIndirectCommandBufferDescriptor()
+        descriptor.commandTypes = [.draw]
+        descriptor.inheritPipelineState = true
+        descriptor.inheritBuffers = false
+        descriptor.maxVertexBufferBindCount = 2
+        descriptor.maxFragmentBufferBindCount = 0
+
+        let uniformStride = alignedBufferStride(MemoryLayout<SceneUniforms>.stride)
+        let uniformBufferLength = uniformStride * max(capacity, 1)
+        var resources: [ShadowIndirectFrameResources] = []
+        resources.reserveCapacity(maxFramesInFlight)
+
+        for frameIndex in 0..<maxFramesInFlight {
+            guard
+                let uniformBuffer = device.makeBuffer(
+                    length: uniformBufferLength,
+                    options: .storageModeShared
+                ),
+                let indirectCommandBuffer = device.makeIndirectCommandBuffer(
+                    descriptor: descriptor,
+                    maxCommandCount: max(capacity, 1),
+                    options: []
+                )
+            else {
+                return []
+            }
+
+            uniformBuffer.label = "ShadowIndirectUniformBuffer[\(frameIndex)]"
+            indirectCommandBuffer.label = "ShadowCasterIndirectCommandBuffer[\(frameIndex)]"
+            resources.append(
+                ShadowIndirectFrameResources(
+                    uniformBuffer: uniformBuffer,
+                    indirectCommandBuffer: indirectCommandBuffer,
+                    capacity: max(capacity, 1),
+                    uniformStride: uniformStride
+                )
+            )
+        }
+
+        return resources
+    }
+
+    private static func alignedBufferStride(_ stride: Int) -> Int {
+        let alignment = 256
+        return ((stride + alignment - 1) / alignment) * alignment
+    }
+
+    private func physicalSkyColor(
+        baseSkyColor: SIMD3<Float>,
+        cameraForward: SIMD3<Float>
+    ) -> SIMD3<Float> {
+        let atmosphere = scene.environment.physicalAtmosphere
+        guard atmosphere.model != "disabled" else {
+            return baseSkyColor
+        }
+
+        let viewDirection = simd_normalize(cameraForward)
+        let sunVector = simd_normalize(-scene.environment.sunDirection)
+        let sunElevation = simd_clamp(sunVector.y, 0.0, 1.0)
+        let viewUp = simd_clamp(viewDirection.y * 0.5 + 0.5, 0.0, 1.0)
+        let sunAlignment = simd_clamp(simd_dot(viewDirection, sunVector), 0.0, 1.0)
+        let horizonFactor = powf(1.0 - viewUp, max(atmosphere.densityFalloff, 0.25))
+        let twilightFactor = 1.0 - simd_clamp((sunElevation - 0.08) / 0.52, 0.0, 1.0)
+
+        let horizon = SIMD3<Float>(
+            scene.environment.skyHorizonColor.x,
+            scene.environment.skyHorizonColor.y,
+            scene.environment.skyHorizonColor.z
+        )
+        let zenith = SIMD3<Float>(
+            scene.environment.skyZenithColor.x,
+            scene.environment.skyZenithColor.y,
+            scene.environment.skyZenithColor.z
+        )
+        let fog = SIMD3<Float>(
+            scene.environment.fogColor.x,
+            scene.environment.fogColor.y,
+            scene.environment.fogColor.z
+        )
+        let rayleighScale = atmosphere.rayleighStrength
+            * (0.45 + sunElevation * 0.55)
+            * (0.52 + viewUp * 0.48)
+        let rayleigh = SIMD3<Float>(
+            0.36 * rayleighScale,
+            0.58 * rayleighScale,
+            rayleighScale
+        )
+        let miePhase = powf(sunAlignment, 8.0 + atmosphere.mieAnisotropy * 56.0)
+        let warmScale = atmosphere.mieStrength * miePhase
+        let warmScatter = SIMD3<Float>(
+            scene.environment.sunColor.x * warmScale,
+            scene.environment.sunColor.y * warmScale,
+            scene.environment.sunColor.z * warmScale
+        )
+        let ozoneScale = atmosphere.ozoneAbsorption * twilightFactor
+        let ozoneTint = SIMD3<Float>(
+            ozoneScale,
+            0.74 * ozoneScale,
+            0.54 * ozoneScale
+        )
+        let hazeBase = Self.mix(fog, horizon, t: 0.42)
+        let hazeScale = atmosphere.turbidity * (0.35 + horizonFactor)
+        let hazeTint = SIMD3<Float>(
+            hazeBase.x * hazeScale,
+            hazeBase.y * hazeScale,
+            hazeBase.z * hazeScale
+        )
+        var physicalSky = Self.mix(horizon, zenith, t: viewUp)
+        physicalSky += rayleigh * 0.20
+        physicalSky += warmScatter
+        physicalSky += ozoneTint * 0.18
+        physicalSky += hazeTint * 0.22
+
+        let authoredBlend = simd_clamp(0.42 + atmosphere.horizonLift * 0.35 + atmosphere.turbidity * 0.18, 0.0, 0.82)
+        let sky = Self.mix(baseSkyColor, physicalSky, t: authoredBlend)
+        return simd_clamp(sky, SIMD3<Float>(repeating: 0.0), SIMD3<Float>(repeating: 1.0))
+    }
+
+    private func physicalAtmosphereControls(
+        baseControls: SIMD4<Float>,
+        cameraForward: SIMD3<Float>
+    ) -> SIMD4<Float> {
+        let atmosphere = scene.environment.physicalAtmosphere
+        guard atmosphere.model != "disabled" else {
+            return baseControls
+        }
+
+        let sunVector = simd_normalize(-scene.environment.sunDirection)
+        let sunElevation = simd_clamp(sunVector.y, 0.0, 1.0)
+        let horizonView = simd_clamp(1.0 - (cameraForward.y * 0.5 + 0.5), 0.0, 1.0)
+        let lowSunHaze = (1.0 - sunElevation) * atmosphere.mieStrength
+        var controls = baseControls
+        controls.x = simd_clamp(controls.x - atmosphere.turbidity * 0.055 - lowSunHaze * 0.025, 0.18, 0.50)
+        controls.y = simd_clamp(controls.y + atmosphere.densityFalloff * 0.055 + horizonView * atmosphere.turbidity * 0.16, 1.08, 1.95)
+        controls.z = simd_clamp(controls.z + atmosphere.rayleighStrength * 0.025 - atmosphere.turbidity * 0.018, 1.02, 1.32)
+        controls.w = simd_clamp(controls.w + atmosphere.horizonLift * 0.16 + lowSunHaze * 0.18, 0.66, 1.0)
+        return controls
     }
 
     private func makeShadowFrame(
@@ -1529,6 +1921,8 @@ private final class JungleTerrainRenderer {
         shadowTexture: MTLTexture,
         shadowSamplerState: MTLSamplerState,
         frameResourceIndex: Int,
+        skyColor: SIMD3<Float>,
+        atmosphereControls: SIMD4<Float>,
         solidObjectDrawer: (MTLRenderCommandEncoder) -> Void
     ) {
         let resourceIndex = normalizedFrameResourceIndex(frameResourceIndex)
@@ -1539,8 +1933,8 @@ private final class JungleTerrainRenderer {
             ),
             let uniformBuffer = updateUniformBuffer(
                 for: frame,
-                skyColor: skyColor(for: frame),
-                atmosphereControls: atmosphereControls(for: frame),
+                skyColor: skyColor,
+                atmosphereControls: atmosphereControls,
                 shadowFrame: shadowFrame,
                 frameResourceIndex: resourceIndex
             )

@@ -23,6 +23,13 @@ This directory stores both the sourced Canberra photographs in `Origin/` and the
 - The closeout keeps the existing texture provenance: dry grass and water from the Lake Burley Griffin source, concrete from the Parliament House source, arterial asphalt from the authored Canberra road set, and facade breakup from the authored Canberra facade set.
 - Smoke coverage expects the route/map footer to report `West Basin Materials:` and the West Basin comparison stop to frame water motion, promenade hardscape, and vegetation response together.
 
+## Cycle 112 District Texture Closeout
+
+- `west_basin_yarralumla_sector.json` now extends the earlier closeout across all West Basin/Yarralumla terrain patches, named road strips, and remaining support masses using dry-grass, arterial asphalt, facade, and vegetation-appropriate assignments from the shared Canberra texture library.
+- `black_mountain_belconnen_sector.json` now extends the earlier closeout across Belconnen basin terrain, Ginninderra/Lake shelves, named north-west roads, Belconnen support towers, Bruce/AIS/UC/Calvary/CIT masses, Emu Bank, and Lake Ginninderra edge masses.
+- `black_mountain_scope_perch_sector.json` now gives the playable perch slopes, local access roads, retaining walls, lookout barrier, and plinth concrete material coverage.
+- `Docs/CYCLE_112_TEXTURE_ACCEPTANCE.md` is the acceptance checklist for the two review frames: West Basin shoreline/hardscape/vegetation and Black Mountain Telstra/Bruce/Belconnen scope coverage.
+
 ## Source Photographs
 
 | Local file | Upstream page | Author | License | Notes |

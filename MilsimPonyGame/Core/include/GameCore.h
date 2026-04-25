@@ -63,6 +63,10 @@ typedef struct GameThreatObserver {
     float turnRateDegreesPerSecond;
     float scanArcDegrees;
     float scanCycleSeconds;
+    float patrolStrideMeters;
+    float patrolPhaseOffsetRadians;
+    float patrolCycleSeconds;
+    bool patrolEnabled;
 } GameThreatObserver;
 
 typedef struct GameBallisticsConfiguration {
@@ -122,6 +126,9 @@ typedef struct GameShotFeedback {
 } GameShotFeedback;
 
 typedef struct GameObserverDebugState {
+    float positionX;
+    float positionY;
+    float positionZ;
     float distanceMeters;
     float rangeMeters;
     float fieldOfViewDegrees;
@@ -134,10 +141,12 @@ typedef struct GameObserverDebugState {
     float scanArcDegrees;
     float scanCycleSeconds;
     float scanPhaseSeconds;
+    float patrolOffsetMeters;
     bool neutralized;
     bool alerted;
     bool supportingGroup;
     bool scanHalted;
+    bool patrolMoving;
     bool inRange;
     bool inViewCone;
     bool hasLineOfSight;

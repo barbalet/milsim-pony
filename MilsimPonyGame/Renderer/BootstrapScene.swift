@@ -89,6 +89,101 @@ struct ScenePostProcessSettings {
     let ssaoStrength: Float
     let ssaoRadius: Float
     let ssaoBias: Float
+    let antiAliasing: SceneAntiAliasingSettings
+    let reflection: SceneReflectionSettings
+}
+
+struct SceneReflectionSettings {
+    let status: String
+    let rule: String
+    let screenSpaceReflectionStatus: String
+    let approach: String
+    let probeTargets: [String]
+    let ssrStrength: Float
+    let ssrMaxDistancePixels: Float
+    let ssrDepthThickness: Float
+    let probeFallbackStrength: Float
+    let reflectionHorizonY: Float
+    let probeColor: SIMD4<Float>
+}
+
+struct SceneAntiAliasingSettings {
+    let status: String
+    let rule: String
+    let mode: String
+    let edgeThreshold: Float
+    let blendStrength: Float
+    let depthRejection: Float
+    let scopeStabilityRule: String
+}
+
+struct ScenePhysicalAtmosphereSettings {
+    let status: String
+    let rule: String
+    let model: String
+    let rayleighStrength: Float
+    let mieStrength: Float
+    let mieAnisotropy: Float
+    let ozoneAbsorption: Float
+    let turbidity: Float
+    let horizonLift: Float
+    let densityFalloff: Float
+    let scopeStabilityRule: String
+}
+
+struct SceneIndirectRenderingSettings {
+    let status: String
+    let rule: String
+    let mode: String
+    let drawClass: String
+    let commandPath: String
+    let capacity: Int
+    let coverageNote: String
+    let fallbackRule: String
+    let measurementRule: String
+}
+
+struct SceneSDFUISettings {
+    let status: String
+    let rule: String
+    let mode: String
+    let fontFamily: String
+    let coverage: [String]
+    let outlinePixels: Float
+    let shadowPixels: Float
+    let minimumScaleFactor: Float
+    let mapLabelRule: String
+    let scopeRule: String
+    let fallbackRule: String
+    let measurementRule: String
+}
+
+struct SceneRenderGraphSettings {
+    let status: String
+    let rule: String
+    let mode: String
+    let passOrder: [String]
+    let importedResources: [String]
+    let transientResources: [String]
+    let aliasingRule: String
+    let validationRule: String
+    let expansionRule: String
+}
+
+struct SceneAudioMixSettings {
+    let status: String
+    let rule: String
+    let mode: String
+    let masterGain: Float
+    let ambienceGain: Float
+    let movementGain: Float
+    let scopeGain: Float
+    let weaponGain: Float
+    let observerGain: Float
+    let footstepSurfaces: [String]
+    let ambienceBeds: [String]
+    let mixRule: String
+    let smokeRule: String
 }
 
 struct SceneBallisticsSettings {
@@ -108,6 +203,11 @@ struct SceneBallisticsSettings {
     let holdBreathRecoverySeconds: Float
 }
 
+enum SceneLODRole {
+    case full
+    case impostor
+}
+
 struct SceneDrawable {
     let name: String
     let vertexBuffer: MTLBuffer
@@ -122,6 +222,9 @@ struct SceneDrawable {
     let retainedInJungleRenderer: Bool
     let castsShadow: Bool
     let receivesShadow: Bool
+    let lodGroupID: String?
+    let lodRole: SceneLODRole?
+    let lodSwitchDistance: Float?
 
     init(
         name: String,
@@ -136,7 +239,10 @@ struct SceneDrawable {
         material: SceneMaterial? = nil,
         retainedInJungleRenderer: Bool,
         castsShadow: Bool = false,
-        receivesShadow: Bool = false
+        receivesShadow: Bool = false,
+        lodGroupID: String? = nil,
+        lodRole: SceneLODRole? = nil,
+        lodSwitchDistance: Float? = nil
     ) {
         self.name = name
         self.vertexBuffer = vertexBuffer
@@ -151,6 +257,9 @@ struct SceneDrawable {
         self.retainedInJungleRenderer = retainedInJungleRenderer
         self.castsShadow = castsShadow
         self.receivesShadow = receivesShadow
+        self.lodGroupID = lodGroupID
+        self.lodRole = lodRole
+        self.lodSwitchDistance = lodSwitchDistance
     }
 }
 
@@ -167,6 +276,18 @@ struct SceneEnvironment {
     let hazeStrength: Float
     let shadow: SceneShadowSettings
     let postProcess: ScenePostProcessSettings
+    let dynamicLights: [SceneDynamicLight]
+    let physicalAtmosphere: ScenePhysicalAtmosphereSettings
+}
+
+struct SceneDynamicLight {
+    let id: String
+    let label: String
+    let position: SIMD3<Float>
+    let color: SIMD3<Float>
+    let intensity: Float
+    let radius: Float
+    let clusterTag: String
 }
 
 struct SceneDebugInfo {
@@ -393,6 +514,18 @@ struct SceneMapCollisionVolume: Identifiable {
     let halfDepth: Float
     let yawDegrees: Float
     let source: String
+
+    var widthMeters: Float {
+        halfWidth * 2
+    }
+
+    var depthMeters: Float {
+        halfDepth * 2
+    }
+
+    var areaSquareMeters: Float {
+        widthMeters * depthMeters
+    }
 }
 
 struct SceneMapConfiguration {
@@ -450,6 +583,12 @@ struct SceneMapConfiguration {
     let collisionAuthoringRule: String
     let collisionAuthoringAudit: String
     let collisionAuthoringBlockerScope: String
+    let selectedCollisionVolumeID: String?
+    let selectedCollisionVolumeLabel: String?
+    let collisionAuthoringValidationStatus: String
+    let collisionAuthoringExportStatus: String
+    let collisionAuthoringReviewGuidance: String
+    let collisionAuthoringMinimumClearanceMeters: Float
     let environmentalMotionStatus: String
     let environmentalMotionRule: String
     let environmentalMotionWindSummary: String
@@ -474,6 +613,24 @@ struct SceneMapConfiguration {
     let lightingArchitectureStatus: String
     let lightingArchitectureRule: String
     let lightingArchitectureSummary: String
+    let timeOfDayStatus: String
+    let timeOfDayRule: String
+    let timeOfDaySummary: String
+    let antiAliasingStatus: String
+    let antiAliasingRule: String
+    let antiAliasingSummary: String
+    let physicalAtmosphereStatus: String
+    let physicalAtmosphereRule: String
+    let physicalAtmosphereSummary: String
+    let indirectRenderingStatus: String
+    let indirectRenderingRule: String
+    let indirectRenderingSummary: String
+    let sdfUIStatus: String
+    let sdfUIRule: String
+    let sdfUISummary: String
+    let renderGraphStatus: String
+    let renderGraphRule: String
+    let renderGraphSummary: String
     let sessionPersistenceStatus: String
     let sessionPersistenceRule: String
     let sessionPersistenceSummary: String
@@ -573,6 +730,7 @@ final class BootstrapScene {
     let environment: SceneEnvironment
     let scopeConfiguration: ScopeConfiguration
     let ballisticsSettings: SceneBallisticsSettings
+    let audioMixSettings: SceneAudioMixSettings
     let detectionFailThreshold: Float
     private(set) var mapConfiguration: SceneMapConfiguration
 
@@ -607,6 +765,7 @@ final class BootstrapScene {
             environment = buildResult.environment
             scopeConfiguration = buildResult.scopeConfiguration
             ballisticsSettings = buildResult.ballisticsSettings
+            audioMixSettings = buildResult.audioMixSettings
             detectionFailThreshold = buildResult.evasionInfo.failThreshold
             mapConfiguration = buildResult.mapConfiguration
             mapConfigurationTemplate = buildResult.mapConfiguration
@@ -633,6 +792,7 @@ final class BootstrapScene {
             environment = fallbackResult.environment
             scopeConfiguration = fallbackResult.scopeConfiguration
             ballisticsSettings = fallbackResult.ballisticsSettings
+            audioMixSettings = fallbackResult.audioMixSettings
             detectionFailThreshold = fallbackResult.evasionInfo.failThreshold
             mapConfiguration = fallbackResult.mapConfiguration
             mapConfigurationTemplate = fallbackResult.mapConfiguration
@@ -709,13 +869,11 @@ final class BootstrapScene {
             )
     }
 
-    func prepareFreshRun(activateSelectedAlternate: Bool = false) {
+    func prepareFreshRun(activeRouteID: String? = nil) {
         cachedTerrainPatchState = nil
         let spawn = spawnOptions.randomElement() ?? debugInfoTemplate.spawn
         debugInfo = sceneDebugInfo(applying: spawn)
-        let alternateRoute = activateSelectedAlternate
-            ? selectedLiveBindableAlternateRoute()
-            : nil
+        let alternateRoute = selectedLiveBindableAlternateRoute(activeRouteID: activeRouteID)
         if let alternateRoute {
             let alternateCheckpoints = checkpoints(for: alternateRoute)
             activeRouteCheckpointConfigurations = alternateCheckpoints
@@ -748,6 +906,9 @@ final class BootstrapScene {
             }
             let offset = drawable.worldCenter - cameraPosition
             let distance = simd_length(offset)
+            guard shouldRender(drawable, distance: distance) else {
+                continue
+            }
             let maximumDrawDistance = drawable.maxDrawDistance * scopeDrawDistanceMultiplier
             let minimumViewDot = scopeActive ? -1 : drawable.minimumViewDot
 
@@ -785,12 +946,29 @@ final class BootstrapScene {
 
             let offset = drawable.worldCenter - cameraPosition
             let distance = simd_length(offset)
+            guard shouldRender(drawable, distance: distance) else {
+                return nil
+            }
             let maximumDrawDistance = drawable.maxDrawDistance * scopeDrawDistanceMultiplier
             guard distance - drawable.boundingRadius <= maximumDrawDistance else {
                 return nil
             }
 
             return drawable
+        }
+    }
+
+    private func shouldRender(_ drawable: SceneDrawable, distance: Float) -> Bool {
+        guard let role = drawable.lodRole,
+              let switchDistance = drawable.lodSwitchDistance else {
+            return true
+        }
+
+        switch role {
+        case .full:
+            return distance < switchDistance
+        case .impostor:
+            return distance >= switchDistance
         }
     }
 
@@ -921,6 +1099,12 @@ final class BootstrapScene {
                     packagingAutomationLine(),
                     testerDistributionLine(),
                     lightingArchitectureLine(),
+                    timeOfDayLine(),
+                    antiAliasingLine(),
+                    physicalAtmosphereLine(),
+                    indirectRenderingLine(),
+                    sdfUILine(),
+                    renderGraphLine(),
                     blackMountainMaterialCloseoutLine(),
                     westBasinWaterCloseoutLine(),
                     sessionPersistenceLine(),
@@ -968,6 +1152,12 @@ final class BootstrapScene {
             packagingAutomationLine(),
             testerDistributionLine(),
             lightingArchitectureLine(),
+            timeOfDayLine(),
+            antiAliasingLine(),
+            physicalAtmosphereLine(),
+            indirectRenderingLine(),
+            sdfUILine(),
+            renderGraphLine(),
             blackMountainMaterialCloseoutLine(),
             westBasinWaterCloseoutLine(),
             sessionPersistenceLine(),
@@ -1347,12 +1537,36 @@ final class BootstrapScene {
         "Lighting Plan: \(mapConfiguration.lightingArchitectureStatus) / \(mapConfiguration.lightingArchitectureSummary)"
     }
 
+    private func timeOfDayLine() -> String {
+        "Time Of Day: \(mapConfiguration.timeOfDayStatus) / \(mapConfiguration.timeOfDaySummary)"
+    }
+
+    private func antiAliasingLine() -> String {
+        "Anti-Aliasing: \(mapConfiguration.antiAliasingStatus) / \(mapConfiguration.antiAliasingSummary)"
+    }
+
+    private func physicalAtmosphereLine() -> String {
+        "Physical Atmosphere: \(mapConfiguration.physicalAtmosphereStatus) / \(mapConfiguration.physicalAtmosphereSummary)"
+    }
+
+    private func indirectRenderingLine() -> String {
+        "Indirect Rendering: \(mapConfiguration.indirectRenderingStatus) / \(mapConfiguration.indirectRenderingSummary)"
+    }
+
+    private func sdfUILine() -> String {
+        "SDF UI: \(mapConfiguration.sdfUIStatus) / \(mapConfiguration.sdfUISummary)"
+    }
+
+    private func renderGraphLine() -> String {
+        "Render Graph: \(mapConfiguration.renderGraphStatus) / \(mapConfiguration.renderGraphSummary)"
+    }
+
     private func blackMountainMaterialCloseoutLine() -> String {
         let blackMountainStop = mapConfiguration.comparisonStops.first { stop in
             stop.district.localizedCaseInsensitiveContains("Black Mountain")
         }
         let captureNote = blackMountainStop?.captureNote ?? "Capture Telstra Tower, Black Mountain, and Bruce material reads from the active route."
-        return "Black Mountain Materials: Telstra/Bruce source-backed assignments / \(mapConfiguration.textureLibrary) / \(captureNote)"
+        return "Black Mountain Materials: Cycle 112 source-backed Telstra/Bruce/Belconnen assignments / \(mapConfiguration.textureLibrary) / \(captureNote)"
     }
 
     private func westBasinWaterCloseoutLine() -> String {
@@ -1360,7 +1574,7 @@ final class BootstrapScene {
             stop.district.localizedCaseInsensitiveContains("West Basin")
         }
         let captureNote = westBasinStop?.captureNote ?? "Capture West Basin shoreline, promenade materials, water motion, and vegetation response from the active route."
-        return "West Basin Materials: shoreline/water/vegetation closeout / \(mapConfiguration.environmentalMotionWindSummary) / \(captureNote)"
+        return "West Basin Materials: Cycle 112 shoreline/water/vegetation/asphalt/facade closeout / \(mapConfiguration.environmentalMotionWindSummary) / \(captureNote)"
     }
 
     private func sessionPersistenceLine() -> String {
@@ -1418,8 +1632,8 @@ final class BootstrapScene {
         }
     }
 
-    private func selectedLiveBindableAlternateRoute() -> AlternateRouteConfiguration? {
-        guard let selectedID = routeInfo.routeSelection.selectedAlternateRouteID else {
+    private func selectedLiveBindableAlternateRoute(activeRouteID: String?) -> AlternateRouteConfiguration? {
+        guard let selectedID = activeRouteID, selectedID != mapConfigurationTemplate.activeRouteID else {
             return nil
         }
 
@@ -1591,8 +1805,8 @@ final class BootstrapScene {
             routeSectorNames: activeSectorNames,
             activeRouteID: activeRouteID,
             activeRouteLabel: activeRouteName,
-            selectedAlternateRouteID: mapConfigurationTemplate.selectedAlternateRouteID,
-            selectedAlternateRouteLabel: mapConfigurationTemplate.selectedAlternateRouteLabel,
+            selectedAlternateRouteID: activeAlternateRoute?.id,
+            selectedAlternateRouteLabel: activeAlternateRoute?.name,
             routeBindingStatus: liveBindingActive
                 ? "alternate route live-bound at fresh boundary"
                 : mapConfigurationTemplate.routeBindingStatus,
@@ -1641,6 +1855,12 @@ final class BootstrapScene {
             collisionAuthoringRule: mapConfigurationTemplate.collisionAuthoringRule,
             collisionAuthoringAudit: mapConfigurationTemplate.collisionAuthoringAudit,
             collisionAuthoringBlockerScope: mapConfigurationTemplate.collisionAuthoringBlockerScope,
+            selectedCollisionVolumeID: mapConfigurationTemplate.selectedCollisionVolumeID,
+            selectedCollisionVolumeLabel: mapConfigurationTemplate.selectedCollisionVolumeLabel,
+            collisionAuthoringValidationStatus: mapConfigurationTemplate.collisionAuthoringValidationStatus,
+            collisionAuthoringExportStatus: mapConfigurationTemplate.collisionAuthoringExportStatus,
+            collisionAuthoringReviewGuidance: mapConfigurationTemplate.collisionAuthoringReviewGuidance,
+            collisionAuthoringMinimumClearanceMeters: mapConfigurationTemplate.collisionAuthoringMinimumClearanceMeters,
             environmentalMotionStatus: mapConfigurationTemplate.environmentalMotionStatus,
             environmentalMotionRule: mapConfigurationTemplate.environmentalMotionRule,
             environmentalMotionWindSummary: mapConfigurationTemplate.environmentalMotionWindSummary,
@@ -1665,6 +1885,24 @@ final class BootstrapScene {
             lightingArchitectureStatus: mapConfigurationTemplate.lightingArchitectureStatus,
             lightingArchitectureRule: mapConfigurationTemplate.lightingArchitectureRule,
             lightingArchitectureSummary: mapConfigurationTemplate.lightingArchitectureSummary,
+            timeOfDayStatus: mapConfigurationTemplate.timeOfDayStatus,
+            timeOfDayRule: mapConfigurationTemplate.timeOfDayRule,
+            timeOfDaySummary: mapConfigurationTemplate.timeOfDaySummary,
+            antiAliasingStatus: mapConfigurationTemplate.antiAliasingStatus,
+            antiAliasingRule: mapConfigurationTemplate.antiAliasingRule,
+            antiAliasingSummary: mapConfigurationTemplate.antiAliasingSummary,
+            physicalAtmosphereStatus: mapConfigurationTemplate.physicalAtmosphereStatus,
+            physicalAtmosphereRule: mapConfigurationTemplate.physicalAtmosphereRule,
+            physicalAtmosphereSummary: mapConfigurationTemplate.physicalAtmosphereSummary,
+            indirectRenderingStatus: mapConfigurationTemplate.indirectRenderingStatus,
+            indirectRenderingRule: mapConfigurationTemplate.indirectRenderingRule,
+            indirectRenderingSummary: mapConfigurationTemplate.indirectRenderingSummary,
+            sdfUIStatus: mapConfigurationTemplate.sdfUIStatus,
+            sdfUIRule: mapConfigurationTemplate.sdfUIRule,
+            sdfUISummary: mapConfigurationTemplate.sdfUISummary,
+            renderGraphStatus: mapConfigurationTemplate.renderGraphStatus,
+            renderGraphRule: mapConfigurationTemplate.renderGraphRule,
+            renderGraphSummary: mapConfigurationTemplate.renderGraphSummary,
             sessionPersistenceStatus: mapConfigurationTemplate.sessionPersistenceStatus,
             sessionPersistenceRule: mapConfigurationTemplate.sessionPersistenceRule,
             sessionPersistenceSummary: mapConfigurationTemplate.sessionPersistenceSummary,
@@ -2051,6 +2289,7 @@ private struct SceneBuildResult {
     let environment: SceneEnvironment
     let scopeConfiguration: ScopeConfiguration
     let ballisticsSettings: SceneBallisticsSettings
+    let audioMixSettings: SceneAudioMixSettings
     let mapConfiguration: SceneMapConfiguration
     let sectors: [SceneSectorRuntime]
     let groundModel: WorldGroundModel
@@ -2061,6 +2300,25 @@ private struct SceneBuildResult {
     let traversalTuning: SceneTraversalTuning
     let environmentalMotion: EnvironmentalMotionConfiguration
     let spawnOptions: [SpawnConfiguration]
+}
+
+private struct ResolvedTimeOfDayLighting {
+    let status: String
+    let rule: String
+    let label: String
+    let hour: Float
+    let sunAzimuthDegrees: Float
+    let sunElevationDegrees: Float
+    let sunDirection: SIMD3<Float>
+    let skyHorizonColor: SIMD4<Float>
+    let skyZenithColor: SIMD4<Float>
+    let sunColor: SIMD3<Float>
+    let ambientIntensity: Float
+    let diffuseIntensity: Float
+    let fogColor: SIMD4<Float>
+    let hazeStrength: Float
+    let shadowStrength: Float
+    let shadowCoverageMultiplier: Float
 }
 
 private struct SceneRuntimeWorld {
@@ -2173,21 +2431,35 @@ private final class ScenePackageBuilder {
             packageRootURL: packageRootURL
         )
         let atmosphereConfiguration = sceneConfiguration.atmosphere ?? AtmosphereConfiguration()
+        let timeOfDayLighting = Self.resolveTimeOfDayLighting(
+            sceneConfiguration.timeOfDay,
+            sky: sceneConfiguration.sky,
+            sun: sceneConfiguration.sun,
+            atmosphere: atmosphereConfiguration
+        )
         let detectionConfiguration = sceneConfiguration.detection ?? DetectionConfiguration()
         let guidanceConfiguration = sceneConfiguration.guidance ?? GuidanceConfiguration()
         let playerConfiguration = sceneConfiguration.player ?? PlayerConfiguration()
         let scopeConfiguration = sceneConfiguration.scope ?? ScopeConfiguration()
         let shadowConfiguration = sceneConfiguration.shadow ?? ShadowConfiguration()
         let postProcessConfiguration = sceneConfiguration.postProcess ?? PostProcessConfiguration()
+        let antiAliasingSettings = Self.resolvedAntiAliasing(sceneConfiguration.antiAliasing)
+        let physicalAtmosphereSettings = Self.resolvedPhysicalAtmosphere(sceneConfiguration.physicalAtmosphere)
+        let indirectRenderingSettings = Self.resolvedIndirectRendering(sceneConfiguration.indirectRendering)
+        let sdfUISettings = Self.resolvedSDFUI(sceneConfiguration.sdfUI)
+        let renderGraphSettings = Self.resolvedRenderGraph(sceneConfiguration.renderGraph)
+        let audioMixSettings = Self.resolvedAudioMix(sceneConfiguration.audioMix)
         let ballisticsConfiguration = sceneConfiguration.ballistics ?? BallisticsConfiguration()
         let environmentalMotion = sceneConfiguration.environmentalMotion ?? EnvironmentalMotionConfiguration()
         let materialBreakup = sceneConfiguration.materialBreakup ?? MaterialBreakupConfiguration()
         let surfaceFidelity = sceneConfiguration.surfaceFidelity ?? SurfaceFidelityConfiguration()
         let distantLOD = sceneConfiguration.distantLOD ?? DistantLODConfiguration()
         let waterReflection = sceneConfiguration.waterReflection ?? WaterReflectionConfiguration()
+        let reflectionSettings = Self.resolvedReflectionSettings(waterReflection)
         let packagingAutomation = sceneConfiguration.packagingAutomation ?? PackagingAutomationConfiguration()
         let testerDistribution = sceneConfiguration.testerDistribution ?? TesterDistributionConfiguration()
         let lightingArchitecture = sceneConfiguration.lightingArchitecture ?? LightingArchitectureConfiguration()
+        let dynamicLights = Self.resolvedDynamicLights(sceneConfiguration.dynamicLights ?? [])
         let sessionPersistence = sceneConfiguration.sessionPersistence ?? SessionPersistenceConfiguration()
         let materialBreakupRoadDecalDensity = simd_clamp(materialBreakup.roadDecalDensity ?? 0.55, 0.0, 2.0)
         let materialBreakupRoadScuffStrength = simd_clamp(materialBreakup.roadScuffStrength ?? 0.42, 0.0, 1.0)
@@ -2199,10 +2471,10 @@ private final class ScenePackageBuilder {
         )
         let shadowSettings = SceneShadowSettings(
             mapResolution: max(shadowConfiguration.mapResolution ?? 2048, 512),
-            coverage: max(shadowConfiguration.coverage ?? 120.0, 24.0),
+            coverage: max((shadowConfiguration.coverage ?? 120.0) * timeOfDayLighting.shadowCoverageMultiplier, 24.0),
             depthBias: max(shadowConfiguration.depthBias ?? 0.015, 0.0),
             normalBias: max(shadowConfiguration.normalBias ?? 0.010, 0.0),
-            strength: min(max(shadowConfiguration.strength ?? 0.72, 0.0), 1.0),
+            strength: min(max(timeOfDayLighting.shadowStrength, 0.0), 1.0),
             scopeCoverageMultiplier: max(shadowConfiguration.scopeCoverageMultiplier ?? 1.25, 1.0),
             forwardOffsetMultiplier: min(max(shadowConfiguration.forwardOffsetMultiplier ?? 0.35, 0.0), 1.0),
             cascadeCount: min(max(shadowConfiguration.cascadeCount ?? 1, 1), 4),
@@ -2224,7 +2496,9 @@ private final class ScenePackageBuilder {
             vignetteStrength: simd_clamp(postProcessConfiguration.vignetteStrength ?? 0.08, 0.0, 1.0),
             ssaoStrength: simd_clamp(postProcessConfiguration.ssaoStrength ?? 0.18, 0.0, 1.0),
             ssaoRadius: simd_clamp(postProcessConfiguration.ssaoRadius ?? 1.6, 0.5, 6.0),
-            ssaoBias: simd_clamp(postProcessConfiguration.ssaoBias ?? 0.0008, 0.0, 0.02)
+            ssaoBias: simd_clamp(postProcessConfiguration.ssaoBias ?? 0.0008, 0.0, 0.02),
+            antiAliasing: antiAliasingSettings,
+            reflection: reflectionSettings
         )
         let ballisticsSettings = SceneBallisticsSettings(
             muzzleVelocityMetersPerSecond: max(ballisticsConfiguration.muzzleVelocityMetersPerSecond ?? 820.0, 40.0),
@@ -2259,6 +2533,8 @@ private final class ScenePackageBuilder {
         var texturedWorldDrawableCount = 0
         var flatColorWorldDrawableCount = 0
         var continuityGroundDrawableCount = 0
+        var distantLODImpostorCount = 0
+        let distantLODImpostorStartMeters = max(distantLOD.impostorStartMeters ?? 420.0, 1.0)
 
         let includedSectorIDs = sceneConfiguration.includedSectors.isEmpty
             ? Array(sectorLookup.keys).sorted()
@@ -2418,7 +2694,8 @@ private final class ScenePackageBuilder {
                     from: block,
                     sectorID: sector.id,
                     residency: residency,
-                    landmarkBreakupStrength: materialBreakupLandmarkStrength
+                    landmarkBreakupStrength: materialBreakupLandmarkStrength,
+                    distantLOD: distantLOD
                 ) {
                     sceneDrawables.append(drawable)
                     grayboxCount += 1
@@ -2426,6 +2703,23 @@ private final class ScenePackageBuilder {
                         texturedWorldDrawableCount += 1
                     } else {
                         flatColorWorldDrawableCount += 1
+                    }
+
+                    if let impostorDrawable = grayboxImpostorDrawable(
+                        from: block,
+                        sectorID: sector.id,
+                        residency: residency,
+                        distantLOD: distantLOD,
+                        switchDistance: distantLODImpostorStartMeters,
+                        landmarkBreakupStrength: materialBreakupLandmarkStrength
+                    ) {
+                        sceneDrawables.append(impostorDrawable)
+                        distantLODImpostorCount += 1
+                        if impostorDrawable.material.hasAnyTexture {
+                            texturedWorldDrawableCount += 1
+                        } else {
+                            flatColorWorldDrawableCount += 1
+                        }
                     }
                 }
                 if let shadowDrawable = grayboxShadowDrawable(from: block, sectorID: sector.id) {
@@ -2491,7 +2785,13 @@ private final class ScenePackageBuilder {
             status: "collision authoring review pending",
             rule: "requires sector blocker inventory before route handoff editing",
             audit: "no collision authoring audit loaded",
-            blockerScope: "sector blockers only"
+            blockerScope: "sector blockers only",
+            selectedVolumeID: nil,
+            selectedVolumeLabel: nil,
+            validationStatus: nil,
+            exportStatus: nil,
+            reviewGuidance: nil,
+            minimumClearanceMeters: nil
         )
         let routePlannedDistanceMeters = plannedRouteDistance(for: sceneConfiguration.route.checkpoints)
         let surfaceFidelitySummary = surfaceFidelitySummary(
@@ -2531,6 +2831,15 @@ private final class ScenePackageBuilder {
             ),
             "Ground: \(groundModel.localSurfaces.count) local / \(groundModel.continuitySurfaces.count) continuity surfaces / \(continuityGroundDrawableCount) global drawable",
             "Texture Coverage: \(texturedWorldDrawableCount) textured world drawables / \(flatColorWorldDrawableCount) flat-color world drawables",
+            "LOD Switching: \(distantLODImpostorCount) landmark impostors / swap \(Int(distantLODImpostorStartMeters.rounded()))m / full meshes below threshold",
+            Self.timeOfDaySummaryLine(timeOfDayLighting),
+            Self.dynamicLightSummaryLine(dynamicLights),
+            Self.antiAliasingSummaryLine(antiAliasingSettings),
+            Self.physicalAtmosphereSummaryLine(physicalAtmosphereSettings),
+            Self.indirectRenderingSummaryLine(indirectRenderingSettings),
+            Self.sdfUISummaryLine(sdfUISettings),
+            Self.renderGraphSummaryLine(renderGraphSettings),
+            Self.audioMixSummaryLine(audioMixSettings),
             String(
                 format: "Scope: %.1fx / %.1f deg / x%.1f draw stabilization",
                 scopeConfiguration.magnification,
@@ -2594,6 +2903,8 @@ private final class ScenePackageBuilder {
             "Route Release: \(routeSelection.releaseStatus ?? "alternate route release gate pending") / \(routeSelection.releaseRule ?? "release gate waits for explicit live-switch implementation")",
             "Route Preflight: \(routeSelection.preflightStatus ?? "alternate route live-switch preflight pending") / \(routeSelection.preflightRule ?? "preflight records switch readiness without changing the active binding")",
             "Collision Authoring: \(collisionAuthoring.status) / \(collisionAuthoring.rule) / \(collisionAuthoring.audit)",
+            "Collision Validation: \(collisionAuthoring.validationStatus ?? "selected blocker validation pending") / clearance \(String(format: "%.1fm", Double(collisionAuthoring.minimumClearanceMeters ?? 1.5)))",
+            "Collision Export: \(collisionAuthoring.exportStatus ?? "copy selected blocker source id before JSON edit") / \(collisionAuthoring.reviewGuidance ?? "review map highlight, dimensions, sector ownership, and route clearance")",
             "Environmental Motion: \(environmentalMotion.status ?? "environmental motion pending") / \(environmentalMotionWindSummary(environmentalMotion))",
             "Surface Fidelity: \(surfaceFidelity.status ?? "surface fidelity review pending") / \(surfaceFidelitySummary)",
             "Session Persistence: \(sessionPersistence.status ?? "session persistence planning pending") / \(sessionPersistenceSummary)",
@@ -2621,21 +2932,24 @@ private final class ScenePackageBuilder {
                 spawn: sceneConfiguration.spawn
             ),
             environment: SceneEnvironment(
-                skyHorizonColor: sceneConfiguration.sky.horizonColorVector,
-                skyZenithColor: sceneConfiguration.sky.zenithColorVector,
-                sunDirection: sceneConfiguration.sun.directionVector,
-                sunColor: sceneConfiguration.sun.colorVector,
-                ambientIntensity: sceneConfiguration.sun.ambientIntensity,
-                diffuseIntensity: sceneConfiguration.sun.diffuseIntensity,
-                fogColor: atmosphereConfiguration.fogColorVector,
+                skyHorizonColor: timeOfDayLighting.skyHorizonColor,
+                skyZenithColor: timeOfDayLighting.skyZenithColor,
+                sunDirection: timeOfDayLighting.sunDirection,
+                sunColor: timeOfDayLighting.sunColor,
+                ambientIntensity: timeOfDayLighting.ambientIntensity,
+                diffuseIntensity: timeOfDayLighting.diffuseIntensity,
+                fogColor: timeOfDayLighting.fogColor,
                 fogNear: max(atmosphereConfiguration.fogNear ?? 38, 8),
                 fogFar: max(atmosphereConfiguration.fogFar ?? 118, max(atmosphereConfiguration.fogNear ?? 38, 8) + 1),
-                hazeStrength: max(atmosphereConfiguration.hazeStrength ?? 0.16, 0),
+                hazeStrength: max(timeOfDayLighting.hazeStrength, 0),
                 shadow: shadowSettings,
-                postProcess: postProcessSettings
+                postProcess: postProcessSettings,
+                dynamicLights: dynamicLights,
+                physicalAtmosphere: physicalAtmosphereSettings
             ),
             scopeConfiguration: scopeConfiguration,
             ballisticsSettings: ballisticsSettings,
+            audioMixSettings: audioMixSettings,
             mapConfiguration: buildMapConfiguration(
                 sceneName: sceneConfiguration.sceneName,
                 loadedSectors: loadedSectors,
@@ -2655,6 +2969,7 @@ private final class ScenePackageBuilder {
                 surfaceFidelitySummary: surfaceFidelitySummary,
                 distantLOD: distantLOD,
                 distantLODSummary: Self.distantLODSummary(distantLOD),
+                distantLODImpostorCount: distantLODImpostorCount,
                 waterReflection: waterReflection,
                 waterReflectionSummary: Self.waterReflectionSummary(waterReflection),
                 packagingAutomation: packagingAutomation,
@@ -2662,7 +2977,14 @@ private final class ScenePackageBuilder {
                 testerDistribution: testerDistribution,
                 testerDistributionSummary: Self.testerDistributionSummary(testerDistribution),
                 lightingArchitecture: lightingArchitecture,
-                lightingArchitectureSummary: Self.lightingArchitectureSummary(lightingArchitecture),
+                lightingArchitectureSummary: Self.lightingArchitectureSummary(lightingArchitecture, dynamicLights: dynamicLights),
+                timeOfDayLighting: timeOfDayLighting,
+                dynamicLights: dynamicLights,
+                antiAliasingSettings: antiAliasingSettings,
+                physicalAtmosphereSettings: physicalAtmosphereSettings,
+                indirectRenderingSettings: indirectRenderingSettings,
+                sdfUISettings: sdfUISettings,
+                renderGraphSettings: renderGraphSettings,
                 sessionPersistence: sessionPersistence,
                 sessionPersistenceSummary: sessionPersistenceSummary,
                 reviewPack: reviewPack,
@@ -2729,6 +3051,7 @@ private final class ScenePackageBuilder {
         surfaceFidelitySummary: String,
         distantLOD: DistantLODConfiguration,
         distantLODSummary: String,
+        distantLODImpostorCount: Int,
         waterReflection: WaterReflectionConfiguration,
         waterReflectionSummary: String,
         packagingAutomation: PackagingAutomationConfiguration,
@@ -2737,6 +3060,13 @@ private final class ScenePackageBuilder {
         testerDistributionSummary: String,
         lightingArchitecture: LightingArchitectureConfiguration,
         lightingArchitectureSummary: String,
+        timeOfDayLighting: ResolvedTimeOfDayLighting,
+        dynamicLights: [SceneDynamicLight],
+        antiAliasingSettings: SceneAntiAliasingSettings,
+        physicalAtmosphereSettings: ScenePhysicalAtmosphereSettings,
+        indirectRenderingSettings: SceneIndirectRenderingSettings,
+        sdfUISettings: SceneSDFUISettings,
+        renderGraphSettings: SceneRenderGraphSettings,
         sessionPersistence: SessionPersistenceConfiguration,
         sessionPersistenceSummary: String,
         reviewPack: ReviewPackConfiguration,
@@ -3027,6 +3357,15 @@ private final class ScenePackageBuilder {
             ),
             collisionAuthoringAudit: collisionAuthoring.audit,
             collisionAuthoringBlockerScope: collisionAuthoring.blockerScope,
+            selectedCollisionVolumeID: collisionAuthoring.selectedVolumeID,
+            selectedCollisionVolumeLabel: collisionAuthoring.selectedVolumeLabel,
+            collisionAuthoringValidationStatus: collisionAuthoring.validationStatus
+                ?? "selected blocker must report dimensions, sector, and route clearance",
+            collisionAuthoringExportStatus: collisionAuthoring.exportStatus
+                ?? "copy selected blocker source id before JSON export/edit",
+            collisionAuthoringReviewGuidance: collisionAuthoring.reviewGuidance
+                ?? "cycle selected blocker footprints before editing sector collision JSON",
+            collisionAuthoringMinimumClearanceMeters: max(collisionAuthoring.minimumClearanceMeters ?? 1.5, 0),
             environmentalMotionStatus: environmentalMotion.status ?? "environmental motion pending",
             environmentalMotionRule: environmentalMotion.rule ?? "scene uses default terrain breeze",
             environmentalMotionWindSummary: environmentalMotionWindSummary(environmentalMotion),
@@ -3038,7 +3377,7 @@ private final class ScenePackageBuilder {
             surfaceFidelitySummary: surfaceFidelitySummary,
             distantLODStatus: distantLOD.status ?? "distant LOD planning pending",
             distantLODRule: distantLOD.rule ?? "author key landmark impostor metadata before renderer promotion",
-            distantLODSummary: distantLODSummary,
+            distantLODSummary: "\(distantLODSummary) / \(distantLODImpostorCount) renderer impostors",
             waterReflectionStatus: waterReflection.status ?? "water reflection planning pending",
             waterReflectionRule: waterReflection.rule ?? "prototype or defer reflection probe after water motion closeout",
             waterReflectionSummary: waterReflectionSummary,
@@ -3050,7 +3389,25 @@ private final class ScenePackageBuilder {
             testerDistributionSummary: testerDistributionSummary,
             lightingArchitectureStatus: lightingArchitecture.status ?? "lighting architecture planning pending",
             lightingArchitectureRule: lightingArchitecture.rule ?? "lock time-of-day, atmosphere, clustered lighting, and render graph decisions before renderer rewrites",
-            lightingArchitectureSummary: lightingArchitectureSummary,
+            lightingArchitectureSummary: "\(lightingArchitectureSummary) / \(Self.dynamicLightSummary(dynamicLights))",
+            timeOfDayStatus: timeOfDayLighting.status,
+            timeOfDayRule: timeOfDayLighting.rule,
+            timeOfDaySummary: Self.timeOfDaySummary(timeOfDayLighting),
+            antiAliasingStatus: antiAliasingSettings.status,
+            antiAliasingRule: antiAliasingSettings.rule,
+            antiAliasingSummary: Self.antiAliasingSummary(antiAliasingSettings),
+            physicalAtmosphereStatus: physicalAtmosphereSettings.status,
+            physicalAtmosphereRule: physicalAtmosphereSettings.rule,
+            physicalAtmosphereSummary: Self.physicalAtmosphereSummary(physicalAtmosphereSettings),
+            indirectRenderingStatus: indirectRenderingSettings.status,
+            indirectRenderingRule: indirectRenderingSettings.rule,
+            indirectRenderingSummary: Self.indirectRenderingSummary(indirectRenderingSettings),
+            sdfUIStatus: sdfUISettings.status,
+            sdfUIRule: sdfUISettings.rule,
+            sdfUISummary: Self.sdfUISummary(sdfUISettings),
+            renderGraphStatus: renderGraphSettings.status,
+            renderGraphRule: renderGraphSettings.rule,
+            renderGraphSummary: Self.renderGraphSummary(renderGraphSettings),
             sessionPersistenceStatus: sessionPersistence.status ?? "session persistence planning pending",
             sessionPersistenceRule: sessionPersistence.rule ?? "capture route, checkpoint, difficulty, map, and review state before save/resume activation",
             sessionPersistenceSummary: sessionPersistenceSummary,
@@ -3132,6 +3489,119 @@ private final class ScenePackageBuilder {
         )
     }
 
+    private static func resolveTimeOfDayLighting(
+        _ configuration: TimeOfDayConfiguration?,
+        sky: SkyConfiguration,
+        sun: SunConfiguration,
+        atmosphere: AtmosphereConfiguration
+    ) -> ResolvedTimeOfDayLighting {
+        guard configuration?.enabled ?? (configuration != nil) else {
+            return ResolvedTimeOfDayLighting(
+                status: configuration?.status ?? "static authored daylight",
+                rule: configuration?.rule ?? "use authored sky and sun values without time-of-day remapping",
+                label: configuration?.label ?? "Authored daylight",
+                hour: configuration?.hour ?? 13.67,
+                sunAzimuthDegrees: configuration?.sunAzimuthDegrees ?? 238.0,
+                sunElevationDegrees: configuration?.sunElevationDegrees ?? 58.0,
+                sunDirection: sun.directionVector,
+                skyHorizonColor: sky.horizonColorVector,
+                skyZenithColor: sky.zenithColorVector,
+                sunColor: sun.colorVector,
+                ambientIntensity: sun.ambientIntensity,
+                diffuseIntensity: sun.diffuseIntensity,
+                fogColor: atmosphere.fogColorVector,
+                hazeStrength: atmosphere.hazeStrength ?? 0.16,
+                shadowStrength: 0.72,
+                shadowCoverageMultiplier: 1.0
+            )
+        }
+
+        let hour = simd_clamp(configuration?.hour ?? 13.67, 0.0, 24.0)
+        let dayProgress = simd_clamp((hour - 6.0) / 12.0, 0.0, 1.0)
+        let daylightCurve = sinf(dayProgress * .pi)
+        let elevation = configuration?.sunElevationDegrees ?? simd_clamp(5.0 + (daylightCurve * 64.0), -8.0, 82.0)
+        let azimuth = configuration?.sunAzimuthDegrees ?? (75.0 + (dayProgress * 210.0))
+        let sunDirection = Self.sunDirection(azimuthDegrees: azimuth, elevationDegrees: elevation)
+        let lowSunFactor = 1.0 - simd_clamp((elevation - 6.0) / 58.0, 0.0, 1.0)
+
+        let generatedHorizon = blend(
+            SIMD4<Float>(0.96, 0.62, 0.38, 1.0),
+            sky.horizonColorVector,
+            t: simd_clamp(daylightCurve, 0.0, 1.0)
+        )
+        let generatedZenith = blend(
+            SIMD4<Float>(0.15, 0.20, 0.36, 1.0),
+            sky.zenithColorVector,
+            t: simd_clamp(daylightCurve, 0.0, 1.0)
+        )
+        let generatedSunColor = blend(
+            SIMD3<Float>(1.0, 0.68, 0.42),
+            sun.colorVector,
+            t: simd_clamp(daylightCurve, 0.0, 1.0)
+        )
+        let generatedFog = blend(
+            SIMD4<Float>(0.80, 0.70, 0.62, 1.0),
+            atmosphere.fogColorVector,
+            t: simd_clamp(daylightCurve, 0.0, 1.0)
+        )
+
+        return ResolvedTimeOfDayLighting(
+            status: configuration?.status ?? "time-of-day scenario active",
+            rule: configuration?.rule ?? "derive sky, sun, ambient light, haze, and shadow coverage from scenario time",
+            label: configuration?.label ?? String(format: "%02d:%02d scenario light", Int(hour), Int(hour.truncatingRemainder(dividingBy: 1) * 60)),
+            hour: hour,
+            sunAzimuthDegrees: azimuth,
+            sunElevationDegrees: elevation,
+            sunDirection: sunDirection,
+            skyHorizonColor: configuration?.horizonColorVector ?? generatedHorizon,
+            skyZenithColor: configuration?.zenithColorVector ?? generatedZenith,
+            sunColor: configuration?.sunColorVector ?? generatedSunColor,
+            ambientIntensity: simd_clamp(configuration?.ambientIntensity ?? (0.22 + (daylightCurve * 0.24)), 0.02, 1.2),
+            diffuseIntensity: simd_clamp(configuration?.diffuseIntensity ?? (0.48 + (daylightCurve * 0.46)), 0.02, 1.4),
+            fogColor: configuration?.fogColorVector ?? generatedFog,
+            hazeStrength: simd_clamp(configuration?.hazeStrength ?? ((atmosphere.hazeStrength ?? 0.16) + (lowSunFactor * 0.05)), 0.0, 1.0),
+            shadowStrength: simd_clamp(configuration?.shadowStrength ?? (0.58 + (daylightCurve * 0.18)), 0.0, 1.0),
+            shadowCoverageMultiplier: simd_clamp(configuration?.shadowCoverageMultiplier ?? (1.0 + (lowSunFactor * 0.45)), 0.5, 2.5)
+        )
+    }
+
+    private static func sunDirection(azimuthDegrees: Float, elevationDegrees: Float) -> SIMD3<Float> {
+        let azimuth = azimuthDegrees * (.pi / 180.0)
+        let elevation = elevationDegrees * (.pi / 180.0)
+        let horizontal = cosf(elevation)
+        let direction = SIMD3<Float>(
+            -sinf(azimuth) * horizontal,
+            -sinf(elevation),
+            -cosf(azimuth) * horizontal
+        )
+        return simd_normalize(direction)
+    }
+
+    private static func blend(_ start: SIMD4<Float>, _ end: SIMD4<Float>, t: Float) -> SIMD4<Float> {
+        start + ((end - start) * simd_clamp(t, 0.0, 1.0))
+    }
+
+    private static func blend(_ start: SIMD3<Float>, _ end: SIMD3<Float>, t: Float) -> SIMD3<Float> {
+        start + ((end - start) * simd_clamp(t, 0.0, 1.0))
+    }
+
+    private static func timeOfDaySummary(_ lighting: ResolvedTimeOfDayLighting) -> String {
+        String(
+            format: "%@ / %.2fh / sun az %.0f elev %.0f / ambient %.2f diffuse %.2f / shadow x%.2f",
+            lighting.label,
+            lighting.hour,
+            lighting.sunAzimuthDegrees,
+            lighting.sunElevationDegrees,
+            lighting.ambientIntensity,
+            lighting.diffuseIntensity,
+            lighting.shadowCoverageMultiplier
+        )
+    }
+
+    private static func timeOfDaySummaryLine(_ lighting: ResolvedTimeOfDayLighting) -> String {
+        "Time Of Day: \(lighting.status) / \(timeOfDaySummary(lighting))"
+    }
+
     private static func distantLODSummary(_ configuration: DistantLODConfiguration) -> String {
         let targets = configuration.landmarkTargets ?? []
         let targetSummary = targets.isEmpty
@@ -3156,13 +3626,34 @@ private final class ScenePackageBuilder {
             : targets.prefix(3).joined(separator: ", ")
         let extraCount = max(targets.count - 3, 0)
         let extraSummary = extraCount > 0 ? " +\(extraCount)" : ""
+        let ssrStrength = simd_clamp(configuration.ssrStrength ?? 0.0, 0.0, 1.0)
+        let probeFallback = simd_clamp(configuration.probeFallbackStrength ?? 0.0, 0.0, 1.0)
         return String(
-            format: "%d probes / %@%@ / %@ / %@",
+            format: "%d probes / %@%@ / %@ / %@ / SSR %.2f probe %.2f",
             targets.count,
             targetSummary,
             extraSummary,
             configuration.approach ?? "material probe metadata before SSR",
-            configuration.screenSpaceReflectionStatus ?? "SSR deferred"
+            configuration.screenSpaceReflectionStatus ?? "SSR deferred",
+            ssrStrength,
+            probeFallback
+        )
+    }
+
+    private static func resolvedReflectionSettings(_ configuration: WaterReflectionConfiguration) -> SceneReflectionSettings {
+        SceneReflectionSettings(
+            status: configuration.status ?? "water reflection planning pending",
+            rule: configuration.rule ?? "prototype or defer reflection probe after water motion closeout",
+            screenSpaceReflectionStatus: configuration.screenSpaceReflectionStatus ?? "SSR deferred",
+            approach: configuration.approach ?? "material probe metadata before SSR",
+            probeTargets: configuration.probeTargets ?? [],
+            ssrStrength: simd_clamp(configuration.ssrStrength ?? 0.0, 0.0, 1.0),
+            ssrMaxDistancePixels: simd_clamp(configuration.ssrMaxDistancePixels ?? 36.0, 4.0, 180.0),
+            ssrDepthThickness: simd_clamp(configuration.ssrDepthThickness ?? 0.018, 0.0005, 0.2),
+            probeFallbackStrength: simd_clamp(configuration.probeFallbackStrength ?? 0.0, 0.0, 1.0),
+            reflectionHorizonY: simd_clamp(configuration.reflectionHorizonY ?? 0.54, 0.1, 0.9),
+            probeColor: configuration.probeColor?.simd4(or: SIMD4<Float>(0.22, 0.38, 0.52, 1.0))
+                ?? SIMD4<Float>(0.22, 0.38, 0.52, 1.0)
         )
     }
 
@@ -3202,7 +3693,7 @@ private final class ScenePackageBuilder {
         )
     }
 
-    private static func lightingArchitectureSummary(_ configuration: LightingArchitectureConfiguration) -> String {
+    private static func lightingArchitectureSummary(_ configuration: LightingArchitectureConfiguration, dynamicLights: [SceneDynamicLight] = []) -> String {
         let prerequisites = configuration.measuredPrerequisites ?? []
         let prerequisiteSummary = prerequisites.isEmpty
             ? "measured prerequisites pending"
@@ -3220,6 +3711,227 @@ private final class ScenePackageBuilder {
             extraSummary,
             configuration.smokeCommand ?? "Docs/CYCLE_98_SMOKE_TEST.md"
         )
+    }
+
+    private static func resolvedDynamicLights(_ configurations: [DynamicLightConfiguration]) -> [SceneDynamicLight] {
+        configurations.prefix(16).map { configuration in
+            SceneDynamicLight(
+                id: configuration.id,
+                label: configuration.label,
+                position: configuration.positionVector,
+                color: configuration.colorVector,
+                intensity: simd_clamp(configuration.intensity ?? 0.7, 0.0, 4.0),
+                radius: simd_clamp(configuration.radius ?? 48.0, 2.0, 220.0),
+                clusterTag: configuration.clusterTag ?? "unclustered"
+            )
+        }
+    }
+
+    private static func dynamicLightSummary(_ lights: [SceneDynamicLight]) -> String {
+        let clusterCount = Set(lights.map(\.clusterTag)).count
+        let firstLabels = lights.prefix(3).map(\.label).joined(separator: ", ")
+        let suffix = lights.count > 3 ? " +\(lights.count - 3)" : ""
+        let labels = firstLabels.isEmpty ? "no diagnostic lights" : "\(firstLabels)\(suffix)"
+        return "\(lights.count) dynamic lights / \(clusterCount) CPU clusters / \(labels)"
+    }
+
+    private static func dynamicLightSummaryLine(_ lights: [SceneDynamicLight]) -> String {
+        "Forward+ Lights: \(dynamicLightSummary(lights))"
+    }
+
+    private static func resolvedAntiAliasing(_ configuration: AntiAliasingConfiguration?) -> SceneAntiAliasingSettings {
+        SceneAntiAliasingSettings(
+            status: configuration?.status ?? "scoped-safe anti-aliasing active",
+            rule: configuration?.rule ?? "apply depth-aware edge smoothing in postprocess without temporal history ghosting",
+            mode: configuration?.mode ?? "depth-aware post edge AA",
+            edgeThreshold: simd_clamp(configuration?.edgeThreshold ?? 0.055, 0.005, 0.5),
+            blendStrength: simd_clamp(configuration?.blendStrength ?? 0.38, 0.0, 1.0),
+            depthRejection: simd_clamp(configuration?.depthRejection ?? 0.0018, 0.0001, 0.05),
+            scopeStabilityRule: configuration?.scopeStabilityRule ?? "reject blends across depth discontinuities to protect scope silhouettes"
+        )
+    }
+
+    private static func antiAliasingSummary(_ settings: SceneAntiAliasingSettings) -> String {
+        String(
+            format: "%@ / edge %.3f / blend %.2f / depth %.4f / %@",
+            settings.mode,
+            settings.edgeThreshold,
+            settings.blendStrength,
+            settings.depthRejection,
+            settings.scopeStabilityRule
+        )
+    }
+
+    private static func antiAliasingSummaryLine(_ settings: SceneAntiAliasingSettings) -> String {
+        "Anti-Aliasing: \(settings.status) / \(antiAliasingSummary(settings))"
+    }
+
+    private static func resolvedPhysicalAtmosphere(_ configuration: PhysicalAtmosphereConfiguration?) -> ScenePhysicalAtmosphereSettings {
+        ScenePhysicalAtmosphereSettings(
+            status: configuration?.status ?? "physical atmosphere baseline active",
+            rule: configuration?.rule ?? "derive sky color and distance haze from time-of-day sun elevation plus Rayleigh/Mie controls",
+            model: configuration?.model ?? "rayleigh-mie-ozone approximation",
+            rayleighStrength: simd_clamp(configuration?.rayleighStrength ?? 0.62, 0.0, 2.0),
+            mieStrength: simd_clamp(configuration?.mieStrength ?? 0.28, 0.0, 2.0),
+            mieAnisotropy: simd_clamp(configuration?.mieAnisotropy ?? 0.76, 0.0, 0.98),
+            ozoneAbsorption: simd_clamp(configuration?.ozoneAbsorption ?? 0.16, 0.0, 1.0),
+            turbidity: simd_clamp(configuration?.turbidity ?? 0.42, 0.0, 1.0),
+            horizonLift: simd_clamp(configuration?.horizonLift ?? 0.18, 0.0, 1.0),
+            densityFalloff: simd_clamp(configuration?.densityFalloff ?? 1.25, 0.25, 4.0),
+            scopeStabilityRule: configuration?.scopeStabilityRule ?? "use deterministic camera and sun vectors so scoped sky silhouettes remain stable"
+        )
+    }
+
+    private static func physicalAtmosphereSummary(_ settings: ScenePhysicalAtmosphereSettings) -> String {
+        String(
+            format: "%@ / Rayleigh %.2f / Mie %.2f g %.2f / ozone %.2f / turbidity %.2f / density %.2f",
+            settings.model,
+            settings.rayleighStrength,
+            settings.mieStrength,
+            settings.mieAnisotropy,
+            settings.ozoneAbsorption,
+            settings.turbidity,
+            settings.densityFalloff
+        )
+    }
+
+    private static func physicalAtmosphereSummaryLine(_ settings: ScenePhysicalAtmosphereSettings) -> String {
+        "Physical Atmosphere: \(settings.status) / \(physicalAtmosphereSummary(settings))"
+    }
+
+    private static func resolvedIndirectRendering(_ configuration: IndirectRenderingConfiguration?) -> SceneIndirectRenderingSettings {
+        SceneIndirectRenderingSettings(
+            status: configuration?.status ?? "shadow indirect rendering prototype active",
+            rule: configuration?.rule ?? "encode shadow-caster draw commands through a per-frame MTLIndirectCommandBuffer before expanding to material draws",
+            mode: configuration?.mode ?? "CPU-filled Metal indirect command buffer",
+            drawClass: configuration?.drawClass ?? "shadow casters",
+            commandPath: configuration?.commandPath ?? "SunShadowPass object casters",
+            capacity: max(configuration?.capacity ?? 512, 1),
+            coverageNote: configuration?.coverageNote ?? "covers shadow-casting scene drawables; terrain and material draws remain direct",
+            fallbackRule: configuration?.fallbackRule ?? "fall back to direct draw loop if ICB allocation or capacity validation fails",
+            measurementRule: configuration?.measurementRule ?? "report frame time and drawable count while ICB path is active; capture expansion evidence before broader adoption"
+        )
+    }
+
+    private static func indirectRenderingSummary(_ settings: SceneIndirectRenderingSettings) -> String {
+        "\(settings.mode) / \(settings.drawClass) / cap \(settings.capacity) / \(settings.coverageNote)"
+    }
+
+    private static func indirectRenderingSummaryLine(_ settings: SceneIndirectRenderingSettings) -> String {
+        "Indirect Rendering: \(settings.status) / \(indirectRenderingSummary(settings))"
+    }
+
+    private static func resolvedSDFUI(_ configuration: SDFUIConfiguration?) -> SceneSDFUISettings {
+        let coverage = configuration?.coverage ?? ["HUD", "scope", "map labels"]
+        return SceneSDFUISettings(
+            status: configuration?.status ?? "SDF UI rendering active",
+            rule: configuration?.rule ?? "render HUD, scope, and map labels through scalable signed-distance-style text",
+            mode: configuration?.mode ?? "SwiftUI vector text with SDF-style outline pass",
+            fontFamily: configuration?.fontFamily ?? "monospaced system",
+            coverage: coverage.isEmpty ? ["HUD", "scope", "map labels"] : coverage,
+            outlinePixels: simd_clamp(configuration?.outlinePixels ?? 1.0, 0.0, 4.0),
+            shadowPixels: simd_clamp(configuration?.shadowPixels ?? 2.0, 0.0, 8.0),
+            minimumScaleFactor: simd_clamp(configuration?.minimumScaleFactor ?? 0.58, 0.25, 1.0),
+            mapLabelRule: configuration?.mapLabelRule ?? "keep map road and sector labels crisp across canvas scale",
+            scopeRule: configuration?.scopeRule ?? "keep scope status text readable over reticle and aperture",
+            fallbackRule: configuration?.fallbackRule ?? "fall back to system vector text if SDF atlas generation is unavailable",
+            measurementRule: configuration?.measurementRule ?? "verify HUD, scope, and map text at capture resolutions"
+        )
+    }
+
+    private static func sdfUISummary(_ settings: SceneSDFUISettings) -> String {
+        let coverage = settings.coverage.prefix(4).joined(separator: ", ")
+        let suffix = settings.coverage.count > 4 ? " +\(settings.coverage.count - 4)" : ""
+        return String(
+            format: "%@ / %@%@ / outline %.1fpx shadow %.1fpx / min scale %.2f",
+            settings.mode,
+            coverage,
+            suffix,
+            settings.outlinePixels,
+            settings.shadowPixels,
+            settings.minimumScaleFactor
+        )
+    }
+
+    private static func sdfUISummaryLine(_ settings: SceneSDFUISettings) -> String {
+        "SDF UI: \(settings.status) / \(sdfUISummary(settings))"
+    }
+
+    private static func resolvedRenderGraph(_ configuration: RenderGraphConfiguration?) -> SceneRenderGraphSettings {
+        let passOrder = configuration?.passOrder ?? [
+            "SunShadowPass",
+            "SceneGeometryPass",
+            "PresentationPostProcessPass"
+        ]
+        let importedResources = configuration?.importedResources ?? [
+            "Drawable",
+            "JungleTerrainBuffers",
+            "SceneDrawableBuffers"
+        ]
+        let transientResources = configuration?.transientResources ?? [
+            "ShadowMap",
+            "SceneColor",
+            "SceneDepth"
+        ]
+        return SceneRenderGraphSettings(
+            status: configuration?.status ?? "render graph descriptor active",
+            rule: configuration?.rule ?? "describe renderer pass order and resource ownership before adding more passes",
+            mode: configuration?.mode ?? "manual frame graph descriptor",
+            passOrder: passOrder.isEmpty ? ["SunShadowPass", "SceneGeometryPass", "PresentationPostProcessPass"] : passOrder,
+            importedResources: importedResources,
+            transientResources: transientResources,
+            aliasingRule: configuration?.aliasingRule ?? "no transient aliasing until graph validation is visible",
+            validationRule: configuration?.validationRule ?? "verify pass reads are produced or imported before execution",
+            expansionRule: configuration?.expansionRule ?? "promote CSM, SSR, SSAO, and capture passes into graph nodes as they mature"
+        )
+    }
+
+    private static func renderGraphSummary(_ settings: SceneRenderGraphSettings) -> String {
+        let passSummary = settings.passOrder.joined(separator: " -> ")
+        return "\(settings.mode) / \(settings.passOrder.count) passes / \(settings.transientResources.count) transient / \(settings.importedResources.count) imported / \(passSummary)"
+    }
+
+    private static func renderGraphSummaryLine(_ settings: SceneRenderGraphSettings) -> String {
+        "Render Graph: \(settings.status) / \(renderGraphSummary(settings))"
+    }
+
+    private static func resolvedAudioMix(_ configuration: AudioMixConfiguration?) -> SceneAudioMixSettings {
+        SceneAudioMixSettings(
+            status: configuration?.status ?? "authored audio mix active",
+            rule: configuration?.rule ?? "route audio uses explicit category gains for ambience, movement, scope, weapon, and observer cues",
+            mode: configuration?.mode ?? "procedural authored mix",
+            masterGain: simd_clamp(configuration?.masterGain ?? 0.82, 0.0, 1.0),
+            ambienceGain: simd_clamp(configuration?.ambienceGain ?? 0.48, 0.0, 1.5),
+            movementGain: simd_clamp(configuration?.movementGain ?? 0.74, 0.0, 1.5),
+            scopeGain: simd_clamp(configuration?.scopeGain ?? 0.64, 0.0, 1.5),
+            weaponGain: simd_clamp(configuration?.weaponGain ?? 0.92, 0.0, 1.5),
+            observerGain: simd_clamp(configuration?.observerGain ?? 0.86, 0.0, 1.5),
+            footstepSurfaces: configuration?.footstepSurfaces?.isEmpty == false
+                ? configuration?.footstepSurfaces ?? []
+                : ["asphalt", "dry grass", "concrete"],
+            ambienceBeds: configuration?.ambienceBeds?.isEmpty == false
+                ? configuration?.ambienceBeds ?? []
+                : ["basin wind", "shoreline bed", "threat tension bed"],
+            mixRule: configuration?.mixRule ?? "ambient bed remains below movement/observer cues; weapon and scope cues cut through without masking HUD review",
+            smokeRule: configuration?.smokeRule ?? "settings expose master gain and HUD/session lines report the active category mix"
+        )
+    }
+
+    private static func audioMixSummary(_ settings: SceneAudioMixSettings) -> String {
+        String(
+            format: "%@ / master %.2f / amb %.2f / move %.2f / scope %.2f / weapon %.2f / observer %.2f",
+            settings.mode,
+            settings.masterGain,
+            settings.ambienceGain,
+            settings.movementGain,
+            settings.scopeGain,
+            settings.weaponGain,
+            settings.observerGain
+        )
+    }
+
+    private static func audioMixSummaryLine(_ settings: SceneAudioMixSettings) -> String {
+        "Audio Mix: \(settings.status) / \(audioMixSummary(settings))"
     }
 
     private func surfaceFidelitySummary(
@@ -3410,7 +4122,8 @@ private final class ScenePackageBuilder {
         from configuration: GrayboxBlockConfiguration,
         sectorID: String,
         residency: SectorResidency,
-        landmarkBreakupStrength: Float
+        landmarkBreakupStrength: Float,
+        distantLOD: DistantLODConfiguration? = nil
     ) -> SceneDrawable? {
         let vertices = GeometryBuilder.makeBox(
             halfExtents: configuration.halfExtentsVector,
@@ -3422,6 +4135,7 @@ private final class ScenePackageBuilder {
         }
 
         let normalizedName = configuration.name.lowercased()
+        let lodGroupID = distantLODGroupID(for: configuration, sectorID: sectorID, distantLOD: distantLOD)
         let isWaterSurface = usesWaterMaterial(for: normalizedName)
         let rotation = simd_float4x4.rotation(y: (configuration.yawDegrees ?? 0) * (.pi / 180.0))
         return SceneDrawable(
@@ -3445,8 +4159,101 @@ private final class ScenePackageBuilder {
             ),
             retainedInJungleRenderer: true,
             castsShadow: isWaterSurface ? false : (configuration.castsShadow ?? true),
-            receivesShadow: configuration.receivesShadow ?? true
+            receivesShadow: configuration.receivesShadow ?? true,
+            lodGroupID: lodGroupID,
+            lodRole: lodGroupID == nil ? nil : .full,
+            lodSwitchDistance: lodGroupID == nil ? nil : max(distantLOD?.impostorStartMeters ?? 420.0, 1.0)
         )
+    }
+
+    private func grayboxImpostorDrawable(
+        from configuration: GrayboxBlockConfiguration,
+        sectorID: String,
+        residency: SectorResidency,
+        distantLOD: DistantLODConfiguration,
+        switchDistance: Float,
+        landmarkBreakupStrength: Float
+    ) -> SceneDrawable? {
+        guard let lodGroupID = distantLODGroupID(for: configuration, sectorID: sectorID, distantLOD: distantLOD) else {
+            return nil
+        }
+
+        let halfExtents = configuration.halfExtentsVector
+        let width = max(max(halfExtents.x, halfExtents.z) * 2.1, 1.2)
+        let height = max(halfExtents.y * 2.0, 1.0)
+        let vertices = GeometryBuilder.makeVerticalBillboard(
+            width: width,
+            height: height,
+            color: configuration.colorVector
+        )
+
+        guard let buffer = makeBuffer(from: vertices) else {
+            return nil
+        }
+
+        let isWaterSurface = usesWaterMaterial(for: configuration.name.lowercased())
+        let rotation = simd_float4x4.rotation(y: (configuration.yawDegrees ?? 0) * (.pi / 180.0))
+        let basePosition = SIMD3<Float>(
+            configuration.positionVector.x,
+            configuration.positionVector.y - halfExtents.y,
+            configuration.positionVector.z
+        )
+        return SceneDrawable(
+            name: "\(sectorID):\(configuration.name):LODImpostor",
+            vertexBuffer: buffer,
+            vertexCount: vertices.count,
+            modelMatrix: simd_float4x4.translation(basePosition) * rotation,
+            worldCenter: configuration.positionVector,
+            boundingRadius: simd_length(SIMD3<Float>(width * 0.5, height * 0.5, 0.2)),
+            maxDrawDistance: adaptiveDrawDistance(
+                defaultValue: visibilityDefault(320, for: residency),
+                boundingRadius: simd_length(SIMD3<Float>(width * 0.5, height * 0.5, 0.2)),
+                multiplier: visibilityMultiplier(5.2, for: residency)
+            ),
+            minimumViewDot: visibilityMinimumViewDot(-0.65, for: residency),
+            textureKey: isWaterSurface ? .water : .concrete,
+            material: grayboxMaterial(
+                for: configuration,
+                sectorID: sectorID,
+                landmarkBreakupStrength: landmarkBreakupStrength
+            ),
+            retainedInJungleRenderer: true,
+            castsShadow: false,
+            receivesShadow: true,
+            lodGroupID: lodGroupID,
+            lodRole: .impostor,
+            lodSwitchDistance: switchDistance
+        )
+    }
+
+    private func distantLODGroupID(
+        for configuration: GrayboxBlockConfiguration,
+        sectorID: String,
+        distantLOD: DistantLODConfiguration?
+    ) -> String? {
+        guard let distantLOD,
+              let targets = distantLOD.landmarkTargets,
+              !targets.isEmpty else {
+            return nil
+        }
+
+        let normalizedName = "\(sectorID) \(configuration.name)".lowercased()
+        for target in targets {
+            let words = target
+                .lowercased()
+                .split { !$0.isLetter && !$0.isNumber }
+                .map(String.init)
+                .filter { $0.count > 2 }
+            guard !words.isEmpty else {
+                continue
+            }
+
+            if words.contains(where: { normalizedName.contains($0) }) {
+                return "\(sectorID).\(configuration.name)"
+            }
+        }
+
+        return nil
     }
 
     private func grayboxShadowDrawable(from configuration: GrayboxBlockConfiguration, sectorID: String) -> SceneDrawable? {
@@ -4404,7 +5211,43 @@ private enum FallbackSceneFactory {
                     vignetteStrength: 0.08,
                     ssaoStrength: 0.0,
                     ssaoRadius: 1.6,
-                    ssaoBias: 0.0008
+                    ssaoBias: 0.0008,
+                    antiAliasing: SceneAntiAliasingSettings(
+                        status: "fallback anti-aliasing unavailable",
+                        rule: "fallback scene has no scoped-safe AA configuration",
+                        mode: "disabled",
+                        edgeThreshold: 0.055,
+                        blendStrength: 0.0,
+                        depthRejection: 0.0018,
+                        scopeStabilityRule: "fallback scene has no scope silhouettes"
+                    ),
+                    reflection: SceneReflectionSettings(
+                        status: "fallback reflection unavailable",
+                        rule: "fallback scene has no water or glass reflection targets",
+                        screenSpaceReflectionStatus: "SSR disabled",
+                        approach: "disabled",
+                        probeTargets: [],
+                        ssrStrength: 0.0,
+                        ssrMaxDistancePixels: 36.0,
+                        ssrDepthThickness: 0.018,
+                        probeFallbackStrength: 0.0,
+                        reflectionHorizonY: 0.54,
+                        probeColor: SIMD4<Float>(0.22, 0.38, 0.52, 1.0)
+                    )
+                ),
+                dynamicLights: [],
+                physicalAtmosphere: ScenePhysicalAtmosphereSettings(
+                    status: "physical atmosphere unavailable",
+                    rule: "fallback scene has no authored Rayleigh/Mie atmosphere settings",
+                    model: "disabled",
+                    rayleighStrength: 0.0,
+                    mieStrength: 0.0,
+                    mieAnisotropy: 0.0,
+                    ozoneAbsorption: 0.0,
+                    turbidity: 0.0,
+                    horizonLift: 0.0,
+                    densityFalloff: 1.0,
+                    scopeStabilityRule: "fallback scene has no scoped skyline atmosphere validation"
                 )
             ),
             scopeConfiguration: ScopeConfiguration(),
@@ -4423,6 +5266,21 @@ private enum FallbackSceneFactory {
                 breathAmplitudeDegrees: 0.16,
                 holdBreathDurationSeconds: 2.60,
                 holdBreathRecoverySeconds: 3.60
+            ),
+            audioMixSettings: SceneAudioMixSettings(
+                status: "fallback audio mix active",
+                rule: "fallback scene keeps category gains available",
+                mode: "procedural fallback mix",
+                masterGain: 0.82,
+                ambienceGain: 0.42,
+                movementGain: 0.68,
+                scopeGain: 0.62,
+                weaponGain: 0.88,
+                observerGain: 0.82,
+                footstepSurfaces: ["fallback gravel"],
+                ambienceBeds: ["fallback wind"],
+                mixRule: "fallback mix keeps cues audible without authored scene metadata",
+                smokeRule: "fallback session line reports audio mix availability"
             ),
             mapConfiguration: SceneMapConfiguration(
                 sceneName: "Fallback Bootstrap Scene",
@@ -4479,6 +5337,12 @@ private enum FallbackSceneFactory {
                 collisionAuthoringRule: "fallback scene has no collision blockers",
                 collisionAuthoringAudit: "fallback audit unavailable",
                 collisionAuthoringBlockerScope: "fallback blockers unavailable",
+                selectedCollisionVolumeID: nil,
+                selectedCollisionVolumeLabel: nil,
+                collisionAuthoringValidationStatus: "fallback scene has no blocker validation",
+                collisionAuthoringExportStatus: "fallback scene has no collision export source",
+                collisionAuthoringReviewGuidance: "load authored Canberra scene before collision review",
+                collisionAuthoringMinimumClearanceMeters: 0,
                 environmentalMotionStatus: "environmental motion unavailable",
                 environmentalMotionRule: "fallback scene has no authored terrain motion",
                 environmentalMotionWindSummary: "fallback scene has no authored terrain motion / wind 0.00 gust 0.00",
@@ -4503,6 +5367,24 @@ private enum FallbackSceneFactory {
                 lightingArchitectureStatus: "lighting architecture unavailable",
                 lightingArchitectureRule: "fallback scene has no time-of-day or lighting plan",
                 lightingArchitectureSummary: "static fallback daylight / no clustered lighting or render graph decision",
+                timeOfDayStatus: "time-of-day unavailable",
+                timeOfDayRule: "fallback scene has no configurable scenario time",
+                timeOfDaySummary: "fallback daylight / static sun and ambient",
+                antiAliasingStatus: "anti-aliasing unavailable",
+                antiAliasingRule: "fallback scene has no scoped-safe AA configuration",
+                antiAliasingSummary: "fallback postprocess has no anti-aliasing proof",
+                physicalAtmosphereStatus: "physical atmosphere unavailable",
+                physicalAtmosphereRule: "fallback scene has no authored Rayleigh/Mie atmosphere settings",
+                physicalAtmosphereSummary: "disabled / fallback postprocess has no physical sky proof",
+                indirectRenderingStatus: "indirect rendering unavailable",
+                indirectRenderingRule: "fallback scene uses direct shadow draw calls",
+                indirectRenderingSummary: "disabled / fallback has no ICB coverage proof",
+                sdfUIStatus: "SDF UI unavailable",
+                sdfUIRule: "fallback scene has no scalable UI text configuration",
+                sdfUISummary: "disabled / fallback uses default system text",
+                renderGraphStatus: "render graph unavailable",
+                renderGraphRule: "fallback scene has no pass/resource graph",
+                renderGraphSummary: "disabled / fallback uses direct pass sequencing",
                 sessionPersistenceStatus: "session persistence unavailable",
                 sessionPersistenceRule: "fallback scene has no resumable route state",
                 sessionPersistenceSummary: "fallback scene has no session persistence plan",
@@ -4768,6 +5650,25 @@ private enum GeometryBuilder {
             color: color
         )
 
+        return vertices
+    }
+
+    static func makeVerticalBillboard(width: Float, height: Float, color: SIMD4<Float>) -> [SceneVertex] {
+        let halfWidth = max(width * 0.5, 0.1)
+        let clampedHeight = max(height, 0.1)
+        var vertices: [SceneVertex] = []
+        appendQuad(
+            to: &vertices,
+            p0: SIMD3<Float>(-halfWidth, 0, 0),
+            p1: SIMD3<Float>(halfWidth, 0, 0),
+            p2: SIMD3<Float>(halfWidth, clampedHeight, 0),
+            p3: SIMD3<Float>(-halfWidth, clampedHeight, 0),
+            uv0: SIMD2<Float>(0, 1),
+            uv1: SIMD2<Float>(1, 1),
+            uv2: SIMD2<Float>(1, 0),
+            uv3: SIMD2<Float>(0, 0),
+            color: color
+        )
         return vertices
     }
 

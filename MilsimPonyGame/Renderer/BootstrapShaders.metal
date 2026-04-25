@@ -21,6 +21,15 @@ struct SceneUniforms {
     float4 atmosphereParameters;
     float4 shadowParameters;
     float4 motionParameters;
+    float4 dynamicLightParameters;
+    float4 dynamicLightPosition0;
+    float4 dynamicLightColor0;
+    float4 dynamicLightPosition1;
+    float4 dynamicLightColor1;
+    float4 dynamicLightPosition2;
+    float4 dynamicLightColor2;
+    float4 dynamicLightPosition3;
+    float4 dynamicLightColor3;
 };
 
 struct SceneMaterialUniforms {
@@ -34,6 +43,9 @@ struct ScenePostProcessUniforms {
     float4 highlightTint;
     float4 gradeParameters;
     float4 aoParameters;
+    float4 antiAliasingParameters;
+    float4 reflectionParameters;
+    float4 reflectionProbeColor;
 };
 
 struct SkyUniforms {
@@ -160,6 +172,35 @@ float sampleShadowVisibility(
     return 1.0 - ((1.0 - visibility) * shadowStrength);
 }
 
+float3 accumulateDynamicPointLight(
+    float4 positionRadius,
+    float4 colorIntensity,
+    float3 worldPosition,
+    float3 shadedNormal,
+    float3 viewDirection,
+    float3 baseColor,
+    float roughness
+) {
+    float radius = max(positionRadius.w, 0.001);
+    float3 toLight = positionRadius.xyz - worldPosition;
+    float distanceToLight = length(toLight);
+    float attenuation = saturate(1.0 - (distanceToLight / radius));
+    attenuation *= attenuation;
+    if (attenuation <= 0.0001) {
+        return float3(0.0);
+    }
+
+    float3 lightDirection = toLight / max(distanceToLight, 0.001);
+    float diffuse = saturate(dot(shadedNormal, lightDirection));
+    float3 halfVector = normalize(lightDirection + viewDirection);
+    float specularPower = mix(96.0, 8.0, roughness);
+    float specularStrength = mix(0.10, 0.015, roughness);
+    float specular = pow(saturate(dot(shadedNormal, halfVector)), specularPower) * specularStrength;
+    float intensity = max(colorIntensity.w, 0.0);
+    float3 lightColor = colorIntensity.rgb * intensity * attenuation;
+    return (baseColor * diffuse * lightColor) + (lightColor * specular);
+}
+
 fragment float4 skyFragmentMain(
     SkyVertexOut in [[stage_in]],
     constant SkyUniforms &uniforms [[buffer(0)]]
@@ -248,6 +289,19 @@ fragment float4 bootstrapFragmentMain(
     float3 sunContribution = baseColor * diffuse * diffuseIntensity * uniforms.sunColor.rgb;
     float3 specularContribution = uniforms.sunColor.rgb * specular * diffuseIntensity;
     float3 litColor = ambient + ((sunContribution + specularContribution) * shadowVisibility);
+    uint dynamicLightCount = min((uint)round(uniforms.dynamicLightParameters.x), 4u);
+    if (dynamicLightCount > 0u) {
+        litColor += accumulateDynamicPointLight(uniforms.dynamicLightPosition0, uniforms.dynamicLightColor0, in.worldPosition, shadedNormal, viewDirection, baseColor, roughness);
+    }
+    if (dynamicLightCount > 1u) {
+        litColor += accumulateDynamicPointLight(uniforms.dynamicLightPosition1, uniforms.dynamicLightColor1, in.worldPosition, shadedNormal, viewDirection, baseColor, roughness);
+    }
+    if (dynamicLightCount > 2u) {
+        litColor += accumulateDynamicPointLight(uniforms.dynamicLightPosition2, uniforms.dynamicLightColor2, in.worldPosition, shadedNormal, viewDirection, baseColor, roughness);
+    }
+    if (dynamicLightCount > 3u) {
+        litColor += accumulateDynamicPointLight(uniforms.dynamicLightPosition3, uniforms.dynamicLightColor3, in.worldPosition, shadedNormal, viewDirection, baseColor, roughness);
+    }
 
     float fogDistance = distance(in.worldPosition, uniforms.cameraPosition.xyz);
     float fogFactor = smoothstep(fogNear, max(fogFar, fogNear + 0.001), fogDistance);
@@ -289,6 +343,98 @@ float3 linearToSRGB(float3 color) {
     return select(low, high, positive >= 0.0031308);
 }
 
+float3 applyScopedSafeAA(
+    float3 centerColor,
+    float centerDepth,
+    float2 uv,
+    float2 texelSize,
+    constant ScenePostProcessUniforms &uniforms,
+    texture2d<float> sceneTexture,
+    depth2d<float> sceneDepthTexture,
+    sampler postSampler
+) {
+    float edgeThreshold = max(uniforms.antiAliasingParameters.x, 0.0);
+    float blendStrength = clamp(uniforms.antiAliasingParameters.y, 0.0, 1.0);
+    float depthRejection = max(uniforms.antiAliasingParameters.z, 0.0);
+    if (blendStrength <= 0.0001 || edgeThreshold <= 0.0001) {
+        return centerColor;
+    }
+
+    float3 north = sceneTexture.sample(postSampler, saturate(uv + float2(0.0, -texelSize.y))).rgb;
+    float3 south = sceneTexture.sample(postSampler, saturate(uv + float2(0.0, texelSize.y))).rgb;
+    float3 east = sceneTexture.sample(postSampler, saturate(uv + float2(texelSize.x, 0.0))).rgb;
+    float3 west = sceneTexture.sample(postSampler, saturate(uv + float2(-texelSize.x, 0.0))).rgb;
+    float lumaCenter = postLuminance(centerColor);
+    float lumaRange = max(
+        max(abs(postLuminance(north) - lumaCenter), abs(postLuminance(south) - lumaCenter)),
+        max(abs(postLuminance(east) - lumaCenter), abs(postLuminance(west) - lumaCenter))
+    );
+    float edgeWeight = smoothstep(edgeThreshold, edgeThreshold * 2.6, lumaRange);
+
+    float northDepth = sceneDepthTexture.sample(postSampler, saturate(uv + float2(0.0, -texelSize.y)));
+    float southDepth = sceneDepthTexture.sample(postSampler, saturate(uv + float2(0.0, texelSize.y)));
+    float eastDepth = sceneDepthTexture.sample(postSampler, saturate(uv + float2(texelSize.x, 0.0)));
+    float westDepth = sceneDepthTexture.sample(postSampler, saturate(uv + float2(-texelSize.x, 0.0)));
+    float depthDelta = max(
+        max(abs(northDepth - centerDepth), abs(southDepth - centerDepth)),
+        max(abs(eastDepth - centerDepth), abs(westDepth - centerDepth))
+    );
+    float depthWeight = 1.0 - smoothstep(depthRejection, depthRejection * 4.0, depthDelta);
+    float3 crossAverage = (north + south + east + west) * 0.25;
+    return mix(centerColor, crossAverage, edgeWeight * depthWeight * blendStrength);
+}
+
+float3 applyScreenSpaceReflection(
+    float3 centerColor,
+    float centerDepth,
+    float2 uv,
+    float2 texelSize,
+    constant ScenePostProcessUniforms &uniforms,
+    texture2d<float> sceneTexture,
+    depth2d<float> sceneDepthTexture,
+    sampler postSampler
+) {
+    float ssrStrength = clamp(uniforms.reflectionParameters.x, 0.0, 1.0);
+    float fallbackStrength = clamp(uniforms.reflectionParameters.w, 0.0, 1.0);
+    if ((ssrStrength + fallbackStrength) <= 0.0001 || centerDepth >= 0.9999) {
+        return centerColor;
+    }
+
+    float horizonY = clamp(uniforms.reflectionProbeColor.w, 0.12, 0.90);
+    float waterMask = smoothstep(horizonY - 0.02, 0.98, uv.y) * (1.0 - smoothstep(0.995, 1.0, uv.y));
+    float depthMask = smoothstep(0.08, 0.42, centerDepth) * (1.0 - smoothstep(0.985, 1.0, centerDepth));
+    float reflectionMask = waterMask * depthMask;
+    if (reflectionMask <= 0.0001) {
+        return centerColor;
+    }
+
+    float maxDistancePixels = max(uniforms.reflectionParameters.y, 4.0);
+    float depthThickness = max(uniforms.reflectionParameters.z, 0.0005);
+    float2 reflectedUV = float2(uv.x, clamp(horizonY - ((uv.y - horizonY) * 0.72), 0.0, 1.0));
+    float3 hitColor = sceneTexture.sample(postSampler, reflectedUV).rgb;
+    float hitWeight = 0.0;
+
+    constexpr int maxSteps = 10;
+    for (int stepIndex = 1; stepIndex <= maxSteps; ++stepIndex) {
+        float stepFraction = float(stepIndex) / float(maxSteps);
+        float2 sampleUV = reflectedUV + float2(0.0, -stepFraction * maxDistancePixels * texelSize.y);
+        sampleUV = saturate(sampleUV);
+        float sampleDepth = sceneDepthTexture.sample(postSampler, sampleUV);
+        float depthDelta = abs(sampleDepth - centerDepth);
+        float candidateWeight = (1.0 - smoothstep(depthThickness, depthThickness * 5.0, depthDelta))
+            * (1.0 - stepFraction * 0.58);
+        if (candidateWeight > hitWeight) {
+            hitWeight = candidateWeight;
+            hitColor = sceneTexture.sample(postSampler, sampleUV).rgb;
+        }
+    }
+
+    float3 probeColor = uniforms.reflectionProbeColor.rgb;
+    float3 fallbackColor = mix(probeColor, hitColor, hitWeight);
+    float reflectionAmount = reflectionMask * clamp((ssrStrength * max(hitWeight, 0.18)) + (fallbackStrength * (1.0 - hitWeight) * 0.55), 0.0, 1.0);
+    return mix(centerColor, fallbackColor, reflectionAmount);
+}
+
 fragment float4 postProcessFragmentMain(
     SkyVertexOut in [[stage_in]],
     constant ScenePostProcessUniforms &uniforms [[buffer(0)]],
@@ -303,6 +449,8 @@ fragment float4 postProcessFragmentMain(
     float ssaoRadius = max(uniforms.aoParameters.y, 0.5);
     float ssaoBias = max(uniforms.aoParameters.z, 0.0);
     float2 texelSize = 1.0 / float2(sceneDepthTexture.get_width(), sceneDepthTexture.get_height());
+    hdrColor = applyScopedSafeAA(hdrColor, depth, uv, texelSize, uniforms, sceneTexture, sceneDepthTexture, postSampler);
+    hdrColor = applyScreenSpaceReflection(hdrColor, depth, uv, texelSize, uniforms, sceneTexture, sceneDepthTexture, postSampler);
     float contactDepth = 0.0;
     if (ssaoStrength > 0.0001 && depth < 0.9999) {
         constexpr float2 offsets[8] = {

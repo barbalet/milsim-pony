@@ -78,3 +78,91 @@ These are the highest-leverage changes to bring the engine in line with modern r
 9. **Procedural noise-driven wind and foliage animation** — a compute shader that offsets vegetation vertex positions using a scrolling noise texture (Gerstner or simple sin/cos with per-leaf phase offset) would bring the Jungle terrain layer to life with essentially zero art work, just a shader addition.
 
 10. **Render graph / frame graph architecture** — the current render loop in `GameRenderer.swift` manually sequences passes (shadow → geometry → sky → post-process). Formalizing this as a declarative render graph would make adding new passes (SSR, SSAO, TAA, volumetric fog) safe and composable, and would enable automatic resource aliasing to reduce Metal heap pressure as the pass count grows.
+
+---
+
+## Development Status Check
+
+*Reviewed against the current Cycle 116 development line. This section uses a stricter interpretation than the first planning pass: metadata, readouts, preview-only tools, deferrals, and "architecture decisions" do not count as done. Anything not actually usable in the current build is scheduled into the recovery cycles.*
+
+### Priority Rules From Cycle 114
+
+- **Top priority, Cycles 99-108:** anything not done yet.
+- **Next priority, Cycles 109-118:** anything only partly done.
+- **Secondary overdue priority, Cycles 119-128:** anything allocated to an earlier cycle but still incomplete, plus validation/hardening for the prior two bands.
+- **Done means playable, inspectable, smoke-tested, and no longer dependent on a future implementation note.**
+
+### Top 20 Things That Need Doing
+
+| ID | Item | Honest Status | Required Allocation |
+| --- | --- | --- | --- |
+| 1 | Ballistics solver | Done for current scope | Keep in regression only; no new priority cycle unless tests fail. |
+| 2 | Audio system | Done for authored mix closeout | Cycle 109: scene-authored category gains now drive ambience, movement, scope, weapon, and observer playback nodes; settings expose a persisted master-volume control; route smoke readouts report `Session Audio:` and `Audio Mix:` state. |
+| 3 | Firing feedback loop | Done for player-facing closeout | Cycle 110: scoped firing now shows a visible muzzle flash pulse, recoil kick/recovery, clearer `Shot Feedback:` classification, and retained crack-thump timing. |
+| 4 | Group NPC behavior | Done for formation-patrol closeout | Cycle 111: authored patrol pairs now drive runtime formation sweep movement, halt while alerted/neutralized, resume after recovery, feed live overhead-map positions, and expose moving/sweep state in `Patrol Pairs:` smoke readouts. |
+| 5 | Black Mountain and West Basin texture coverage | Done for source-backed district closeout | Cycle 112: West Basin/Yarralumla and Black Mountain/Bruce/Belconnen sectors now have source-backed dry-grass, asphalt, concrete, water, and facade assignments with smoke and acceptance docs. |
+| 6 | Automated capture pipeline | Done for canonical review states | Cycle 99: `Tools/capture_review.sh` batches title/live/map/scope/pause screenshots and `Tools/image_diff.swift` produces optional baseline diffs. District-specific acceptance captures still feed later texture/map closeouts. |
+| 7 | Multiple rehearsal routes | Done for current selectable-route scope | Cycle 113: the briefing route selector now cycles the primary Woden-to-Belconnen route plus both alternate rehearsal routes, and Start Demo binds the selected route at a fresh-run boundary. |
+| 8 | LOD system for distant buildings | Done for configured landmark grayboxes | Cycle 100: `SceneDrawable` now carries LOD roles and switch thresholds, and configured landmarks swap from full graybox geometry to 6-vertex impostor cards past the authored distance. |
+| 9 | Difficulty tuning knobs | Done, needs regression | Cycle 119: secondary overdue validation against richer group AI and route breadth. |
+| 10 | Sniper scope optics refinement | Done for current optic closeout | Cycle 114: scoped view now has visible lens dirt, edge aberration rings, calibrated mil-dot spacing labels, parallax compensation reporting, and scope-mode smoke coverage. |
+| 11 | Time-of-day system | Done for configurable scenario lighting | Cycle 101: `timeOfDay` scene data now drives renderer sun angle, sky/fog color, haze, ambient/diffuse light, shadow strength, and shadow coverage, with HUD/session smoke visibility. |
+| 12 | Collision volume authoring tools | Done for current authoring workflow | Cycle 115: the briefing map now cycles selectable blocker volumes, highlights the selected footprint, reports sector/dimensions/clearance validation, and exposes export/review source IDs for JSON edits. |
+| 13 | Save/resume session state | Done for current resume scope | Cycle 116: saved review cards now carry route identity, checkpoint progress, map/scope state, checkpoint performance metrics, and an explicit `Resume Saved Run` action that rebinds the saved route before guarded checkpoint restore. |
+| 14 | Performance profiling pass | Partial | Cycle 117: produce formal Metal GPU capture, CPU/GPU bottleneck notes, and before/after profile artifacts. |
+| 15 | Vegetation interaction | Partial | Cycle 118: finish traversal friction, occlusion feedback, and concealment mechanics as gameplay systems. |
+| 16 | Water system | Partial | Cycle 120: secondary overdue closeout for animated reflections/caustic/specular polish after SSR/IBL groundwork starts. |
+| 17 | NPC line-of-sight debug overlay | Partial | Cycle 121: secondary overdue closeout for a real debug overlay mode, not just HUD text telemetry. |
+| 18 | Objective/mission scripting layer | Partial | Cycle 122: secondary overdue expansion to conditional triggers, timed windows, route-fail conditions, and alternate objectives. |
+| 19 | Minimap accuracy pass | Partial | Cycle 123: secondary overdue verification against all playable routes, threat arcs, sector boundaries, and 3D geometry. |
+| 20 | Packaging and distribution | Partial | Cycle 124: secondary overdue completion of notarization, CI/build automation, version policy, and tester distribution. |
+
+### Top 10 Graphics Engine Modernizations
+
+| ID | Item | Honest Status | Required Allocation |
+| --- | --- | --- | --- |
+| G1 | Clustered deferred lighting / Forward+ | Done for implementation start | Cycle 102: scene-authored dynamic lights now feed CPU-side drawable light selection and the forward object shader accumulates up to four local point lights without breaking the single-sun path. |
+| G2 | SSAO or HBAO | Partial | Cycle 125: secondary overdue closeout from contact darkening into a proper SSAO/HBAO-class pass or explicit replacement. |
+| G3 | Temporal anti-aliasing | Done as scoped-safe alternative prototype | Cycle 103: postprocess now applies depth-aware edge anti-aliasing with explicit depth rejection so scoped silhouettes can be smoothed without temporal history ghosting. |
+| G4 | Physically based atmosphere and sky | Done for baseline | Cycle 104: scene-authored Rayleigh/Mie/ozone controls now drive sky clear color, horizon lift, and distance haze from the active time-of-day sun. |
+| G5 | GPU-driven indirect rendering | Done for prototype | Cycle 105: shadow-casting object draws now use a per-frame `MTLIndirectCommandBuffer` with direct-draw fallback; material-pass indirect draws and GPU culling remain expansion work. |
+| G6 | Cascaded shadow maps | Partial | Cycle 126: secondary overdue closeout from CSM readiness metadata to multi-cascade shadow rendering or a documented replacement. |
+| G7 | SDF font and UI rendering | Done for scalable UI prototype | Cycle 106: HUD, scope, and map labels now use a scalable SDF-style outlined text path with scene-authored coverage and smoke-test checks; generated MSDF atlas work remains optional expansion. |
+| G8 | Screen-space reflections with IBL fallback | Done for bounded prototype | Cycle 107: postprocess now blends bounded screen-space reflection samples with a sky-probe fallback for lake/glass readability; material-masked SSR and richer probes remain expansion work. |
+| G9 | Procedural wind and foliage animation | Partial | Cycle 127: secondary overdue closeout with procedural/compute foliage animation or an equivalent renderer-level implementation. |
+| G10 | Render graph / frame graph architecture | Done for scaffold | Cycle 108: current shadow, scene, and presentation passes are represented as a frame graph with imported/transient resources and dependency validation; resource aliasing and fuller scheduling remain expansion work. |
+
+### Next 30 Cycle Recovery Plan
+
+| Cycle | Priority | Work |
+| --- | --- | --- |
+| 99 | Completed top priority | Automated capture pipeline with batch screenshots and diff/comparison reports. |
+| 100 | Completed top priority | Real distant-building LOD/impostor renderer switching. |
+| 101 | Completed top priority | Dynamic time-of-day scenario settings and lighting changes. |
+| 102 | Completed top priority | Forward+/clustered lighting implementation start. |
+| 103 | Completed top priority | TAA or scoped-safe anti-aliasing prototype with evidence. |
+| 104 | Completed top priority | Physically based atmosphere/sky baseline. |
+| 105 | Completed top priority | GPU-driven indirect rendering prototype with capture-backed coverage notes. |
+| 106 | Completed top priority | SDF font/UI rendering for HUD, scope, and map. |
+| 107 | Completed top priority | SSR with IBL/probe fallback for lake/glass. |
+| 108 | Completed top priority | Render graph/frame graph scaffolding. |
+| 109 | Completed next priority | Fuller authored audio system and mix controls. |
+| 110 | Completed next priority | Real firing feedback loop: muzzle flash, recoil animation, miss/hit presentation. |
+| 111 | Completed next priority | Group NPC formation movement and patrol coordination. |
+| 112 | Completed next priority | Black Mountain and West Basin source-backed texture closeout. |
+| 113 | Completed next priority | 2-3 genuinely selectable/playable rehearsal routes. |
+| 114 | Completed next priority | Scope optics closeout: lens effects, mil calibration, parallax compensation. |
+| 115 | Completed next priority | Collision authoring workflow beyond preview: selectable blocker review, validation, and export guidance. |
+| 116 | Completed next priority | Save/resume and checkpoint-performance persistence closeout. |
+| 117 | Next priority | Formal Metal GPU/CPU profiling artifacts and bottleneck report. |
+| 118 | Next priority | Vegetation traversal, concealment, and occlusion feedback closeout. |
+| 119 | Secondary overdue | Difficulty tuning regression across group AI and multiple routes. |
+| 120 | Secondary overdue | Water-system reflection/caustic/specular closeout after SSR groundwork. |
+| 121 | Secondary overdue | NPC LOS debug overlay mode closeout. |
+| 122 | Secondary overdue | Objective/mission scripting expansion. |
+| 123 | Secondary overdue | Minimap accuracy verification across all playable routes. |
+| 124 | Secondary overdue | Packaging/distribution completion: notarization, CI, tester flow. |
+| 125 | Secondary overdue | SSAO/HBAO-class renderer closeout. |
+| 126 | Secondary overdue | CSM implementation closeout. |
+| 127 | Secondary overdue | Procedural foliage animation renderer closeout. |
+| 128 | Secondary overdue | End-to-end REVIEW.md recovery audit and smoke-test pack. |

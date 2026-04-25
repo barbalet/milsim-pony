@@ -138,12 +138,15 @@ private struct StoredSessionSettings {
     let invertLookY: Bool
     let lookSensitivityScale: Double
     let difficultyPreset: RehearsalDifficultyPreset
+    let audioMasterGain: Double
 }
 
 private struct StoredReviewSessionState: Codable, Equatable {
     let schemaVersion: Int
     let sceneLabel: String
     let routeSummary: String
+    let activeRouteID: String?
+    let activeRouteLabel: String
     let completedCheckpointCount: Int
     let totalCheckpointCount: Int
     let nextCheckpointLabel: String?
@@ -154,6 +157,10 @@ private struct StoredReviewSessionState: Codable, Equatable {
     let scopeActive: Bool
     let routeComplete: Bool
     let routeFailed: Bool
+    let elapsedSeconds: Double
+    let restartCount: Int
+    let failCount: Int
+    let routeDistanceMeters: Float
     let reviewPackageLine: String
     let savedAt: TimeInterval
 
@@ -161,6 +168,8 @@ private struct StoredReviewSessionState: Codable, Equatable {
         schemaVersion: Int,
         sceneLabel: String,
         routeSummary: String,
+        activeRouteID: String?,
+        activeRouteLabel: String,
         completedCheckpointCount: Int,
         totalCheckpointCount: Int,
         nextCheckpointLabel: String?,
@@ -171,12 +180,18 @@ private struct StoredReviewSessionState: Codable, Equatable {
         scopeActive: Bool,
         routeComplete: Bool,
         routeFailed: Bool,
+        elapsedSeconds: Double,
+        restartCount: Int,
+        failCount: Int,
+        routeDistanceMeters: Float,
         reviewPackageLine: String,
         savedAt: TimeInterval
     ) {
         self.schemaVersion = schemaVersion
         self.sceneLabel = sceneLabel
         self.routeSummary = routeSummary
+        self.activeRouteID = activeRouteID
+        self.activeRouteLabel = activeRouteLabel
         self.completedCheckpointCount = completedCheckpointCount
         self.totalCheckpointCount = totalCheckpointCount
         self.nextCheckpointLabel = nextCheckpointLabel
@@ -187,6 +202,10 @@ private struct StoredReviewSessionState: Codable, Equatable {
         self.scopeActive = scopeActive
         self.routeComplete = routeComplete
         self.routeFailed = routeFailed
+        self.elapsedSeconds = elapsedSeconds
+        self.restartCount = restartCount
+        self.failCount = failCount
+        self.routeDistanceMeters = routeDistanceMeters
         self.reviewPackageLine = reviewPackageLine
         self.savedAt = savedAt
     }
@@ -196,6 +215,8 @@ private struct StoredReviewSessionState: Codable, Equatable {
         schemaVersion = try container.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 1
         sceneLabel = try container.decodeIfPresent(String.self, forKey: .sceneLabel) ?? "Unknown scene"
         routeSummary = try container.decodeIfPresent(String.self, forKey: .routeSummary) ?? "Route: unavailable"
+        activeRouteID = try container.decodeIfPresent(String.self, forKey: .activeRouteID)
+        activeRouteLabel = try container.decodeIfPresent(String.self, forKey: .activeRouteLabel) ?? "Primary route"
         completedCheckpointCount = try container.decodeIfPresent(Int.self, forKey: .completedCheckpointCount) ?? 0
         totalCheckpointCount = try container.decodeIfPresent(Int.self, forKey: .totalCheckpointCount) ?? 0
         nextCheckpointLabel = try container.decodeIfPresent(String.self, forKey: .nextCheckpointLabel)
@@ -206,13 +227,17 @@ private struct StoredReviewSessionState: Codable, Equatable {
         scopeActive = try container.decodeIfPresent(Bool.self, forKey: .scopeActive) ?? false
         routeComplete = try container.decodeIfPresent(Bool.self, forKey: .routeComplete) ?? false
         routeFailed = try container.decodeIfPresent(Bool.self, forKey: .routeFailed) ?? false
+        elapsedSeconds = try container.decodeIfPresent(Double.self, forKey: .elapsedSeconds) ?? 0
+        restartCount = try container.decodeIfPresent(Int.self, forKey: .restartCount) ?? 0
+        failCount = try container.decodeIfPresent(Int.self, forKey: .failCount) ?? 0
+        routeDistanceMeters = try container.decodeIfPresent(Float.self, forKey: .routeDistanceMeters) ?? 0
         reviewPackageLine = try container.decodeIfPresent(String.self, forKey: .reviewPackageLine) ?? "review pack unavailable"
         savedAt = try container.decodeIfPresent(TimeInterval.self, forKey: .savedAt) ?? 0
     }
 
     var shellLine: String {
         let routeState = routeComplete ? "complete" : (routeFailed ? "compromised" : flowState)
-        return "Last Session: \(completedCheckpointCount)/\(totalCheckpointCount) checkpoints / \(difficultyPreset) / \(currentSectorName) / \(routeState)"
+        return "Last Session: \(completedCheckpointCount)/\(totalCheckpointCount) checkpoints / \(activeRouteLabel) / \(difficultyPreset) / \(currentSectorName) / \(routeState)"
     }
 
     var captureLine: String {
@@ -220,6 +245,12 @@ private struct StoredReviewSessionState: Codable, Equatable {
         let mapState = mapPresented ? "map open" : "map hidden"
         let scopeState = scopeActive ? "scope raised" : "scope ready"
         return "Review Resume: next \(nextLabel) / \(reviewPackageLine) / \(mapState) / \(scopeState)"
+    }
+
+    var checkpointPerformanceLine: String {
+        let elapsed = Int(elapsedSeconds.rounded())
+        let distance = Int(routeDistanceMeters.rounded())
+        return "Checkpoint Performance: \(completedCheckpointCount)/\(totalCheckpointCount) checkpoints / \(distance)m / \(elapsed)s / \(restartCount) restarts / \(failCount) fails"
     }
 
     var guardrailLine: String {
@@ -233,7 +264,7 @@ private struct StoredReviewSessionState: Codable, Equatable {
             return "Review Guardrail: next checkpoint missing from stored review card / fresh run required"
         }
 
-        return "Review Guardrail: stored review card valid / launch starts fresh until checkpoint restore exists"
+        return "Review Guardrail: stored review card valid / resume requires explicit user action"
     }
 
     var restorePreviewLine: String {
@@ -249,7 +280,7 @@ private struct StoredReviewSessionState: Codable, Equatable {
             return "Restore Preview: blocked until next checkpoint context is captured"
         }
 
-        return "Restore Preview: future resume target \(nextCheckpointLabel) / launch still starts fresh"
+        return "Restore Preview: resume target \(nextCheckpointLabel) / explicit action restores checkpoint progress"
     }
 
     func restoreReadinessLine(currentSceneLabel: String, currentRouteSummary: String) -> String {
@@ -258,9 +289,6 @@ private struct StoredReviewSessionState: Codable, Equatable {
         }
         if sceneLabel != currentSceneLabel {
             return "Restore Readiness: blocked by scene mismatch / stored \(sceneLabel)"
-        }
-        if routeSummary != currentRouteSummary {
-            return "Restore Readiness: blocked by route summary mismatch"
         }
         if totalCheckpointCount <= 0
             || completedCheckpointCount < 0
@@ -274,7 +302,7 @@ private struct StoredReviewSessionState: Codable, Equatable {
             return "Restore Readiness: blocked until next checkpoint target is captured"
         }
 
-        return "Restore Readiness: eligible for future manual restore / launch still starts fresh"
+        return "Restore Readiness: eligible for manual restore / saved route binding available"
     }
 
     func manualRestoreArmingLine(currentSceneLabel: String, currentRouteSummary: String) -> String {
@@ -283,9 +311,6 @@ private struct StoredReviewSessionState: Codable, Equatable {
         }
         if sceneLabel != currentSceneLabel {
             return "Manual Restore Arm: disabled / stored scene differs from current scene"
-        }
-        if routeSummary != currentRouteSummary {
-            return "Manual Restore Arm: disabled / stored route differs from current route"
         }
         if totalCheckpointCount <= 0
             || completedCheckpointCount < 0
@@ -299,13 +324,12 @@ private struct StoredReviewSessionState: Codable, Equatable {
             return "Manual Restore Arm: disabled / checkpoint target missing"
         }
 
-        return "Manual Restore Arm: armed for future prompt at \(nextCheckpointLabel) / no auto-restore"
+        return "Manual Restore Arm: armed for \(nextCheckpointLabel) / no auto-restore"
     }
 
     func manualRestorePromptLine(currentSceneLabel: String, currentRouteSummary: String) -> String {
         if schemaVersion != 1
-            || sceneLabel != currentSceneLabel
-            || routeSummary != currentRouteSummary {
+            || sceneLabel != currentSceneLabel {
             return "Manual Restore Prompt: hidden until stored run matches this scene and route"
         }
         if totalCheckpointCount <= 0
@@ -320,13 +344,12 @@ private struct StoredReviewSessionState: Codable, Equatable {
             return "Manual Restore Prompt: hidden until a checkpoint target is captured"
         }
 
-        return "Manual Restore Prompt: future choice Restore \(nextCheckpointLabel) or Start Fresh / start fresh locked"
+        return "Manual Restore Prompt: choose Restore \(nextCheckpointLabel) or Start Fresh"
     }
 
     func manualRestoreChoiceLine(currentSceneLabel: String, currentRouteSummary: String) -> String {
         if schemaVersion != 1
-            || sceneLabel != currentSceneLabel
-            || routeSummary != currentRouteSummary {
+            || sceneLabel != currentSceneLabel {
             return "Restore Choice: hidden / stored run identity not current"
         }
         if totalCheckpointCount <= 0
@@ -401,8 +424,7 @@ private struct StoredReviewSessionState: Codable, Equatable {
 
     func restoreExecutionGateLine(currentSceneLabel: String, currentRouteSummary: String) -> String {
         if schemaVersion != 1
-            || sceneLabel != currentSceneLabel
-            || routeSummary != currentRouteSummary {
+            || sceneLabel != currentSceneLabel {
             return "Restore Execution Gate: closed / stored run identity not current"
         }
         if totalCheckpointCount <= 0
@@ -422,8 +444,7 @@ private struct StoredReviewSessionState: Codable, Equatable {
 
     func manualRestoreExecutionDesignLine(currentSceneLabel: String, currentRouteSummary: String) -> String {
         if schemaVersion != 1
-            || sceneLabel != currentSceneLabel
-            || routeSummary != currentRouteSummary {
+            || sceneLabel != currentSceneLabel {
             return "Restore Execution Design: blocked / identity preflight must pass before any restore action"
         }
         if totalCheckpointCount <= 0
@@ -444,7 +465,6 @@ private struct StoredReviewSessionState: Codable, Equatable {
     func manualRestoreSafetyCheckLine(currentSceneLabel: String, currentRouteSummary: String, maxAgeSeconds: Int) -> String {
         let identityOK = schemaVersion == 1
             && sceneLabel == currentSceneLabel
-            && routeSummary == currentRouteSummary
         let progressOK = totalCheckpointCount > 0
             && completedCheckpointCount >= 0
             && completedCheckpointCount < totalCheckpointCount
@@ -459,7 +479,7 @@ private struct StoredReviewSessionState: Codable, Equatable {
     func restoreAuditLine(currentSceneLabel: String, currentRouteSummary: String) -> String {
         let targetLabel = nextCheckpointLabel ?? "none"
         let ageSeconds = max(Int(Date().timeIntervalSince1970 - savedAt), 0)
-        let identityState = sceneLabel == currentSceneLabel && routeSummary == currentRouteSummary
+        let identityState = sceneLabel == currentSceneLabel
             ? "identity current"
             : "identity mismatch"
 
@@ -531,6 +551,8 @@ private struct StoredReviewSessionState: Codable, Equatable {
         lhs.schemaVersion == rhs.schemaVersion
             && lhs.sceneLabel == rhs.sceneLabel
             && lhs.routeSummary == rhs.routeSummary
+            && lhs.activeRouteID == rhs.activeRouteID
+            && lhs.activeRouteLabel == rhs.activeRouteLabel
             && lhs.completedCheckpointCount == rhs.completedCheckpointCount
             && lhs.totalCheckpointCount == rhs.totalCheckpointCount
             && lhs.nextCheckpointLabel == rhs.nextCheckpointLabel
@@ -541,6 +563,10 @@ private struct StoredReviewSessionState: Codable, Equatable {
             && lhs.scopeActive == rhs.scopeActive
             && lhs.routeComplete == rhs.routeComplete
             && lhs.routeFailed == rhs.routeFailed
+            && lhs.elapsedSeconds == rhs.elapsedSeconds
+            && lhs.restartCount == rhs.restartCount
+            && lhs.failCount == rhs.failCount
+            && lhs.routeDistanceMeters == rhs.routeDistanceMeters
             && lhs.reviewPackageLine == rhs.reviewPackageLine
     }
 }
@@ -548,8 +574,20 @@ private struct StoredReviewSessionState: Codable, Equatable {
 private final class ShotFeedbackAudioEngine {
     static let shared = ShotFeedbackAudioEngine()
 
+    private enum AudioCategory {
+        case weapon
+        case observer
+        case movement
+        case scope
+        case ambience
+    }
+
     private let engine = AVAudioEngine()
-    private let player = AVAudioPlayerNode()
+    private let weaponPlayer = AVAudioPlayerNode()
+    private let observerPlayer = AVAudioPlayerNode()
+    private let movementPlayer = AVAudioPlayerNode()
+    private let scopePlayer = AVAudioPlayerNode()
+    private let ambiencePlayer = AVAudioPlayerNode()
     private let format = AVAudioFormat(standardFormatWithSampleRate: 44_100, channels: 1)!
     private let queue = DispatchQueue(label: "com.milsimpony.game.combat-audio")
     private let shotBuffer: AVAudioPCMBuffer
@@ -562,9 +600,11 @@ private final class ShotFeedbackAudioEngine {
     private let alertRelayBuffer: AVAudioPCMBuffer
     private let alertClearBuffer: AVAudioPCMBuffer
     private let footstepBuffer: AVAudioPCMBuffer
+    private let sprintFootstepBuffer: AVAudioPCMBuffer
     private let scopeRaiseBuffer: AVAudioPCMBuffer
     private let scopeLowerBuffer: AVAudioPCMBuffer
     private let ambientBasinBuffer: AVAudioPCMBuffer
+    private let ambientThreatBuffer: AVAudioPCMBuffer
 
     private init() {
         shotBuffer = Self.makeBuffer(format: format, duration: 0.22) { time, noise in
@@ -633,6 +673,13 @@ private final class ShotFeedbackAudioEngine {
             let gravel = noise * 0.18 * exp(-46.0 * time)
             return (sole + gravel) * envelope
         }
+        sprintFootstepBuffer = Self.makeBuffer(format: format, duration: 0.085) { time, noise in
+            let attack = min(time / 0.004, 1.0)
+            let envelope = attack * exp(-36.0 * time)
+            let sole = sin(2.0 * .pi * 118.0 * time) * 0.17
+            let gravel = noise * 0.26 * exp(-52.0 * time)
+            return (sole + gravel) * envelope
+        }
         scopeRaiseBuffer = Self.makeBuffer(format: format, duration: 0.12) { time, noise in
             let envelope = exp(-20.0 * time)
             let glass = sin(2.0 * .pi * 920.0 * time) * 0.10
@@ -652,57 +699,95 @@ private final class ShotFeedbackAudioEngine {
             let shore = sin(2.0 * .pi * 0.82 * time) * 0.012
             return wind + distantLow + shore
         }
+        ambientThreatBuffer = Self.makeBuffer(format: format, duration: 1.35) { time, noise in
+            let pulse = 0.45 + (sin(2.0 * .pi * 0.74 * time) * 0.20)
+            let wind = noise * 0.014
+            let low = sin(2.0 * .pi * 96.0 * time) * 0.010 * pulse
+            let edge = sin(2.0 * .pi * 312.0 * time) * 0.004 * exp(-0.55 * time)
+            return wind + low + edge
+        }
 
-        engine.attach(player)
-        engine.connect(player, to: engine.mainMixerNode, format: format)
-        engine.mainMixerNode.outputVolume = 0.8
+        [weaponPlayer, observerPlayer, movementPlayer, scopePlayer, ambiencePlayer].forEach { player in
+            engine.attach(player)
+            engine.connect(player, to: engine.mainMixerNode, format: format)
+        }
+        configure(
+            masterGain: 0.82,
+            weaponGain: 0.92,
+            observerGain: 0.86,
+            movementGain: 0.74,
+            scopeGain: 0.64,
+            ambienceGain: 0.48
+        )
         engine.prepare()
     }
 
+    func configure(
+        masterGain: Float,
+        weaponGain: Float,
+        observerGain: Float,
+        movementGain: Float,
+        scopeGain: Float,
+        ambienceGain: Float
+    ) {
+        queue.async { [weak self] in
+            guard let self else {
+                return
+            }
+
+            self.engine.mainMixerNode.outputVolume = simd_clamp(masterGain, 0.0, 1.0)
+            self.weaponPlayer.volume = simd_clamp(weaponGain, 0.0, 1.5)
+            self.observerPlayer.volume = simd_clamp(observerGain, 0.0, 1.5)
+            self.movementPlayer.volume = simd_clamp(movementGain, 0.0, 1.5)
+            self.scopePlayer.volume = simd_clamp(scopeGain, 0.0, 1.5)
+            self.ambiencePlayer.volume = simd_clamp(ambienceGain, 0.0, 1.5)
+        }
+    }
+
     func playShotCue(cooldownSeconds: Double) {
-        play(buffer: shotBuffer)
+        play(buffer: shotBuffer, category: .weapon)
         let boltDelay = min(max(cooldownSeconds * 0.32, 0.07), 0.24)
-        play(buffer: boltBuffer, after: boltDelay)
+        play(buffer: boltBuffer, category: .weapon, after: boltDelay)
     }
 
     func playDryClickCue() {
-        play(buffer: dryClickBuffer)
+        play(buffer: dryClickBuffer, category: .weapon)
     }
 
     func playHitConfirmCue(after delay: Double = 0) {
-        play(buffer: hitConfirmBuffer, after: delay)
+        play(buffer: hitConfirmBuffer, category: .weapon, after: delay)
     }
 
     func playImpactCue(after delay: Double = 0) {
-        play(buffer: impactBuffer, after: delay)
+        play(buffer: impactBuffer, category: .weapon, after: delay)
     }
 
     func playAlertAcquireCue() {
-        play(buffer: alertAcquireBuffer)
+        play(buffer: alertAcquireBuffer, category: .observer)
     }
 
     func playAlertDangerCue() {
-        play(buffer: alertDangerBuffer)
+        play(buffer: alertDangerBuffer, category: .observer)
     }
 
     func playAlertRelayCue() {
-        play(buffer: alertRelayBuffer)
+        play(buffer: alertRelayBuffer, category: .observer)
     }
 
     func playAlertClearCue() {
-        play(buffer: alertClearBuffer)
+        play(buffer: alertClearBuffer, category: .observer)
     }
 
-    func playFootstepCue() {
-        play(buffer: footstepBuffer)
+    func playFootstepCue(sprinting: Bool) {
+        play(buffer: sprinting ? sprintFootstepBuffer : footstepBuffer, category: .movement)
     }
 
     func playScopeToggleCue(raised: Bool) {
-        play(buffer: raised ? scopeRaiseBuffer : scopeLowerBuffer)
+        play(buffer: raised ? scopeRaiseBuffer : scopeLowerBuffer, category: .scope)
     }
 
-    func playAmbientBasinBed() {
-        play(buffer: ambientBasinBuffer)
+    func playAmbientBasinBed(threatened: Bool) {
+        play(buffer: threatened ? ambientThreatBuffer : ambientBasinBuffer, category: .ambience)
     }
 
     func recoverIfNeeded() {
@@ -713,8 +798,8 @@ private final class ShotFeedbackAudioEngine {
 
             do {
                 try self.ensureEngineRunning()
-                if !self.player.isPlaying {
-                    self.player.play()
+                for player in self.allPlayers where !player.isPlaying {
+                    player.play()
                 }
             } catch {
                 NSSound.beep()
@@ -722,7 +807,26 @@ private final class ShotFeedbackAudioEngine {
         }
     }
 
-    private func play(buffer: AVAudioPCMBuffer, after delay: Double = 0) {
+    private var allPlayers: [AVAudioPlayerNode] {
+        [weaponPlayer, observerPlayer, movementPlayer, scopePlayer, ambiencePlayer]
+    }
+
+    private func player(for category: AudioCategory) -> AVAudioPlayerNode {
+        switch category {
+        case .weapon:
+            return weaponPlayer
+        case .observer:
+            return observerPlayer
+        case .movement:
+            return movementPlayer
+        case .scope:
+            return scopePlayer
+        case .ambience:
+            return ambiencePlayer
+        }
+    }
+
+    private func play(buffer: AVAudioPCMBuffer, category: AudioCategory, after delay: Double = 0) {
         queue.async { [weak self] in
             guard let self else {
                 return
@@ -736,9 +840,10 @@ private final class ShotFeedbackAudioEngine {
             }
 
             let startPlayback = {
-                self.player.scheduleBuffer(buffer, completionHandler: nil)
-                if !self.player.isPlaying {
-                    self.player.play()
+                let player = self.player(for: category)
+                player.scheduleBuffer(buffer, completionHandler: nil)
+                if !player.isPlaying {
+                    player.play()
                 }
             }
 
@@ -819,6 +924,10 @@ struct OverheadMapSnapshot {
     let effectiveFailThreshold: Float
     let difficultyLabel: String
     let threatStates: [OverheadMapThreatState]
+    let selectedCollisionVolumeID: String?
+    let selectedCollisionVolumeLine: String
+    let collisionValidationLine: String
+    let collisionExportLine: String
 
     var alertedThreatCount: Int {
         threatStates.filter(\.isAlerted).count
@@ -840,6 +949,8 @@ struct OverheadMapSnapshot {
 struct OverheadMapThreatState: Identifiable {
     let id: String
     let label: String
+    let x: Float
+    let z: Float
     let neutralized: Bool
     let alerted: Bool
     let supportingGroup: Bool
@@ -868,6 +979,9 @@ struct OverheadMapThreatState: Identifiable {
 private struct ObserverLOSDebugState {
     let index: Int
     let label: String
+    let positionX: Float
+    let positionY: Float
+    let positionZ: Float
     let distanceMeters: Float
     let rangeMeters: Float
     let fieldOfViewDegrees: Float
@@ -880,10 +994,12 @@ private struct ObserverLOSDebugState {
     let scanArcDegrees: Float
     let scanCycleSeconds: Float
     let scanPhaseSeconds: Float
+    let patrolOffsetMeters: Float
     let neutralized: Bool
     let alerted: Bool
     let supportingGroup: Bool
     let scanHalted: Bool
+    let patrolMoving: Bool
     let inRange: Bool
     let inViewCone: Bool
     let hasLineOfSight: Bool
@@ -980,6 +1096,7 @@ final class GameSession: ObservableObject {
     @Published private(set) var invertLookY: Bool
     @Published private(set) var lookSensitivityScale: Double
     @Published private(set) var difficultyPreset: RehearsalDifficultyPreset
+    @Published private(set) var audioMasterGain: Double
     @Published private(set) var inputFocusRequestID = 0
 
     private let configuration: LaunchConfiguration
@@ -1017,6 +1134,11 @@ final class GameSession: ObservableObject {
     private var scopeDrawDistanceMultiplier: Float = 2.4
     private var scopeFarPlaneMultiplierValue: Float = 1.35
     private var scopeReticleColorComponents = SIMD4<Float>(0.92, 0.86, 0.42, 0.94)
+    private var scopeLensDirtStrength: Float = 0.0
+    private var scopeEdgeAberrationStrength: Float = 0.0
+    private var scopeParallaxCompensation: Float = 0.0
+    private var scopeMilDotSpacingMils: Float = 1.0
+    private var scopeCalibrationRangeMeters: Float = 400.0
     private var ballisticMuzzleVelocityMetersPerSecond: Float = 820.0
     private var ballisticGravityMetersPerSecondSquared: Float = 9.81
     private var ballisticMaxSimulationTimeSeconds: Float = 2.4
@@ -1025,6 +1147,7 @@ final class GameSession: ObservableObject {
     private var detectionFailThreshold: Float = 1.0
     private var mapConfiguration: SceneMapConfiguration?
     private var cachedOverheadMapSnapshot: OverheadMapSnapshot?
+    private var selectedCollisionVolumeID: String?
     private var latestObserverDebugStates: [ObserverLOSDebugState] = []
     private var lastThreatSeeingCount = 0
     private var lastThreatAlertBand = 0
@@ -1038,9 +1161,25 @@ final class GameSession: ObservableObject {
     private var lastWorldAudioState = "ambient waiting"
     private var lastScopeAudioState = "scope ready"
     private var sessionAudioState = "session audio waiting"
-    private var alternateRouteActivationArmed = false
+    private var sceneAudioMixSettings = SceneAudioMixSettings(
+        status: "audio mix waiting",
+        rule: "scene audio mix has not been loaded",
+        mode: "pending",
+        masterGain: 0.82,
+        ambienceGain: 0.48,
+        movementGain: 0.74,
+        scopeGain: 0.64,
+        weaponGain: 0.92,
+        observerGain: 0.86,
+        footstepSurfaces: [],
+        ambienceBeds: [],
+        mixRule: "waiting for scene audio mix",
+        smokeRule: "waiting for scene audio smoke rule"
+    )
+    private var selectedRouteIDForNextRun: String?
+    private var activeRunRouteID: String?
     private var alternateRouteActivationLine = "Alternate Live Binding: primary route armed"
-    private var freshRunHandler: (() -> Void)?
+    private var freshRunHandler: ((String?) -> Void)?
     private var pendingOverlayLines: [String]?
     private var isOverlayPublishScheduled = false
     private var storedReviewSessionState: StoredReviewSessionState?
@@ -1059,6 +1198,7 @@ final class GameSession: ObservableObject {
         self.invertLookY = storedSettings.invertLookY
         self.lookSensitivityScale = storedSettings.lookSensitivityScale
         self.difficultyPreset = storedSettings.difficultyPreset
+        self.audioMasterGain = storedSettings.audioMasterGain
         self.storedReviewSessionState = storedReviewSessionState
         self.restoreCleanupExecutionLine = restoreCleanupExecutionLine
         self.reviewedManualRestoreTargetLabel = nil
@@ -1070,6 +1210,7 @@ final class GameSession: ObservableObject {
             GameCoreBootstrap(bootMode)
         }
         GameCoreConfigureDifficulty(difficultyPreset.coreTuning)
+        configureAudioEngine()
 
         print("[App] Booting \(configuration.worldName) in \(configuration.bootMode) mode")
         rebuildOverlay()
@@ -1143,26 +1284,42 @@ final class GameSession: ObservableObject {
             && manualRestoreExecutionProgress != nil
     }
 
+    var canResumeSavedSession: Bool {
+        manualRestoreChoiceTargetLabel != nil && manualRestoreExecutionProgress != nil
+    }
+
     var canArmAlternateRouteActivation: Bool {
         guard demoFlowState == .title, let mapConfiguration else {
             return false
         }
 
-        return mapConfiguration.selectedAlternateRouteID != nil
-            && mapConfiguration.activeRouteID != mapConfiguration.selectedAlternateRouteID
-            && !alternateRouteActivationArmed
+        return routeOptions(from: mapConfiguration).count > 1
+    }
+
+    var canInspectCollisionAuthoring: Bool {
+        guard demoFlowState == .title, let mapConfiguration else {
+            return false
+        }
+
+        return !mapConfiguration.collisionVolumes.isEmpty
     }
 
     var alternateRouteActivationButtonTitle: String {
-        guard let label = mapConfiguration?.selectedAlternateRouteLabel else {
-            return "Alternate Route Unavailable"
+        guard let configuration = mapConfiguration else {
+            return "Route Select Unavailable"
         }
 
-        if alternateRouteActivationArmed {
-            return "Alternate Armed: \(label)"
+        return "Route Select: \(selectedRouteLabel(in: configuration))"
+    }
+
+    var collisionAuthoringButtonTitle: String {
+        guard let configuration = mapConfiguration,
+              let selectedVolume = selectedCollisionAuthoringVolume(in: configuration)
+        else {
+            return "Collision Review Unavailable"
         }
 
-        return "Arm Alternate Route: \(label)"
+        return "Collision Review: \(selectedVolume.displayName)"
     }
 
     var manualRestoreChoiceButtonTitle: String {
@@ -1171,6 +1328,15 @@ final class GameSession: ObservableObject {
         }
 
         return "Review Restore Target: \(targetLabel)"
+    }
+
+    var savedSessionResumeButtonTitle: String {
+        guard let storedReviewSessionState,
+              let targetLabel = manualRestoreChoiceTargetLabel else {
+            return "Resume Saved Run Unavailable"
+        }
+
+        return "Resume Saved Run: \(targetLabel) (\(storedReviewSessionState.activeRouteLabel))"
     }
 
     var manualRestoreExecutionButtonTitle: String {
@@ -1316,10 +1482,17 @@ final class GameSession: ObservableObject {
 
     var scopePresentationText: String {
         guard isScopeActive else {
-            return String(format: "Optic: %.1fx mil reticle ready", scopeMagnification)
+            return String(
+                format: "Optic: %.1fx mil reticle ready / %.1f mil dots / %.0fm zero",
+                scopeMagnification,
+                scopeMilDotSpacingMils,
+                scopeCalibrationRangeMeters
+            )
         }
 
-        let parallaxPercent = Int((simd_clamp(scopedWeaponSpreadDegrees / 1.6, 0.0, 1.0) * 100).rounded())
+        let rawParallax = simd_clamp(scopedWeaponSpreadDegrees / 1.6, 0.0, 1.0)
+        let compensatedParallax = rawParallax * (1.0 - scopeParallaxCompensation)
+        let parallaxPercent = Int((compensatedParallax * 100).rounded())
         let recoilText: String
         if
             let snapshot = latestSnapshot,
@@ -1343,8 +1516,9 @@ final class GameSession: ObservableObject {
         }
 
         return String(
-            format: "Optic: mil %.1f hold / parallax %d%% / %@",
+            format: "Optic: %.1f mil hold / %.1f mil dots / parallax %d%% / %@",
             holdoverMils,
+            scopeMilDotSpacingMils,
             parallaxPercent,
             recoilText
         )
@@ -1451,13 +1625,98 @@ final class GameSession: ObservableObject {
         )
     }
 
+    var scopeRecoilOffset: CGSize {
+        guard
+            isScopeActive,
+            let snapshot = latestSnapshot,
+            snapshot.shotCount > 0,
+            snapshot.lastShotElapsedSeconds >= 0
+        else {
+            return .zero
+        }
+
+        let shotAgeSeconds = max(snapshot.elapsedSeconds - snapshot.lastShotElapsedSeconds, 0)
+        let recoveryDurationSeconds = max(Double(snapshot.weaponCycleSeconds) * 0.72, 0.20)
+        let recoil = max(1.0 - (shotAgeSeconds / recoveryDurationSeconds), 0.0)
+        let lateral = snapshot.shotCount % 2 == 0 ? -0.22 : 0.22
+        return CGSize(width: lateral * recoil, height: -0.62 * recoil)
+    }
+
+    var muzzleFlashStrength: CGFloat {
+        guard
+            isScopeActive,
+            let snapshot = latestSnapshot,
+            snapshot.shotCount > 0,
+            snapshot.lastShotElapsedSeconds >= 0
+        else {
+            return 0
+        }
+
+        let shotAgeSeconds = max(snapshot.elapsedSeconds - snapshot.lastShotElapsedSeconds, 0)
+        return CGFloat(max(1.0 - (shotAgeSeconds / 0.16), 0.0))
+    }
+
+    var shotFeedbackText: String {
+        guard
+            let snapshot = latestSnapshot,
+            snapshot.shotCount > 0,
+            snapshot.lastShotElapsedSeconds >= 0
+        else {
+            return "Shot Feedback: hold sight picture for impact"
+        }
+
+        let shotAgeSeconds = max(snapshot.elapsedSeconds - snapshot.lastShotElapsedSeconds, 0)
+        let resultLabel: String
+        if snapshot.lastShotHitObserver {
+            resultLabel = observerLabel(for: snapshot.lastShotObserverIndex).map { "confirmed \($0)" } ?? "confirmed observer hit"
+        } else if snapshot.lastShotHitCollisionVolume {
+            resultLabel = "blocked by cover"
+        } else if snapshot.lastShotHitGround {
+            resultLabel = "ground impact"
+        } else {
+            resultLabel = "clear miss"
+        }
+
+        let recoveryDurationSeconds = max(Double(snapshot.weaponCycleSeconds) * 0.72, 0.20)
+        let recoilPercent = Int((max(1.0 - (shotAgeSeconds / recoveryDurationSeconds), 0) * 100).rounded())
+        return String(
+            format: "Shot Feedback: %@ / recoil %d%% / %.0fm",
+            resultLabel,
+            recoilPercent,
+            snapshot.lastShotTravelDistanceMeters
+        )
+    }
+
     var scopeReticleBloomScale: CGFloat {
         guard isScopeActive else {
             return 0
         }
 
-        let bloom = simd_clamp(scopedWeaponSpreadDegrees / 2.2, 0.0, 1.0)
+        let compensatedSpread = scopedWeaponSpreadDegrees * (1.0 - (scopeParallaxCompensation * 0.35))
+        let bloom = simd_clamp(compensatedSpread / 2.2, 0.0, 1.0)
         return CGFloat(bloom)
+    }
+
+    var scopeLensDirtOpacity: CGFloat {
+        guard isScopeActive else {
+            return 0
+        }
+        return CGFloat(scopeLensDirtStrength)
+    }
+
+    var scopeEdgeAberrationOpacity: CGFloat {
+        guard isScopeActive else {
+            return 0
+        }
+        return CGFloat(scopeEdgeAberrationStrength)
+    }
+
+    var scopeParallaxCompensationPercent: Int {
+        Int((scopeParallaxCompensation * 100).rounded())
+    }
+
+    var scopeMilDotSpacingText: String {
+        String(format: "%.1f mil", scopeMilDotSpacingMils)
     }
 
     private func observerLabel(for index: Int32) -> String? {
@@ -1525,6 +1784,9 @@ final class GameSession: ObservableObject {
             ObserverLOSDebugState(
                 index: index,
                 label: observerLabel(for: Int32(index)) ?? "observer \(index + 1)",
+                positionX: state.positionX,
+                positionY: state.positionY,
+                positionZ: state.positionZ,
                 distanceMeters: state.distanceMeters,
                 rangeMeters: state.rangeMeters,
                 fieldOfViewDegrees: state.fieldOfViewDegrees,
@@ -1537,10 +1799,12 @@ final class GameSession: ObservableObject {
                 scanArcDegrees: state.scanArcDegrees,
                 scanCycleSeconds: state.scanCycleSeconds,
                 scanPhaseSeconds: state.scanPhaseSeconds,
+                patrolOffsetMeters: state.patrolOffsetMeters,
                 neutralized: state.neutralized,
                 alerted: state.alerted,
                 supportingGroup: state.supportingGroup,
                 scanHalted: state.scanHalted,
+                patrolMoving: state.patrolMoving,
                 inRange: state.inRange,
                 inViewCone: state.inViewCone,
                 hasLineOfSight: state.hasLineOfSight,
@@ -1651,7 +1915,7 @@ final class GameSession: ObservableObject {
 
         let ambientInterval = snapshot.alertedObserverCount > 0 || snapshot.seeingObserverCount > 0 ? 1.35 : 1.75
         if snapshot.elapsedSeconds - lastAmbientAudioElapsedSeconds > ambientInterval {
-            ShotFeedbackAudioEngine.shared.playAmbientBasinBed()
+            ShotFeedbackAudioEngine.shared.playAmbientBasinBed(threatened: threatAudibleState(for: snapshot) != "quiet")
             lastAmbientAudioElapsedSeconds = snapshot.elapsedSeconds
             lastWorldAudioState = threatAudibleState(for: snapshot) == "quiet"
                 ? "basin bed"
@@ -1669,7 +1933,7 @@ final class GameSession: ObservableObject {
             : 0.0
         let stepInterval = max(0.26, 0.58 - (Double(speedRatio) * 0.24))
         if snapshot.elapsedSeconds - lastFootstepAudioElapsedSeconds >= stepInterval {
-            ShotFeedbackAudioEngine.shared.playFootstepCue()
+            ShotFeedbackAudioEngine.shared.playFootstepCue(sprinting: snapshot.sprinting)
             lastFootstepAudioElapsedSeconds = snapshot.elapsedSeconds
         }
 
@@ -1748,6 +2012,8 @@ final class GameSession: ObservableObject {
             return OverheadMapThreatState(
                 id: observer.id,
                 label: observer.label,
+                x: debugState?.positionX ?? observer.point.x,
+                z: debugState?.positionZ ?? observer.point.z,
                 neutralized: debugState?.neutralized ?? false,
                 alerted: debugState?.alerted ?? false,
                 supportingGroup: debugState?.supportingGroup ?? false,
@@ -1757,6 +2023,11 @@ final class GameSession: ObservableObject {
                 seeingPlayer: debugState?.seeingPlayer ?? false
             )
         }
+        let selectedCollisionVolume = selectedCollisionAuthoringVolume(in: mapConfiguration)
+        let collisionLines = collisionAuthoringLines(
+            for: selectedCollisionVolume,
+            configuration: mapConfiguration
+        )
 
         cachedOverheadMapSnapshot = OverheadMapSnapshot(
             configuration: mapConfiguration,
@@ -1779,7 +2050,11 @@ final class GameSession: ObservableObject {
             failCount: Int(snapshot?.failCount ?? 0),
             effectiveFailThreshold: effectiveDetectionFailThreshold,
             difficultyLabel: difficultyPreset.displayName,
-            threatStates: threatStates
+            threatStates: threatStates,
+            selectedCollisionVolumeID: selectedCollisionVolume?.id,
+            selectedCollisionVolumeLine: collisionLines.selection,
+            collisionValidationLine: collisionLines.validation,
+            collisionExportLine: collisionLines.export
         )
     }
 
@@ -1870,6 +2145,7 @@ final class GameSession: ObservableObject {
         overlayTitle: String,
         scopeConfiguration: ScopeConfiguration,
         ballisticsSettings: SceneBallisticsSettings,
+        audioMixSettings: SceneAudioMixSettings,
         detectionFailThreshold: Float,
         mapConfiguration: SceneMapConfiguration
     ) {
@@ -1888,11 +2164,18 @@ final class GameSession: ObservableObject {
         scopeDrawDistanceMultiplier = max(scopeConfiguration.drawDistanceMultiplier ?? 2.4, 1.0)
         scopeFarPlaneMultiplierValue = max(scopeConfiguration.farPlaneMultiplier ?? 1.35, 1.0)
         scopeReticleColorComponents = scopeConfiguration.reticleColorVector
+        scopeLensDirtStrength = simd_clamp(scopeConfiguration.lensDirtStrength ?? 0.0, 0.0, 1.0)
+        scopeEdgeAberrationStrength = simd_clamp(scopeConfiguration.edgeAberrationStrength ?? 0.0, 0.0, 1.0)
+        scopeParallaxCompensation = simd_clamp(scopeConfiguration.parallaxCompensation ?? 0.0, 0.0, 1.0)
+        scopeMilDotSpacingMils = max(scopeConfiguration.milDotSpacingMils ?? 1.0, 0.1)
+        scopeCalibrationRangeMeters = max(scopeConfiguration.calibrationRangeMeters ?? 400.0, 25.0)
         ballisticMuzzleVelocityMetersPerSecond = max(ballisticsSettings.muzzleVelocityMetersPerSecond, 40.0)
         ballisticGravityMetersPerSecondSquared = max(ballisticsSettings.gravityMetersPerSecondSquared, 0.1)
         ballisticMaxSimulationTimeSeconds = max(ballisticsSettings.maxSimulationTimeSeconds, 0.25)
         ballisticSimulationStepSeconds = max(ballisticsSettings.simulationStepSeconds, 1.0 / 480.0)
         ballisticLaunchHeightOffsetMeters = ballisticsSettings.launchHeightOffsetMeters
+        sceneAudioMixSettings = audioMixSettings
+        configureAudioEngine()
         self.detectionFailThreshold = max(detectionFailThreshold, 0.1)
         self.mapConfiguration = mapConfiguration
         updateAlternateRouteActivationLine(from: mapConfiguration)
@@ -1908,32 +2191,138 @@ final class GameSession: ObservableObject {
         scopeDrawDistanceMultiplier = max(configuration.drawDistanceMultiplier ?? 2.4, 1.0)
         scopeFarPlaneMultiplierValue = max(configuration.farPlaneMultiplier ?? 1.35, 1.0)
         scopeReticleColorComponents = configuration.reticleColorVector
+        scopeLensDirtStrength = simd_clamp(configuration.lensDirtStrength ?? 0.0, 0.0, 1.0)
+        scopeEdgeAberrationStrength = simd_clamp(configuration.edgeAberrationStrength ?? 0.0, 0.0, 1.0)
+        scopeParallaxCompensation = simd_clamp(configuration.parallaxCompensation ?? 0.0, 0.0, 1.0)
+        scopeMilDotSpacingMils = max(configuration.milDotSpacingMils ?? 1.0, 0.1)
+        scopeCalibrationRangeMeters = max(configuration.calibrationRangeMeters ?? 400.0, 25.0)
         rebuildOverlay()
     }
 
     func noteMapConfiguration(_ configuration: SceneMapConfiguration) {
         mapConfiguration = configuration
+        if selectedCollisionAuthoringVolume(in: configuration) == nil {
+            selectedCollisionVolumeID = defaultCollisionAuthoringVolume(in: configuration)?.id
+        }
         updateAlternateRouteActivationLine(from: configuration)
         refreshOverheadMapSnapshot()
         rebuildOverlay()
     }
 
-    private func updateAlternateRouteActivationLine(from configuration: SceneMapConfiguration) {
-        if configuration.activeRouteID == configuration.selectedAlternateRouteID,
-           let routeLabel = configuration.selectedAlternateRouteLabel {
-            alternateRouteActivationLine = "Alternate Live Binding: active \(routeLabel) / checkpoints rebound"
+    func selectNextCollisionVolumeForReview() {
+        guard let configuration = mapConfiguration, !configuration.collisionVolumes.isEmpty else {
             return
         }
 
-        if alternateRouteActivationArmed, let routeLabel = configuration.selectedAlternateRouteLabel {
-            alternateRouteActivationLine = "Alternate Live Binding: armed \(routeLabel) / waits for fresh-run boundary"
-            return
-        }
-
-        alternateRouteActivationLine = "Alternate Live Binding: primary route active / alternate staged"
+        let volumes = configuration.collisionVolumes
+        let currentID = selectedCollisionAuthoringVolume(in: configuration)?.id
+        let currentIndex = currentID.flatMap { id in volumes.firstIndex { $0.id == id } } ?? -1
+        let nextIndex = (currentIndex + 1) % volumes.count
+        selectedCollisionVolumeID = volumes[nextIndex].id
+        statusLine = "Collision review selected \(volumes[nextIndex].displayName)"
+        refreshOverheadMapSnapshot()
+        rebuildOverlay()
     }
 
-    func setFreshRunHandler(_ handler: @escaping () -> Void) {
+    private func updateAlternateRouteActivationLine(from configuration: SceneMapConfiguration) {
+        let selectedLabel = selectedRouteLabel(in: configuration)
+        if selectedRouteIDForNextRun == configuration.selectedAlternateRouteID {
+            alternateRouteActivationLine = "Route Selection: active \(selectedLabel) / checkpoints rebound"
+            return
+        }
+
+        alternateRouteActivationLine = "Route Selection: selected \(selectedLabel) / binds on next Start Demo"
+    }
+
+    private func updateAlternateRouteActivationLineIfPossible() {
+        guard let mapConfiguration else {
+            return
+        }
+
+        updateAlternateRouteActivationLine(from: mapConfiguration)
+    }
+
+    private func routeOptions(from configuration: SceneMapConfiguration) -> [(id: String?, label: String)] {
+        var options: [(id: String?, label: String)] = [(id: nil, label: configuration.routeName)]
+        options.append(contentsOf: configuration.alternateRoutes.map { route in
+            (id: Optional(route.id), label: route.name)
+        })
+        return options
+    }
+
+    private func routeOptionsLine(from configuration: SceneMapConfiguration) -> String {
+        routeOptions(from: configuration).map { option in
+            option.label
+        }.joined(separator: " / ")
+    }
+
+    private func selectedRouteLabel(in configuration: SceneMapConfiguration) -> String {
+        routeOptions(from: configuration).first { option in
+            option.id == selectedRouteIDForNextRun
+        }?.label ?? configuration.routeName
+    }
+
+    private func activeRouteLabel(in configuration: SceneMapConfiguration) -> String {
+        routeOptions(from: configuration).first { option in
+            option.id == configuration.selectedAlternateRouteID
+        }?.label ?? configuration.routeName
+    }
+
+    private func currentPendingOrActiveRouteLabel(in configuration: SceneMapConfiguration) -> String {
+        if selectedRouteIDForNextRun == configuration.selectedAlternateRouteID {
+            return activeRouteLabel(in: configuration)
+        }
+        return selectedRouteLabel(in: configuration)
+    }
+
+    private func defaultCollisionAuthoringVolume(in configuration: SceneMapConfiguration) -> SceneMapCollisionVolume? {
+        if let configuredID = configuration.selectedCollisionVolumeID,
+           let configuredVolume = configuration.collisionVolumes.first(where: { $0.id == configuredID }) {
+            return configuredVolume
+        }
+
+        if let configuredLabel = configuration.selectedCollisionVolumeLabel,
+           let configuredVolume = configuration.collisionVolumes.first(where: { $0.displayName == configuredLabel }) {
+            return configuredVolume
+        }
+
+        return configuration.collisionVolumes.first(where: { $0.source == "authored" })
+            ?? configuration.collisionVolumes.first
+    }
+
+    private func selectedCollisionAuthoringVolume(in configuration: SceneMapConfiguration) -> SceneMapCollisionVolume? {
+        if let selectedCollisionVolumeID,
+           let selectedVolume = configuration.collisionVolumes.first(where: { $0.id == selectedCollisionVolumeID }) {
+            return selectedVolume
+        }
+
+        return defaultCollisionAuthoringVolume(in: configuration)
+    }
+
+    private func collisionAuthoringLines(
+        for volume: SceneMapCollisionVolume?,
+        configuration: SceneMapConfiguration
+    ) -> (selection: String, validation: String, export: String) {
+        guard let volume else {
+            return (
+                "Collision Selection: no blocker selected",
+                "Collision Validation: \(configuration.collisionAuthoringValidationStatus)",
+                "Collision Export: \(configuration.collisionAuthoringExportStatus)"
+            )
+        }
+
+        let width = String(format: "%.1f", Double(volume.widthMeters))
+        let depth = String(format: "%.1f", Double(volume.depthMeters))
+        let area = Int(volume.areaSquareMeters.rounded())
+        let clearance = String(format: "%.1f", Double(configuration.collisionAuthoringMinimumClearanceMeters))
+        let selection = "Collision Selection: \(volume.displayName) / \(volume.sectorName) / \(volume.source) / \(width)x\(depth)m / \(area)m2"
+        let validation = "Collision Validation: \(configuration.collisionAuthoringValidationStatus) / min clearance \(clearance)m"
+        let export = "Collision Export: \(configuration.collisionAuthoringExportStatus) / source \(volume.id) / \(configuration.collisionAuthoringReviewGuidance)"
+        return (selection, validation, export)
+    }
+
+
+    func setFreshRunHandler(_ handler: @escaping (String?) -> Void) {
         freshRunHandler = handler
     }
 
@@ -1978,9 +2367,8 @@ final class GameSession: ObservableObject {
         }
 
         isSettingsPresented = false
-        if alternateRouteActivationArmed {
-            freshRunHandler?()
-        }
+        freshRunHandler?(selectedRouteIDForNextRun)
+        activeRunRouteID = selectedRouteIDForNextRun
         demoFlowState = .playing
         let restoreTarget = manualRestoreChoiceTargetLabel
         if reviewedManualRestoreTargetLabel == restoreTarget {
@@ -1993,7 +2381,8 @@ final class GameSession: ObservableObject {
             statusLine = "Fresh run started after reviewing \(restoreTarget) - restore remains disabled"
             sessionAudioState = "fresh start cue after restore review"
         } else {
-            statusLine = "Demo live - move through the current Canberra contact lane and verify scoped hits"
+            let routeLabel = mapConfiguration.map { currentPendingOrActiveRouteLabel(in: $0) } ?? "current route"
+            statusLine = "Demo live - \(routeLabel) bound at fresh-run boundary"
             sessionAudioState = "fresh run basin bed armed"
         }
         scheduleGameplayInputFocusRecovery()
@@ -2007,24 +2396,25 @@ final class GameSession: ObservableObject {
             return
         }
 
-        guard let routeLabel = mapConfiguration?.selectedAlternateRouteLabel else {
-            statusLine = "No staged alternate route is available"
+        guard let configuration = mapConfiguration else {
+            statusLine = "No route selection data is available"
             rebuildOverlay()
             return
         }
 
-        alternateRouteActivationArmed = true
-        alternateRouteActivationLine = "Alternate Live Binding: armed \(routeLabel) / waits for fresh-run boundary"
-        statusLine = "Alternate route armed for next Start Demo: \(routeLabel)"
-        rebuildOverlay()
-    }
-
-    func consumeAlternateRouteActivationRequest() -> Bool {
-        defer {
-            alternateRouteActivationArmed = false
+        let options = routeOptions(from: configuration)
+        guard !options.isEmpty else {
+            statusLine = "No rehearsal routes are available"
+            rebuildOverlay()
+            return
         }
 
-        return alternateRouteActivationArmed
+        let currentIndex = options.firstIndex { $0.id == selectedRouteIDForNextRun } ?? 0
+        let nextOption = options[(currentIndex + 1) % options.count]
+        selectedRouteIDForNextRun = nextOption.id
+        alternateRouteActivationLine = "Route Selection: selected \(nextOption.label) / binds on next Start Demo"
+        statusLine = "Selected rehearsal route for next Start Demo: \(nextOption.label)"
+        rebuildOverlay()
     }
 
     func previewManualRestoreChoice() {
@@ -2044,6 +2434,24 @@ final class GameSession: ObservableObject {
         restoreReviewExpiryLine = "Restore Review Expiry: tracking \(targetLabel) until target or boundary changes"
         statusLine = "Restore target reviewed: \(targetLabel) - Start Demo still begins fresh"
         rebuildOverlay()
+    }
+
+    func resumeSavedSession() {
+        guard sceneReady else {
+            statusLine = "Scene data still loading"
+            rebuildOverlay()
+            return
+        }
+
+        guard let targetLabel = manualRestoreChoiceTargetLabel else {
+            statusLine = "Resume blocked - no saved checkpoint target"
+            rebuildOverlay()
+            return
+        }
+
+        reviewedManualRestoreTargetLabel = targetLabel
+        restoreReviewExpiryLine = "Restore Review Expiry: tracking \(targetLabel) for saved-session resume"
+        requestManualRestoreExecution()
     }
 
     func requestManualRestoreExecution() {
@@ -2073,6 +2481,13 @@ final class GameSession: ObservableObject {
             return
         }
 
+        if let storedReviewSessionState {
+            selectedRouteIDForNextRun = storedReviewSessionState.activeRouteID
+            activeRunRouteID = storedReviewSessionState.activeRouteID
+            freshRunHandler?(storedReviewSessionState.activeRouteID)
+            updateAlternateRouteActivationLineIfPossible()
+        }
+
         guard GameCoreRestoreToCheckpointProgress(Int32(restoreProgress)) else {
             statusLine = "Manual restore blocked by core checkpoint validation"
             rebuildOverlay()
@@ -2088,7 +2503,7 @@ final class GameSession: ObservableObject {
         refreshSnapshotFromCore()
         resetThreatFeedbackState()
         ShotFeedbackAudioEngine.shared.playScopeToggleCue(raised: false)
-        ShotFeedbackAudioEngine.shared.playAmbientBasinBed()
+        ShotFeedbackAudioEngine.shared.playAmbientBasinBed(threatened: false)
         sessionAudioState = "manual restore cue + basin bed"
         statusLine = "Manual restore executed to \(targetLabel)"
         reviewedManualRestoreTargetLabel = nil
@@ -2134,7 +2549,7 @@ final class GameSession: ObservableObject {
             return
         }
 
-        freshRunHandler?()
+        freshRunHandler?(activeRunRouteID)
         isSettingsPresented = false
         demoFlowState = .playing
         clearManualRestoreReviewState(
@@ -2153,7 +2568,9 @@ final class GameSession: ObservableObject {
             return
         }
 
-        freshRunHandler?()
+        selectedRouteIDForNextRun = nil
+        activeRunRouteID = nil
+        freshRunHandler?(nil)
         isSettingsPresented = false
         demoFlowState = .title
         clearManualRestoreReviewState(
@@ -2200,6 +2617,15 @@ final class GameSession: ObservableObject {
         lookSensitivityScale = max(min(value, 1.8), 0.6)
         persistSettings()
         applyLookSettings()
+        rebuildOverlay()
+    }
+
+    func setAudioMasterGain(_ value: Double) {
+        audioMasterGain = max(min(value, 1.0), 0.0)
+        persistSettings()
+        configureAudioEngine()
+        sessionAudioState = "settings master gain updated"
+        statusLine = String(format: "Audio master %.0f%%", audioMasterGain * 100)
         rebuildOverlay()
     }
 
@@ -2704,6 +3130,17 @@ final class GameSession: ObservableObject {
         refreshSnapshotFromCore()
     }
 
+    private func configureAudioEngine() {
+        ShotFeedbackAudioEngine.shared.configure(
+            masterGain: Float(audioMasterGain) * sceneAudioMixSettings.masterGain,
+            weaponGain: sceneAudioMixSettings.weaponGain,
+            observerGain: sceneAudioMixSettings.observerGain,
+            movementGain: sceneAudioMixSettings.movementGain,
+            scopeGain: sceneAudioMixSettings.scopeGain,
+            ambienceGain: sceneAudioMixSettings.ambienceGain
+        )
+    }
+
     private func toggleScopeIfPossible() -> Bool {
         guard sceneReady, demoFlowState == .playing, menuPanel == nil else {
             return false
@@ -2782,6 +3219,9 @@ final class GameSession: ObservableObject {
         if let storedReviewResumeLine {
             lines.append(storedReviewResumeLine)
         }
+        if let storedReviewCheckpointPerformanceLine {
+            lines.append(storedReviewCheckpointPerformanceLine)
+        }
         if let storedReviewGuardrailLine {
             lines.append(storedReviewGuardrailLine)
         }
@@ -2842,6 +3282,9 @@ final class GameSession: ObservableObject {
 
         if sceneReady {
             lines.append("Route: \(routeSummary)")
+            if let mapConfiguration {
+                lines.append("Route Options: \(routeOptionsLine(from: mapConfiguration))")
+            }
             lines.append(briefingDetails.first ?? routeSummary)
             if let activeRouteLine = routeDetails.first(where: { $0.hasPrefix("Active Route:") }) {
                 lines.append(activeRouteLine)
@@ -2890,6 +3333,15 @@ final class GameSession: ObservableObject {
             }
             if let collisionAuthoringLine = routeDetails.first(where: { $0.hasPrefix("Collision Authoring:") }) {
                 lines.append(collisionAuthoringLine)
+            }
+            if let mapConfiguration {
+                let collisionLines = collisionAuthoringLines(
+                    for: selectedCollisionAuthoringVolume(in: mapConfiguration),
+                    configuration: mapConfiguration
+                )
+                lines.append(collisionLines.selection)
+                lines.append(collisionLines.validation)
+                lines.append(collisionLines.export)
             }
             if let environmentalMotionLine = routeDetails.first(where: { $0.hasPrefix("Environmental Motion:") }) {
                 lines.append(environmentalMotionLine)
@@ -2998,6 +3450,8 @@ final class GameSession: ObservableObject {
             String(format: "Scope: %.1fx / %.1f deg / x%.1f draw", scopeMagnification, scopeFieldOfViewDegrees, scopeDrawDistanceMultiplier),
             "Map: \(isMapPresented ? "open" : "hidden") / \(currentMapSectorName)",
             String(format: "HUD opacity: %.0f%%", hudOpacity * 100),
+            String(format: "Audio master: %.0f%% / %@", audioMasterGain * 100, sceneAudioMixSettings.mode),
+            sceneAudioMixSettings.mixRule,
             "Build: \(configuration.releaseDisplayName)",
             "Bundle: \(configuration.bundleIdentifier)",
             "Content: \(configuration.contentSourceSummary)",
@@ -3132,7 +3586,7 @@ final class GameSession: ObservableObject {
         }
 
         guard snapshot.shotCount > 0, snapshot.lastShotElapsedSeconds >= 0 else {
-            return "Muzzle Feedback: flash idle placeholder / recoil settled / no shot trace"
+            return "Muzzle Feedback: flash idle / recoil settled / no shot trace"
         }
 
         let shotAgeSeconds = max(snapshot.elapsedSeconds - snapshot.lastShotElapsedSeconds, 0)
@@ -3154,7 +3608,7 @@ final class GameSession: ObservableObject {
         }
 
         return String(
-            format: "Muzzle Feedback: flash %d%% placeholder / recoil %d%% %@ / last %@ %.0fm",
+            format: "Muzzle Feedback: flash %d%% visible / recoil %d%% %@ / last %@ %.0fm",
             flashPercent,
             recoilPercent,
             recoilState,
@@ -3242,6 +3696,20 @@ final class GameSession: ObservableObject {
         )
     }
 
+    private func audioMixLine() -> String {
+        String(
+            format: "Audio Mix: %@ / master %.0f%% / scene %.0f%% / amb %.0f%% / move %.0f%% / scope %.0f%% / weapon %.0f%% / observer %.0f%%",
+            sceneAudioMixSettings.mode,
+            audioMasterGain * 100,
+            sceneAudioMixSettings.masterGain * 100,
+            sceneAudioMixSettings.ambienceGain * 100,
+            sceneAudioMixSettings.movementGain * 100,
+            sceneAudioMixSettings.scopeGain * 100,
+            sceneAudioMixSettings.weaponGain * 100,
+            sceneAudioMixSettings.observerGain * 100
+        )
+    }
+
     private func scopeCalibrationLine() -> String {
         guard let snapshot = latestSnapshot else {
             return "Scope Calibration: waiting for live optic telemetry"
@@ -3257,18 +3725,21 @@ final class GameSession: ObservableObject {
         let holdoverMils = rangeMeters > 1
             ? dropMeters / max(rangeMeters / 1000.0, 0.001)
             : 0
-        let parallaxPercent = Int((simd_clamp(scopedWeaponSpreadDegrees / 1.6, 0.0, 1.0) * 100).rounded())
+        let rawParallax = simd_clamp(scopedWeaponSpreadDegrees / 1.6, 0.0, 1.0)
+        let parallaxPercent = Int((rawParallax * (1.0 - scopeParallaxCompensation) * 100).rounded())
         let edgeStabilityPercent = Int((simd_clamp(scopedWeaponStability - (scopedWeaponSpreadDegrees * 0.08), 0.0, 1.0) * 100).rounded())
         let breathCue = steadyAimActive
             ? String(format: "breath held %.1fs", holdBreathSecondsRemaining)
             : "breath drifting"
 
         return String(
-            format: "Scope Calibration: %.0fm range / %.2fm drop / %.1f mil hold / parallax %d%% / edge %d%% / %@",
+            format: "Scope Calibration: %.0fm range / %.2fm drop / %.1f mil hold / %.1f mil dots / parallax %d%% comp %.0f%% / edge %d%% / %@",
             rangeMeters,
             dropMeters,
             holdoverMils,
+            scopeMilDotSpacingMils,
             parallaxPercent,
+            scopeParallaxCompensation * 100,
             edgeStabilityPercent,
             breathCue
         )
@@ -3355,6 +3826,17 @@ final class GameSession: ObservableObject {
         let activeCount = observers.filter { index, _ in
             index >= latestObserverDebugStates.count || !latestObserverDebugStates[index].neutralized
         }.count
+        let movingCount = observers.filter { index, _ in
+            index < latestObserverDebugStates.count && latestObserverDebugStates[index].patrolMoving
+        }.count
+        let patrolOffsets = observers.compactMap { index, _ in
+            index < latestObserverDebugStates.count
+                ? abs(latestObserverDebugStates[index].patrolOffsetMeters)
+                : nil
+        }
+        let averagePatrolOffset = patrolOffsets.isEmpty
+            ? 0.0
+            : patrolOffsets.reduce(0, +) / Float(patrolOffsets.count)
         let routeID = observers.compactMap { $0.element.patrolRouteID }.first ?? "static-route"
         let roles = observers
             .compactMap { $0.element.patrolRole }
@@ -3377,14 +3859,16 @@ final class GameSession: ObservableObject {
             .capitalized
 
         return String(
-            format: "Patrol Pairs: %d authored / %@ %d/%d active / route %@ / roles %@ / %.0fm spacing",
+            format: "Patrol Pairs: %d authored / %@ %d/%d active / %d moving / route %@ / roles %@ / %.0fm spacing / %.1fm sweep",
             patrolPairs.count,
             displayGroup,
             activeCount,
             observers.count,
+            movingCount,
             routeID,
             roles.isEmpty ? "unassigned" : roles,
-            spacingMeters
+            spacingMeters,
+            averagePatrolOffset
         )
     }
 
@@ -3620,6 +4104,54 @@ final class GameSession: ObservableObject {
         return "Lighting Plan: \(mapConfiguration.lightingArchitectureStatus) / \(mapConfiguration.lightingArchitectureSummary) / \(frameBaseline)"
     }
 
+    private func timeOfDayLine() -> String {
+        guard let mapConfiguration else {
+            return "Time Of Day: waiting for scenario lighting"
+        }
+
+        return "Time Of Day: \(mapConfiguration.timeOfDayStatus) / \(mapConfiguration.timeOfDaySummary)"
+    }
+
+    private func antiAliasingLine() -> String {
+        guard let mapConfiguration else {
+            return "Anti-Aliasing: waiting for scoped-safe AA settings"
+        }
+
+        return "Anti-Aliasing: \(mapConfiguration.antiAliasingStatus) / \(mapConfiguration.antiAliasingSummary)"
+    }
+
+    private func physicalAtmosphereLine() -> String {
+        guard let mapConfiguration else {
+            return "Physical Atmosphere: waiting for physical sky settings"
+        }
+
+        return "Physical Atmosphere: \(mapConfiguration.physicalAtmosphereStatus) / \(mapConfiguration.physicalAtmosphereSummary)"
+    }
+
+    private func indirectRenderingLine() -> String {
+        guard let mapConfiguration else {
+            return "Indirect Rendering: waiting for indirect renderer settings"
+        }
+
+        return "Indirect Rendering: \(mapConfiguration.indirectRenderingStatus) / \(mapConfiguration.indirectRenderingSummary)"
+    }
+
+    private func sdfUILine() -> String {
+        guard let mapConfiguration else {
+            return "SDF UI: waiting for scalable UI text settings"
+        }
+
+        return "SDF UI: \(mapConfiguration.sdfUIStatus) / \(mapConfiguration.sdfUISummary)"
+    }
+
+    private func renderGraphLine() -> String {
+        guard let mapConfiguration else {
+            return "Render Graph: waiting for renderer pass graph"
+        }
+
+        return "Render Graph: \(mapConfiguration.renderGraphStatus) / \(mapConfiguration.renderGraphSummary)"
+    }
+
     private func coreWorldLine() -> String {
         let sectorCount: Int32 = latestProfilingSnapshot?.sectorCount ?? 0
         let collisionVolumeCount: Int32 = latestProfilingSnapshot?.collisionVolumeCount ?? 0
@@ -3641,6 +4173,7 @@ final class GameSession: ObservableObject {
             .joined(separator: ", ")
         let storedSessionLine = storedReviewSessionLine ?? "Last Session: no persisted review state yet"
         let storedResumeLine = storedReviewResumeLine ?? "Review Resume: no persisted capture context yet"
+        let storedCheckpointPerformanceLine = storedReviewCheckpointPerformanceLine ?? "Checkpoint Performance: no persisted checkpoint performance yet"
         let storedGuardrailLine = storedReviewGuardrailLine ?? "Review Guardrail: no persisted review card to validate yet"
         let storedPreviewLine = storedReviewRestorePreviewLine ?? "Restore Preview: no persisted checkpoint target yet"
         let storedReadinessLine = storedReviewRestoreReadinessLine ?? "Restore Readiness: no persisted review card to inspect yet"
@@ -3676,6 +4209,7 @@ final class GameSession: ObservableObject {
             "Scene Summary: \(sceneSummary)",
             storedSessionLine,
             storedResumeLine,
+            storedCheckpointPerformanceLine,
             storedGuardrailLine,
             storedPreviewLine,
             storedReadinessLine,
@@ -3697,29 +4231,55 @@ final class GameSession: ObservableObject {
             storedCleanupPreviewLine,
             restoreCleanupExecutionLine,
             "Session Audio: \(sessionAudioState) / world \(lastWorldAudioState) / movement \(lastMovementAudioState) / scope \(lastScopeAudioState)",
+            audioMixLine(),
             String(
-                format: "Scope: %@ / %.1fx / %.1f deg / x%.1f draw",
+                format: "Scope: %@ / %.1fx / %.1f deg / x%.1f draw / dirt %.0f%% / edge %.0f%%",
                 isScopeActive ? "active" : "ready",
                 scopeMagnification,
                 scopeFieldOfViewDegrees,
-                scopeDrawDistanceMultiplier
+                scopeDrawDistanceMultiplier,
+                scopeLensDirtStrength * 100,
+                scopeEdgeAberrationStrength * 100
             ),
             briefingSummary,
             routeSummary,
             evasionSummary,
             streamingSummary,
         ]
+        let strafeIntent = Double(snapshot?.strafeIntent ?? 0.0)
+        let forwardIntent = Double(snapshot?.forwardIntent ?? 0.0)
+        let moveSpeed = Double(snapshot?.moveSpeed ?? 0.0)
+        let walkSpeed = Double(snapshot?.walkSpeed ?? 0.0)
+        let sprintSpeed = Double(snapshot?.sprintSpeed ?? 0.0)
+        let lookSensitivity = Double(snapshot?.lookSensitivity ?? 0.0)
+        let groundHeight = Double(snapshot?.groundHeight ?? 0.0)
+        let activeSectorCount = Int(snapshot?.activeSectorCount ?? 0)
+        let completedCheckpoints = Int(snapshot?.completedCheckpointCount ?? 0)
+        let totalCheckpoints = Int(snapshot?.totalCheckpointCount ?? 0)
+        let routeDistanceMeters = Double(snapshot?.routeDistanceMeters ?? 0.0)
+        let restartCount = Int(snapshot?.restartCount ?? 0)
+        let suspicionLevel = Double(snapshot?.suspicionLevel ?? 0.0)
+        let alertedObserverCount = Int(snapshot?.alertedObserverCount ?? 0)
+        let seeingObserverCount = Int(snapshot?.seeingObserverCount ?? 0)
+        let activeObserverCount = Int(snapshot?.activeObserverCount ?? 0)
+        let failCount = Int(snapshot?.failCount ?? 0)
+        let yawDegrees = Double(snapshot?.yawDegrees ?? 0.0)
+        let pitchDegrees = Double(snapshot?.pitchDegrees ?? 0.0)
+        let cameraX = Double(snapshot?.cameraX ?? 0.0)
+        let cameraY = Double(snapshot?.cameraY ?? 0.0)
+        let cameraZ = Double(snapshot?.cameraZ ?? 0.0)
+        let elapsedSeconds = Double(snapshot?.elapsedSeconds ?? 0.0)
         var metricLines = [
             "Viewport: \(Int(viewportSize.width)) x \(Int(viewportSize.height))",
             frameTimingLine,
             "Pressed: \(pressed.isEmpty ? "None" : pressed)",
-            String(format: "Intent: strafe %.1f forward %.1f sprint %@", snapshot?.strafeIntent ?? 0, snapshot?.forwardIntent ?? 0, (snapshot?.sprinting ?? false) ? "on" : "off"),
+            String(format: "Intent: strafe %.1f forward %.1f sprint %@", strafeIntent, forwardIntent, (snapshot?.sprinting ?? false) ? "on" : "off"),
             String(
                 format: "Move Speed: %.2f m/s (walk %.2f / sprint %.2f / look %.3f)",
-                snapshot?.moveSpeed ?? 0,
-                snapshot?.walkSpeed ?? 0,
-                snapshot?.sprintSpeed ?? 0,
-                snapshot?.lookSensitivity ?? 0
+                moveSpeed,
+                walkSpeed,
+                sprintSpeed,
+                lookSensitivity
             ),
             weaponStatusLine(),
             muzzleFeedbackLine(),
@@ -3736,35 +4296,42 @@ final class GameSession: ObservableObject {
             packagingAutomationLine(),
             testerDistributionLine(),
             lightingArchitectureLine(),
+            timeOfDayLine(),
+            antiAliasingLine(),
+            physicalAtmosphereLine(),
+            indirectRenderingLine(),
+            sdfUILine(),
+            renderGraphLine(),
             coreWorldLine(),
             String(format: "Optic: %@ / %.1fx", isScopeActive ? "raised" : "lowered", scopeMagnification),
-            String(format: "Settings: look x%.2f / %@ / HUD %.0f%%", lookSensitivityScale, invertLookY ? "invert Y" : "standard Y", hudOpacity * 100),
+            String(format: "Settings: look x%.2f / %@ / HUD %.0f%% / audio %.0f%%", lookSensitivityScale, invertLookY ? "invert Y" : "standard Y", hudOpacity * 100, audioMasterGain * 100),
             difficultyTelemetryLine(),
-            String(format: "Ground: %.2f m / %@ / %d active sectors", snapshot?.groundHeight ?? 0, (snapshot?.grounded ?? false) ? "grounded" : "fallback", snapshot?.activeSectorCount ?? 0),
+            String(format: "Ground: %.2f m / %@ / %lld active sectors", groundHeight, (snapshot?.grounded ?? false) ? "grounded" : "fallback", activeSectorCount),
             String(
-                format: "Route Metrics: %d / %d checkpoints / %.0fm / %d restarts",
-                snapshot?.completedCheckpointCount ?? 0,
-                snapshot?.totalCheckpointCount ?? 0,
-                snapshot?.routeDistanceMeters ?? 0,
-                snapshot?.restartCount ?? 0
+                format: "Route Metrics: %lld / %lld checkpoints / %.0fm / %lld restarts",
+                completedCheckpoints,
+                totalCheckpoints,
+                routeDistanceMeters,
+                restartCount
             ),
             String(
-                format: "Pressure: %.2f / %d alerted / %d watching / %d in range / %d fails",
-                snapshot?.suspicionLevel ?? 0,
-                snapshot?.alertedObserverCount ?? 0,
-                snapshot?.seeingObserverCount ?? 0,
-                snapshot?.activeObserverCount ?? 0,
-                snapshot?.failCount ?? 0
+                format: "Pressure: %.2f / %lld alerted / %lld watching / %lld in range / %lld fails",
+                suspicionLevel,
+                alertedObserverCount,
+                seeingObserverCount,
+                activeObserverCount,
+                failCount
             ),
-            String(format: "Look: yaw %.1f pitch %.1f", snapshot?.yawDegrees ?? 0, snapshot?.pitchDegrees ?? 0),
-            String(format: "Camera: %.2f %.2f %.2f", snapshot?.cameraX ?? 0, snapshot?.cameraY ?? 0, snapshot?.cameraZ ?? 0),
+            String(format: "Look: yaw %.1f pitch %.1f", yawDegrees, pitchDegrees),
+            String(format: "Camera: %.2f %.2f %.2f", cameraX, cameraY, cameraZ),
             String(format: "Mouse Delta: %.1f %.1f", lastMouseDelta.width, lastMouseDelta.height),
-            String(format: "Uptime: %.2fs", snapshot?.elapsedSeconds ?? 0),
+            String(format: "Uptime: %.2fs", elapsedSeconds),
         ]
         metricLines.insert(
             contentsOf: [
                 observerFeedbackLine(),
                 worldMovementAudioLine(),
+                audioMixLine(),
                 vegetationConcealmentLine(),
                 alternateRouteActivationLine,
                 patrolPairFoundationLine(),
@@ -3853,6 +4420,7 @@ final class GameSession: ObservableObject {
         defaults.set(invertLookY, forKey: Self.invertLookYDefaultsKey)
         defaults.set(lookSensitivityScale, forKey: Self.lookSensitivityScaleDefaultsKey)
         defaults.set(difficultyPreset.rawValue, forKey: Self.difficultyPresetDefaultsKey)
+        defaults.set(audioMasterGain, forKey: Self.audioMasterGainDefaultsKey)
     }
 
     private var storedReviewSessionLine: String? {
@@ -3861,6 +4429,10 @@ final class GameSession: ObservableObject {
 
     private var storedReviewResumeLine: String? {
         storedReviewSessionState?.captureLine
+    }
+
+    private var storedReviewCheckpointPerformanceLine: String? {
+        storedReviewSessionState?.checkpointPerformanceLine
     }
 
     private var storedReviewGuardrailLine: String? {
@@ -3912,8 +4484,7 @@ final class GameSession: ObservableObject {
         }
 
         guard storedReviewSessionState.schemaVersion == 1,
-              storedReviewSessionState.sceneLabel == sceneLabel,
-              storedReviewSessionState.routeSummary == routeSummary else {
+              storedReviewSessionState.sceneLabel == sceneLabel else {
             return nil
         }
 
@@ -4069,10 +4640,15 @@ final class GameSession: ObservableObject {
         let reviewPackageLine = routeDetails.first(where: { $0.hasPrefix("Review Pack:") })
             ?? sceneDetails.first(where: { $0.hasPrefix("Review Pack:") })
             ?? "review pack unavailable"
+        let storedActiveRouteLabel = mapConfiguration.map { activeRouteLabel(in: $0) }
+            ?? mapConfiguration.map { currentPendingOrActiveRouteLabel(in: $0) }
+            ?? "Primary route"
         let state = StoredReviewSessionState(
             schemaVersion: 1,
             sceneLabel: sceneLabel,
             routeSummary: routeSummary,
+            activeRouteID: activeRunRouteID,
+            activeRouteLabel: storedActiveRouteLabel,
             completedCheckpointCount: completedCheckpointCount,
             totalCheckpointCount: totalCheckpointCount,
             nextCheckpointLabel: nextCheckpointLabel,
@@ -4083,6 +4659,10 @@ final class GameSession: ObservableObject {
             scopeActive: isScopeActive,
             routeComplete: snapshot.routeComplete,
             routeFailed: snapshot.routeFailed,
+            elapsedSeconds: snapshot.elapsedSeconds,
+            restartCount: Int(snapshot.restartCount),
+            failCount: Int(snapshot.failCount),
+            routeDistanceMeters: snapshot.routeDistanceMeters,
             reviewPackageLine: reviewPackageLine,
             savedAt: Date().timeIntervalSince1970
         )
@@ -4197,6 +4777,7 @@ final class GameSession: ObservableObject {
         let hudOpacity = defaults.object(forKey: hudOpacityDefaultsKey) as? Double ?? 0.88
         let invertLookY = defaults.object(forKey: invertLookYDefaultsKey) as? Bool ?? false
         let lookSensitivityScale = defaults.object(forKey: lookSensitivityScaleDefaultsKey) as? Double ?? 1.0
+        let audioMasterGain = defaults.object(forKey: audioMasterGainDefaultsKey) as? Double ?? 1.0
         let difficultyPreset = defaults.string(forKey: difficultyPresetDefaultsKey)
             .flatMap(RehearsalDifficultyPreset.init(rawValue:))
             ?? .baseline
@@ -4205,7 +4786,8 @@ final class GameSession: ObservableObject {
             hudOpacity: max(min(hudOpacity, 1.0), 0.35),
             invertLookY: invertLookY,
             lookSensitivityScale: max(min(lookSensitivityScale, 1.8), 0.6),
-            difficultyPreset: difficultyPreset
+            difficultyPreset: difficultyPreset,
+            audioMasterGain: max(min(audioMasterGain, 1.0), 0.0)
         )
     }
 
@@ -4223,6 +4805,7 @@ final class GameSession: ObservableObject {
     private static let invertLookYDefaultsKey = "milsimPony.invertLookY"
     private static let lookSensitivityScaleDefaultsKey = "milsimPony.lookSensitivityScale"
     private static let difficultyPresetDefaultsKey = "milsimPony.difficultyPreset"
+    private static let audioMasterGainDefaultsKey = "milsimPony.audioMasterGain"
     private static let reviewSessionStateDefaultsKey = "milsimPony.reviewSessionState.v1"
     private static let reviewSessionStateFreshnessWindowSeconds = 86_400
 }

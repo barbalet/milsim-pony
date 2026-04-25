@@ -10,20 +10,43 @@ The intent is to improve the current Metal renderer without discarding the exist
 - `WorldSceneData` owns what world JSON can describe.
 - `GameCore` remains authoritative for gameplay and simulation.
 
+## REVIEW Recovery Priority
+
+The stricter Cycle 98 REVIEW audit supersedes the older loose sequencing below when there is a conflict. Renderer items that were previously treated as deferred now have fixed recovery slots:
+
+| Cycle | Renderer Work |
+| --- | --- |
+| `100` | Actual distant-building LOD/impostor renderer switching. |
+| `101` | Dynamic time-of-day lighting controls complete; scenario time now drives sun, sky/fog, haze, ambient/diffuse light, and shadow coverage. |
+| `102` | Forward+/clustered lighting implementation start complete; scene dynamic lights feed a bounded per-drawable shader light list. |
+| `103` | Scoped-safe anti-aliasing prototype complete; depth-aware post edge AA avoids temporal ghosting in scope. |
+| `104` | Physically based atmosphere and sky baseline complete; scene Rayleigh/Mie/ozone controls now feed time-of-day sky and haze. |
+| `105` | GPU-driven indirect rendering prototype complete for shadow-casting object draws, using a fallback-safe per-frame ICB. |
+| `106` | SDF font/UI rendering complete for HUD, scope, and map labels using a scalable outlined text path. |
+| `107` | SSR with IBL/probe fallback complete as a bounded postprocess reflection prototype. |
+| `108` | Render graph/frame graph scaffolding complete for the current shadow, scene, and presentation passes. |
+| `125` | SSAO/HBAO-class closeout. |
+| `126` | CSM implementation closeout. |
+| `127` | Procedural foliage animation closeout. |
+
+No renderer modernization from REVIEW.md should remain in a "future" bucket beyond Cycle `128` without a new explicit review decision.
+
 ## Current Renderer Baseline
 
 The renderer already has a clean split between world assembly and GPU drawing, but it is still visually closer to a strong prototype than a production material pipeline.
 
-- Solid objects are shaded with `vertex color * one texture * one directional light * fog` in `MilsimPonyGame/Renderer/BootstrapShaders.metal`.
-- Terrain gets better atmosphere treatment, but it is still color-driven rather than material-driven in `MilsimPonyGame/Renderer/GameRenderer.swift`.
+- Solid objects are shaded with `vertex color * one texture * one scenario-driven directional light * optional local dynamic lights * physical-atmosphere fog`, then postprocessed with depth-aware edge anti-aliasing and bounded SSR/probe reflection in `MilsimPonyGame/Renderer/BootstrapShaders.metal`.
+- Shadow-casting object draws now have an indirect-command prototype in `MilsimPonyGame/Renderer/GameRenderer.swift`; material draws and terrain remain direct until profiling justifies broader ICB/GPU-culling work.
+- The current shadow, scene geometry, and presentation postprocess passes are represented by a lightweight frame graph descriptor with imported/transient resources and read-before-write validation in `MilsimPonyGame/Renderer/GameRenderer.swift`.
+- Terrain now shares the scene physical-atmosphere clear color and haze controls, but it is still color-driven rather than material-driven in `MilsimPonyGame/Renderer/GameRenderer.swift`.
 - Scene data only exposes flat colors for `terrainPatches`, `roadStrips`, and `grayboxBlocks` in `MilsimPonyGame/World/WorldSceneData.swift`.
 - `SceneTextureKey` only exposes four shared albedo textures in `MilsimPonyGame/Renderer/BootstrapScene.swift`.
 - Scoped stability is currently driven mostly by `drawDistanceMultiplier` and view-dot culling in `MilsimPonyGame/Renderer/BootstrapScene.swift`.
 - The OBJ loader currently ignores UVs and texture map references, so authored assets cannot yet take real albedo/normal/roughness/AO inputs in `MilsimPonyGame/Renderer/BootstrapScene.swift`.
 
-## Sequencing
+## Historical Sequencing
 
-Recommended order for this repo:
+The original recommended order for this repo was:
 
 1. Shared groundwork for scene/material schema.
 2. Cascaded sun shadows.
@@ -33,7 +56,7 @@ Recommended order for this repo:
    `SMAA + HLOD/impostors` first, `TAA` second if ghosting risk is under control.
 6. Decals and landmark-specific material breakup.
 
-That order is deliberate:
+That order was deliberate, but it is now subordinate to the REVIEW recovery priority above:
 
 - Shadows improve readability immediately with the least asset churn.
 - Materials are not worth doing properly until the schema and asset path can carry them.

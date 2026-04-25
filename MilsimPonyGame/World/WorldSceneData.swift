@@ -26,6 +26,7 @@ struct SceneConfiguration: Decodable {
     let randomSpawns: [SpawnConfiguration]?
     let sky: SkyConfiguration
     let sun: SunConfiguration
+    let timeOfDay: TimeOfDayConfiguration?
     let atmosphere: AtmosphereConfiguration?
     let player: PlayerConfiguration?
     let scope: ScopeConfiguration?
@@ -40,6 +41,13 @@ struct SceneConfiguration: Decodable {
     let packagingAutomation: PackagingAutomationConfiguration?
     let testerDistribution: TesterDistributionConfiguration?
     let lightingArchitecture: LightingArchitectureConfiguration?
+    let dynamicLights: [DynamicLightConfiguration]?
+    let antiAliasing: AntiAliasingConfiguration?
+    let physicalAtmosphere: PhysicalAtmosphereConfiguration?
+    let indirectRendering: IndirectRenderingConfiguration?
+    let sdfUI: SDFUIConfiguration?
+    let renderGraph: RenderGraphConfiguration?
+    let audioMix: AudioMixConfiguration?
     let sessionPersistence: SessionPersistenceConfiguration?
     let route: RouteConfiguration
     let reviewPack: ReviewPackConfiguration?
@@ -102,6 +110,11 @@ struct ScopeConfiguration: Decodable {
     let drawDistanceMultiplier: Float?
     let farPlaneMultiplier: Float?
     let reticleColor: [Float]?
+    let lensDirtStrength: Float?
+    let edgeAberrationStrength: Float?
+    let parallaxCompensation: Float?
+    let milDotSpacingMils: Float?
+    let calibrationRangeMeters: Float?
 
     init(
         label: String? = nil,
@@ -110,7 +123,12 @@ struct ScopeConfiguration: Decodable {
         lookSensitivityMultiplier: Float? = 0.26,
         drawDistanceMultiplier: Float? = 2.4,
         farPlaneMultiplier: Float? = 1.35,
-        reticleColor: [Float]? = nil
+        reticleColor: [Float]? = nil,
+        lensDirtStrength: Float? = 0.0,
+        edgeAberrationStrength: Float? = 0.0,
+        parallaxCompensation: Float? = 0.0,
+        milDotSpacingMils: Float? = 1.0,
+        calibrationRangeMeters: Float? = 400.0
     ) {
         self.label = label
         self.magnification = magnification
@@ -119,6 +137,11 @@ struct ScopeConfiguration: Decodable {
         self.drawDistanceMultiplier = drawDistanceMultiplier
         self.farPlaneMultiplier = farPlaneMultiplier
         self.reticleColor = reticleColor
+        self.lensDirtStrength = lensDirtStrength
+        self.edgeAberrationStrength = edgeAberrationStrength
+        self.parallaxCompensation = parallaxCompensation
+        self.milDotSpacingMils = milDotSpacingMils
+        self.calibrationRangeMeters = calibrationRangeMeters
     }
 
     var reticleColorVector: SIMD4<Float> {
@@ -433,6 +456,41 @@ struct SunConfiguration: Decodable {
     }
 }
 
+struct TimeOfDayConfiguration: Decodable {
+    let enabled: Bool?
+    let status: String?
+    let rule: String?
+    let label: String?
+    let hour: Float?
+    let sunAzimuthDegrees: Float?
+    let sunElevationDegrees: Float?
+    let horizonColor: [Float]?
+    let zenithColor: [Float]?
+    let sunColor: [Float]?
+    let fogColor: [Float]?
+    let ambientIntensity: Float?
+    let diffuseIntensity: Float?
+    let shadowStrength: Float?
+    let shadowCoverageMultiplier: Float?
+    let hazeStrength: Float?
+
+    var horizonColorVector: SIMD4<Float>? {
+        horizonColor?.simdColor(or: SIMD4<Float>(0.55, 0.70, 0.84, 1))
+    }
+
+    var zenithColorVector: SIMD4<Float>? {
+        zenithColor?.simdColor(or: SIMD4<Float>(0.17, 0.30, 0.48, 1))
+    }
+
+    var sunColorVector: SIMD3<Float>? {
+        sunColor?.simd3(or: SIMD3<Float>(1.0, 0.95, 0.86))
+    }
+
+    var fogColorVector: SIMD4<Float>? {
+        fogColor?.simdColor(or: SIMD4<Float>(0.66, 0.74, 0.80, 1))
+    }
+}
+
 struct EnvironmentalMotionConfiguration: Decodable {
     let status: String?
     let rule: String?
@@ -538,6 +596,12 @@ struct WaterReflectionConfiguration: Decodable {
     let approach: String?
     let deferredReason: String?
     let screenSpaceReflectionStatus: String?
+    let ssrStrength: Float?
+    let ssrMaxDistancePixels: Float?
+    let ssrDepthThickness: Float?
+    let probeFallbackStrength: Float?
+    let reflectionHorizonY: Float?
+    let probeColor: [Float]?
 
     init(
         status: String? = "water reflection planning pending",
@@ -545,7 +609,13 @@ struct WaterReflectionConfiguration: Decodable {
         probeTargets: [String]? = nil,
         approach: String? = "material probe metadata before SSR",
         deferredReason: String? = "SSR waits for stable distant LOD and water probe evidence",
-        screenSpaceReflectionStatus: String? = "SSR deferred"
+        screenSpaceReflectionStatus: String? = "SSR deferred",
+        ssrStrength: Float? = 0.0,
+        ssrMaxDistancePixels: Float? = 36.0,
+        ssrDepthThickness: Float? = 0.018,
+        probeFallbackStrength: Float? = 0.0,
+        reflectionHorizonY: Float? = 0.54,
+        probeColor: [Float]? = nil
     ) {
         self.status = status
         self.rule = rule
@@ -553,6 +623,12 @@ struct WaterReflectionConfiguration: Decodable {
         self.approach = approach
         self.deferredReason = deferredReason
         self.screenSpaceReflectionStatus = screenSpaceReflectionStatus
+        self.ssrStrength = ssrStrength
+        self.ssrMaxDistancePixels = ssrMaxDistancePixels
+        self.ssrDepthThickness = ssrDepthThickness
+        self.probeFallbackStrength = probeFallbackStrength
+        self.reflectionHorizonY = reflectionHorizonY
+        self.probeColor = probeColor
     }
 }
 
@@ -647,6 +723,153 @@ struct LightingArchitectureConfiguration: Decodable {
         self.measuredPrerequisites = measuredPrerequisites
         self.smokeCommand = smokeCommand
     }
+}
+
+struct DynamicLightConfiguration: Decodable {
+    let id: String
+    let label: String
+    let position: [Float]
+    let color: [Float]
+    let intensity: Float?
+    let radius: Float?
+    let clusterTag: String?
+
+    var positionVector: SIMD3<Float> {
+        position.simd3(or: SIMD3<Float>(0, 3, 0))
+    }
+
+    var colorVector: SIMD3<Float> {
+        color.simd3(or: SIMD3<Float>(1, 0.92, 0.74))
+    }
+}
+
+struct AntiAliasingConfiguration: Decodable {
+    let status: String?
+    let rule: String?
+    let mode: String?
+    let edgeThreshold: Float?
+    let blendStrength: Float?
+    let depthRejection: Float?
+    let scopeStabilityRule: String?
+}
+
+struct PhysicalAtmosphereConfiguration: Decodable {
+    let status: String?
+    let rule: String?
+    let model: String?
+    let rayleighStrength: Float?
+    let mieStrength: Float?
+    let mieAnisotropy: Float?
+    let ozoneAbsorption: Float?
+    let turbidity: Float?
+    let horizonLift: Float?
+    let densityFalloff: Float?
+    let scopeStabilityRule: String?
+}
+
+struct IndirectRenderingConfiguration: Decodable {
+    let status: String?
+    let rule: String?
+    let mode: String?
+    let drawClass: String?
+    let commandPath: String?
+    let capacity: Int?
+    let coverageNote: String?
+    let fallbackRule: String?
+    let measurementRule: String?
+}
+
+struct SDFUIConfiguration: Decodable {
+    let status: String?
+    let rule: String?
+    let mode: String?
+    let fontFamily: String?
+    let coverage: [String]?
+    let outlinePixels: Float?
+    let shadowPixels: Float?
+    let minimumScaleFactor: Float?
+    let mapLabelRule: String?
+    let scopeRule: String?
+    let fallbackRule: String?
+    let measurementRule: String?
+
+    init(
+        status: String? = "SDF UI rendering planning pending",
+        rule: String? = "render HUD, scope, and map labels through a scalable text path",
+        mode: String? = "signed-distance-style SwiftUI text pass",
+        fontFamily: String? = "monospaced system",
+        coverage: [String]? = nil,
+        outlinePixels: Float? = 1.0,
+        shadowPixels: Float? = 2.0,
+        minimumScaleFactor: Float? = 0.58,
+        mapLabelRule: String? = "keep map road and sector labels crisp across canvas scale",
+        scopeRule: String? = "keep scope status text readable over reticle and aperture",
+        fallbackRule: String? = "fall back to system vector text if SDF atlas generation is unavailable",
+        measurementRule: String? = "verify HUD, scope, and map text at capture resolutions"
+    ) {
+        self.status = status
+        self.rule = rule
+        self.mode = mode
+        self.fontFamily = fontFamily
+        self.coverage = coverage
+        self.outlinePixels = outlinePixels
+        self.shadowPixels = shadowPixels
+        self.minimumScaleFactor = minimumScaleFactor
+        self.mapLabelRule = mapLabelRule
+        self.scopeRule = scopeRule
+        self.fallbackRule = fallbackRule
+        self.measurementRule = measurementRule
+    }
+}
+
+struct RenderGraphConfiguration: Decodable {
+    let status: String?
+    let rule: String?
+    let mode: String?
+    let passOrder: [String]?
+    let importedResources: [String]?
+    let transientResources: [String]?
+    let aliasingRule: String?
+    let validationRule: String?
+    let expansionRule: String?
+
+    init(
+        status: String? = "render graph planning pending",
+        rule: String? = "describe renderer pass order and resource ownership before adding more passes",
+        mode: String? = "manual frame graph descriptor",
+        passOrder: [String]? = nil,
+        importedResources: [String]? = nil,
+        transientResources: [String]? = nil,
+        aliasingRule: String? = "no transient aliasing until graph validation is visible",
+        validationRule: String? = "verify pass reads are produced or imported before execution",
+        expansionRule: String? = "promote CSM, SSR, SSAO, and capture passes into graph nodes as they mature"
+    ) {
+        self.status = status
+        self.rule = rule
+        self.mode = mode
+        self.passOrder = passOrder
+        self.importedResources = importedResources
+        self.transientResources = transientResources
+        self.aliasingRule = aliasingRule
+        self.validationRule = validationRule
+        self.expansionRule = expansionRule
+    }
+}
+
+struct AudioMixConfiguration: Decodable {
+    let status: String?
+    let rule: String?
+    let mode: String?
+    let masterGain: Float?
+    let ambienceGain: Float?
+    let movementGain: Float?
+    let scopeGain: Float?
+    let weaponGain: Float?
+    let observerGain: Float?
+    let footstepSurfaces: [String]?
+    let ambienceBeds: [String]?
+    let mixRule: String?
+    let smokeRule: String?
 }
 
 struct SessionPersistenceConfiguration: Decodable {
@@ -804,6 +1027,12 @@ struct CollisionAuthoringConfiguration: Decodable {
     let rule: String
     let audit: String
     let blockerScope: String
+    let selectedVolumeID: String?
+    let selectedVolumeLabel: String?
+    let validationStatus: String?
+    let exportStatus: String?
+    let reviewGuidance: String?
+    let minimumClearanceMeters: Float?
 }
 
 struct AlternateRouteConfiguration: Decodable {
@@ -1340,6 +1569,16 @@ enum WorldRuntimeConversions {
                 resolvedGroupIndex = 0
             }
 
+            let patrolRouteID = observer.patrolRouteID?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let patrolRole = observer.patrolRole?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased()
+            let formationSpacing = max(observer.formationSpacingMeters ?? 0.0, 0.0)
+            let patrolEnabled = patrolRouteID?.isEmpty == false && formationSpacing > 0.0
+            let rolePhaseOffset: Float = patrolRole?.contains("wing") == true ? .pi : 0.0
+            let scanCycleSeconds = max(observer.scanCycleSeconds ?? 5.2, 0.0)
+
             return GameThreatObserver(
                 positionX: observer.positionVector.x,
                 positionY: observer.positionVector.y,
@@ -1362,7 +1601,15 @@ enum WorldRuntimeConversions {
                 ),
                 turnRateDegreesPerSecond: max(observer.turnRateDegreesPerSecond ?? 78.0, 0.0),
                 scanArcDegrees: max(observer.scanArcDegrees ?? (resolvedGroupIndex > 0 ? 28.0 : 0.0), 0.0),
-                scanCycleSeconds: max(observer.scanCycleSeconds ?? 5.2, 0.0)
+                scanCycleSeconds: scanCycleSeconds,
+                patrolStrideMeters: patrolEnabled
+                    ? min(max(formationSpacing * 0.65, 2.4), 16.0)
+                    : 0.0,
+                patrolPhaseOffsetRadians: rolePhaseOffset,
+                patrolCycleSeconds: patrolEnabled
+                    ? min(max(scanCycleSeconds * 1.9, 6.0), 24.0)
+                    : 0.0,
+                patrolEnabled: patrolEnabled
             )
         }
     }

@@ -325,6 +325,75 @@ static float GameCoreObserverScanCycleSeconds(const GameThreatObserver *observer
     return GameCoreClamp(authoredCycle, 1.2f, 20.0f);
 }
 
+static float GameCoreObserverPatrolCycleSeconds(const GameThreatObserver *observer) {
+    if (observer == NULL || !observer->patrolEnabled || !(observer->patrolStrideMeters > 0.0f)) {
+        return 0.0f;
+    }
+
+    const float authoredCycle = observer->patrolCycleSeconds > 0.0f
+        ? observer->patrolCycleSeconds
+        : (GameCoreObserverScanCycleSeconds(observer) * 2.0f);
+    return GameCoreClamp(authoredCycle, 3.0f, 30.0f);
+}
+
+static float GameCoreObserverPatrolOffsetMeters(int observerIndex) {
+    if (observerIndex < 0 || observerIndex >= gameState.threatObserverCount) {
+        return 0.0f;
+    }
+
+    const GameThreatObserver *observer = &gameState.threatObservers[observerIndex];
+    const GameThreatObserver *authoredObserver = &gameState.authoredThreatObservers[observerIndex];
+    const float yawRadians = GameCoreDegreesToRadians(authoredObserver->yawDegrees);
+    const float forwardX = sinf(yawRadians);
+    const float forwardZ = -cosf(yawRadians);
+    const float deltaX = observer->positionX - authoredObserver->positionX;
+    const float deltaZ = observer->positionZ - authoredObserver->positionZ;
+    return (deltaX * forwardX) + (deltaZ * forwardZ);
+}
+
+static bool GameCoreObserverPatrolMoving(int observerIndex) {
+    if (observerIndex < 0 || observerIndex >= gameState.threatObserverCount) {
+        return false;
+    }
+
+    const GameThreatObserver *observer = &gameState.threatObservers[observerIndex];
+    const bool alerted = gameState.observerAlertSecondsRemaining[observerIndex] > 0.001f;
+    return observer->patrolEnabled
+        && observer->patrolStrideMeters > 0.0f
+        && GameCoreObserverPatrolCycleSeconds(observer) > 0.0f
+        && !gameState.observerNeutralized[observerIndex]
+        && !alerted;
+}
+
+static void GameCoreUpdateObserverPatrolPosition(int observerIndex) {
+    if (observerIndex < 0 || observerIndex >= gameState.threatObserverCount) {
+        return;
+    }
+
+    GameThreatObserver *observer = &gameState.threatObservers[observerIndex];
+    const GameThreatObserver *authoredObserver = &gameState.authoredThreatObservers[observerIndex];
+
+    if (!GameCoreObserverPatrolMoving(observerIndex)) {
+        return;
+    }
+
+    const float cycleSeconds = GameCoreObserverPatrolCycleSeconds(observer);
+    const float normalizedPhase = (float)fmod(
+        (gameState.elapsedSeconds / (double)cycleSeconds)
+            + ((double)observer->patrolPhaseOffsetRadians / (2.0 * M_PI)),
+        1.0
+    );
+    const float patrolOffset = sinf(normalizedPhase * 2.0f * (float)M_PI)
+        * GameCoreClamp(observer->patrolStrideMeters, 0.0f, 32.0f);
+    const float yawRadians = GameCoreDegreesToRadians(authoredObserver->yawDegrees);
+    const float forwardX = sinf(yawRadians);
+    const float forwardZ = -cosf(yawRadians);
+
+    observer->positionX = authoredObserver->positionX + (forwardX * patrolOffset);
+    observer->positionY = authoredObserver->positionY;
+    observer->positionZ = authoredObserver->positionZ + (forwardZ * patrolOffset);
+}
+
 static void GameCorePrimeObserverAlert(
     int observerIndex,
     int sourceIndex,
@@ -852,6 +921,9 @@ static void GameCoreResetDetectionState(bool clearFailCount) {
     memset(gameState.observerNeutralized, 0, sizeof(gameState.observerNeutralized));
     GameCoreResetAllObserverDebugStates();
     for (int index = 0; index < gameState.threatObserverCount; index++) {
+        gameState.threatObservers[index].positionX = gameState.authoredThreatObservers[index].positionX;
+        gameState.threatObservers[index].positionY = gameState.authoredThreatObservers[index].positionY;
+        gameState.threatObservers[index].positionZ = gameState.authoredThreatObservers[index].positionZ;
         gameState.threatObservers[index].yawDegrees = gameState.authoredThreatObservers[index].yawDegrees;
         gameState.threatObservers[index].pitchDegrees = gameState.authoredThreatObservers[index].pitchDegrees;
         const float scanCycleSeconds = GameCoreObserverScanCycleSeconds(&gameState.threatObservers[index]);
@@ -1174,6 +1246,7 @@ static void GameCoreUpdateDetection(double deltaTime) {
             }
         }
 
+        GameCoreUpdateObserverPatrolPosition(index);
         GameCoreUpdateObserverFacing(index, detectionDeltaTime);
 
         const GameThreatObserver *observer = &gameState.threatObservers[index];
@@ -1195,6 +1268,9 @@ static void GameCoreUpdateDetection(double deltaTime) {
         }
 
         gameState.observerDebugStates[index] = (GameObserverDebugState) {
+            .positionX = observer->positionX,
+            .positionY = observer->positionY,
+            .positionZ = observer->positionZ,
             .rangeMeters = observer->range,
             .fieldOfViewDegrees = effectiveFieldOfViewDegrees,
             .yawDegrees = observer->yawDegrees,
@@ -1206,12 +1282,14 @@ static void GameCoreUpdateDetection(double deltaTime) {
             .scanArcDegrees = scanArcDegrees,
             .scanCycleSeconds = scanCycleSeconds,
             .scanPhaseSeconds = gameState.observerScanPhaseSeconds[index],
+            .patrolOffsetMeters = GameCoreObserverPatrolOffsetMeters(index),
             .neutralized = gameState.observerNeutralized[index],
             .alerted = alerted,
             .supportingGroup = alerted
                 && gameState.observerAlertSourceIndex[index] >= 0
                 && gameState.observerAlertSourceIndex[index] != index,
             .scanHalted = alerted && scanArcDegrees > 0.0f,
+            .patrolMoving = GameCoreObserverPatrolMoving(index),
         };
     }
 

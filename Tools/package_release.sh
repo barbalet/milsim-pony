@@ -8,9 +8,9 @@ scheme_name="MilsimPonyGame"
 derived_data_path="${DERIVED_DATA_PATH:-/tmp/MilsimPonyReleaseDerived}"
 artifacts_root="${ARTIFACTS_ROOT:-$repo_root/artifacts/release}"
 manifest_path="$repo_root/MilsimPonyGame/Assets/WorldData/CanberraBootstrap/world_manifest.json"
-release_cycle="${RELEASE_CYCLE:-98}"
-expected_version="${EXPECTED_MARKETING_VERSION:-0.98.0}"
-expected_build="${EXPECTED_BUILD_NUMBER:-98}"
+release_cycle="${RELEASE_CYCLE:-116}"
+expected_version="${EXPECTED_MARKETING_VERSION:-1.16.0}"
+expected_build="${EXPECTED_BUILD_NUMBER:-116}"
 tester_channel="${TESTER_CHANNEL:-local-review zip}"
 notarization_profile="${NOTARIZATION_PROFILE:-}"
 validate_only=0
@@ -19,7 +19,25 @@ check_distribution=0
 timestamp="$(date -u +"%Y%m%d-%H%M%S")"
 release_docs=(
   "README.md"
-  "Docs/CYCLE_98_SMOKE_TEST.md"
+  "Docs/CYCLE_116_SMOKE_TEST.md"
+  "Docs/CYCLE_115_SMOKE_TEST.md"
+  "Docs/CYCLE_114_SMOKE_TEST.md"
+  "Docs/CYCLE_113_SMOKE_TEST.md"
+  "Docs/CYCLE_112_SMOKE_TEST.md"
+  "Docs/CYCLE_112_TEXTURE_ACCEPTANCE.md"
+  "Docs/CYCLE_111_SMOKE_TEST.md"
+  "Docs/CYCLE_110_SMOKE_TEST.md"
+  "Docs/CYCLE_109_SMOKE_TEST.md"
+  "Docs/CYCLE_108_SMOKE_TEST.md"
+  "Docs/CYCLE_107_SMOKE_TEST.md"
+  "Docs/CYCLE_106_SMOKE_TEST.md"
+  "Docs/CYCLE_105_SMOKE_TEST.md"
+  "Docs/CYCLE_104_SMOKE_TEST.md"
+  "Docs/CYCLE_103_SMOKE_TEST.md"
+  "Docs/CYCLE_102_SMOKE_TEST.md"
+  "Docs/CYCLE_101_SMOKE_TEST.md"
+  "Docs/CYCLE_100_SMOKE_TEST.md"
+  "Docs/CYCLE_99_SMOKE_TEST.md"
   "Docs/LIGHTING_ARCHITECTURE_DECISION.md"
   "Docs/TESTER_DISTRIBUTION_PIPELINE.md"
   "Docs/DEVELOPMENT_BACKLOG.md"
@@ -206,11 +224,29 @@ World Manifest: MilsimPonyGame/Assets/WorldData/CanberraBootstrap/world_manifest
 Tester Channel: $tester_channel
 Notarization Profile: ${notarization_profile:-not configured}
 Distribution Gate: Tools/package_release.sh --check-distribution
-SDF UI Scope: HUD/map text crispness scoped after tester pipeline
+SDF UI Scope: HUD, scope, and map labels use scalable outlined text
 Lighting Architecture: Docs/LIGHTING_ARCHITECTURE_DECISION.md
 Included Docs:
 - ReleaseDocs/README.md
-- ReleaseDocs/CYCLE_98_SMOKE_TEST.md
+- ReleaseDocs/CYCLE_116_SMOKE_TEST.md
+- ReleaseDocs/CYCLE_115_SMOKE_TEST.md
+- ReleaseDocs/CYCLE_114_SMOKE_TEST.md
+- ReleaseDocs/CYCLE_113_SMOKE_TEST.md
+- ReleaseDocs/CYCLE_112_SMOKE_TEST.md
+- ReleaseDocs/CYCLE_112_TEXTURE_ACCEPTANCE.md
+- ReleaseDocs/CYCLE_111_SMOKE_TEST.md
+- ReleaseDocs/CYCLE_110_SMOKE_TEST.md
+- ReleaseDocs/CYCLE_109_SMOKE_TEST.md
+- ReleaseDocs/CYCLE_108_SMOKE_TEST.md
+- ReleaseDocs/CYCLE_107_SMOKE_TEST.md
+- ReleaseDocs/CYCLE_106_SMOKE_TEST.md
+- ReleaseDocs/CYCLE_105_SMOKE_TEST.md
+- ReleaseDocs/CYCLE_104_SMOKE_TEST.md
+- ReleaseDocs/CYCLE_103_SMOKE_TEST.md
+- ReleaseDocs/CYCLE_102_SMOKE_TEST.md
+- ReleaseDocs/CYCLE_101_SMOKE_TEST.md
+- ReleaseDocs/CYCLE_100_SMOKE_TEST.md
+- ReleaseDocs/CYCLE_99_SMOKE_TEST.md
 - ReleaseDocs/LIGHTING_ARCHITECTURE_DECISION.md
 - ReleaseDocs/TESTER_DISTRIBUTION_PIPELINE.md
 - ReleaseDocs/DEVELOPMENT_BACKLOG.md

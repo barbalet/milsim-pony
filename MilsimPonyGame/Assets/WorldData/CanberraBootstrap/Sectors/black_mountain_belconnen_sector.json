@@ -31,6 +31,12 @@
       "cornerHeights": [6.0, 4.0, 3.0, 5.0],
       "subdivisions": 18,
       "color": [0.35, 0.42, 0.30, 1.0],
+      "material": {
+        "albedoTexture": "Textures/Final/canberra_dry_grass_texture.png",
+        "baseColor": [0.94, 1.03, 0.88, 1.0],
+        "roughness": 0.91,
+        "ambientOcclusionStrength": 0.86
+      },
       "yawDegrees": -6.0
     },
     {
@@ -55,6 +61,12 @@
       "cornerHeights": [10.0, 8.0, 5.0, 6.0],
       "subdivisions": 14,
       "color": [0.34, 0.41, 0.30, 1.0],
+      "material": {
+        "albedoTexture": "Textures/Final/canberra_dry_grass_texture.png",
+        "baseColor": [0.93, 1.02, 0.87, 1.0],
+        "roughness": 0.92,
+        "ambientOcclusionStrength": 0.86
+      },
       "yawDegrees": 0.0
     },
     {
@@ -64,6 +76,12 @@
       "cornerHeights": [8.0, 6.0, 4.0, 5.0],
       "subdivisions": 14,
       "color": [0.33, 0.40, 0.29, 1.0],
+      "material": {
+        "albedoTexture": "Textures/Final/canberra_dry_grass_texture.png",
+        "baseColor": [0.91, 1.00, 0.85, 1.0],
+        "roughness": 0.93,
+        "ambientOcclusionStrength": 0.87
+      },
       "yawDegrees": -4.0
     },
     {
@@ -73,6 +91,12 @@
       "cornerHeights": [3.4, 2.6, 1.0, 1.2],
       "subdivisions": 14,
       "color": [0.35, 0.42, 0.31, 1.0],
+      "material": {
+        "albedoTexture": "Textures/Final/canberra_dry_grass_texture.png",
+        "baseColor": [0.94, 1.03, 0.88, 1.0],
+        "roughness": 0.91,
+        "ambientOcclusionStrength": 0.85
+      },
       "yawDegrees": 6.0
     }
   ],
@@ -87,6 +111,15 @@
       "shoulderWidth": 1.0,
       "centerLineWidth": 0.20,
       "crownHeight": 0.04,
+      "material": {
+        "albedoTexture": "Textures/Final/canberra_arterial_asphalt_albedo.png",
+        "normalTexture": "Textures/Final/canberra_arterial_asphalt_normal.png",
+        "roughnessTexture": "Textures/Final/canberra_arterial_asphalt_roughness.png",
+        "ambientOcclusionTexture": "Textures/Final/canberra_arterial_asphalt_ao.png",
+        "baseColor": [1.00, 1.00, 0.98, 1.0],
+        "roughness": 0.88,
+        "normalScale": 1.04
+      },
       "yawDegrees": 84.0
     },
     {
@@ -99,6 +132,15 @@
       "shoulderWidth": 0.9,
       "centerLineWidth": 0.18,
       "crownHeight": 0.04,
+      "material": {
+        "albedoTexture": "Textures/Final/canberra_arterial_asphalt_albedo.png",
+        "normalTexture": "Textures/Final/canberra_arterial_asphalt_normal.png",
+        "roughnessTexture": "Textures/Final/canberra_arterial_asphalt_roughness.png",
+        "ambientOcclusionTexture": "Textures/Final/canberra_arterial_asphalt_ao.png",
+        "baseColor": [0.98, 0.98, 0.96, 1.0],
+        "roughness": 0.90,
+        "normalScale": 1.02
+      },
       "yawDegrees": 0.0
     },
     {
@@ -111,6 +153,15 @@
       "shoulderWidth": 0.9,
       "centerLineWidth": 0.18,
       "crownHeight": 0.04,
+      "material": {
+        "albedoTexture": "Textures/Final/canberra_arterial_asphalt_albedo.png",
+        "normalTexture": "Textures/Final/canberra_arterial_asphalt_normal.png",
+        "roughnessTexture": "Textures/Final/canberra_arterial_asphalt_roughness.png",
+        "ambientOcclusionTexture": "Textures/Final/canberra_arterial_asphalt_ao.png",
+        "baseColor": [0.98, 0.98, 0.96, 1.0],
+        "roughness": 0.90,
+        "normalScale": 1.02
+      },
       "yawDegrees": 34.0
     },
     {
@@ -123,6 +174,15 @@
       "shoulderWidth": 0.9,
       "centerLineWidth": 0.18,
       "crownHeight": 0.04,
+      "material": {
+        "albedoTexture": "Textures/Final/canberra_arterial_asphalt_albedo.png",
+        "normalTexture": "Textures/Final/canberra_arterial_asphalt_normal.png",
+        "roughnessTexture": "Textures/Final/canberra_arterial_asphalt_roughness.png",
+        "ambientOcclusionTexture": "Textures/Final/canberra_arterial_asphalt_ao.png",
+        "baseColor": [0.98, 0.98, 0.96, 1.0],
+        "roughness": 0.90,
+        "normalScale": 1.02
+      },
       "yawDegrees": 88.0
     },
     {
@@ -135,6 +195,15 @@
       "shoulderWidth": 0.92,
       "centerLineWidth": 0.18,
       "crownHeight": 0.04,
+      "material": {
+        "albedoTexture": "Textures/Final/canberra_arterial_asphalt_albedo.png",
+        "normalTexture": "Textures/Final/canberra_arterial_asphalt_normal.png",
+        "roughnessTexture": "Textures/Final/canberra_arterial_asphalt_roughness.png",
+        "ambientOcclusionTexture": "Textures/Final/canberra_arterial_asphalt_ao.png",
+        "baseColor": [0.99, 0.99, 0.97, 1.0],
+        "roughness": 0.89,
+        "normalScale": 1.03
+      },
       "yawDegrees": 56.0
     },
     {
@@ -147,6 +216,15 @@
       "shoulderWidth": 0.72,
       "centerLineWidth": 0.12,
       "crownHeight": 0.03,
+      "material": {
+        "albedoTexture": "Textures/Final/canberra_arterial_asphalt_albedo.png",
+        "normalTexture": "Textures/Final/canberra_arterial_asphalt_normal.png",
+        "roughnessTexture": "Textures/Final/canberra_arterial_asphalt_roughness.png",
+        "ambientOcclusionTexture": "Textures/Final/canberra_arterial_asphalt_ao.png",
+        "baseColor": [0.96, 0.97, 0.95, 1.0],
+        "roughness": 0.91,
+        "normalScale": 1.00
+      },
       "yawDegrees": 88.0
     },
     {
@@ -159,6 +237,15 @@
       "shoulderWidth": 0.82,
       "centerLineWidth": 0.16,
       "crownHeight": 0.03,
+      "material": {
+        "albedoTexture": "Textures/Final/canberra_arterial_asphalt_albedo.png",
+        "normalTexture": "Textures/Final/canberra_arterial_asphalt_normal.png",
+        "roughnessTexture": "Textures/Final/canberra_arterial_asphalt_roughness.png",
+        "ambientOcclusionTexture": "Textures/Final/canberra_arterial_asphalt_ao.png",
+        "baseColor": [0.97, 0.97, 0.95, 1.0],
+        "roughness": 0.90,
+        "normalScale": 1.01
+      },
       "yawDegrees": 12.0
     },
     {
@@ -171,6 +258,15 @@
       "shoulderWidth": 0.88,
       "centerLineWidth": 0.18,
       "crownHeight": 0.03,
+      "material": {
+        "albedoTexture": "Textures/Final/canberra_arterial_asphalt_albedo.png",
+        "normalTexture": "Textures/Final/canberra_arterial_asphalt_normal.png",
+        "roughnessTexture": "Textures/Final/canberra_arterial_asphalt_roughness.png",
+        "ambientOcclusionTexture": "Textures/Final/canberra_arterial_asphalt_ao.png",
+        "baseColor": [0.97, 0.97, 0.95, 1.0],
+        "roughness": 0.90,
+        "normalScale": 1.01
+      },
       "yawDegrees": 16.0
     }
   ],
@@ -212,6 +308,15 @@
       "position": [-148.0, 16.0, -194.0],
       "halfExtents": [22.0, 16.0, 14.0],
       "color": [0.45, 0.48, 0.52, 1.0],
+      "material": {
+        "albedoTexture": "Textures/Final/canberra_civic_facade_albedo.png",
+        "normalTexture": "Textures/Final/canberra_civic_facade_normal.png",
+        "roughnessTexture": "Textures/Final/canberra_civic_facade_roughness.png",
+        "ambientOcclusionTexture": "Textures/Final/canberra_civic_facade_ao.png",
+        "baseColor": [0.95, 0.99, 1.04, 1.0],
+        "roughness": 0.78,
+        "normalScale": 1.08
+      },
       "yawDegrees": 0.0
     },
     {
@@ -219,6 +324,15 @@
       "position": [-108.0, 11.0, -180.0],
       "halfExtents": [15.0, 11.0, 11.0],
       "color": [0.44, 0.47, 0.50, 1.0],
+      "material": {
+        "albedoTexture": "Textures/Final/canberra_civic_facade_albedo.png",
+        "normalTexture": "Textures/Final/canberra_civic_facade_normal.png",
+        "roughnessTexture": "Textures/Final/canberra_civic_facade_roughness.png",
+        "ambientOcclusionTexture": "Textures/Final/canberra_civic_facade_ao.png",
+        "baseColor": [0.94, 0.98, 1.03, 1.0],
+        "roughness": 0.79,
+        "normalScale": 1.06
+      },
       "yawDegrees": 0.0
     },
     {
@@ -226,6 +340,15 @@
       "position": [-132.0, 22.0, -176.0],
       "halfExtents": [7.0, 22.0, 7.0],
       "color": [0.52, 0.55, 0.59, 1.0],
+      "material": {
+        "albedoTexture": "Textures/Final/canberra_civic_facade_albedo.png",
+        "normalTexture": "Textures/Final/canberra_civic_facade_normal.png",
+        "roughnessTexture": "Textures/Final/canberra_civic_facade_roughness.png",
+        "ambientOcclusionTexture": "Textures/Final/canberra_civic_facade_ao.png",
+        "baseColor": [1.00, 1.03, 1.07, 1.0],
+        "roughness": 0.74,
+        "normalScale": 1.08
+      },
       "yawDegrees": 0.0
     },
     {
@@ -249,6 +372,15 @@
       "position": [-18.0, 4.5, -146.0],
       "halfExtents": [10.0, 4.5, 8.0],
       "color": [0.42, 0.45, 0.48, 1.0],
+      "material": {
+        "albedoTexture": "Textures/Final/canberra_civic_facade_albedo.png",
+        "normalTexture": "Textures/Final/canberra_civic_facade_normal.png",
+        "roughnessTexture": "Textures/Final/canberra_civic_facade_roughness.png",
+        "ambientOcclusionTexture": "Textures/Final/canberra_civic_facade_ao.png",
+        "baseColor": [0.94, 0.98, 1.02, 1.0],
+        "roughness": 0.79,
+        "normalScale": 1.06
+      },
       "yawDegrees": 0.0
     },
     {
@@ -256,6 +388,15 @@
       "position": [-144.0, 10.0, -204.0],
       "halfExtents": [28.0, 10.0, 16.0],
       "color": [0.45, 0.48, 0.52, 1.0],
+      "material": {
+        "albedoTexture": "Textures/Final/canberra_civic_facade_albedo.png",
+        "normalTexture": "Textures/Final/canberra_civic_facade_normal.png",
+        "roughnessTexture": "Textures/Final/canberra_civic_facade_roughness.png",
+        "ambientOcclusionTexture": "Textures/Final/canberra_civic_facade_ao.png",
+        "baseColor": [0.96, 0.99, 1.04, 1.0],
+        "roughness": 0.78,
+        "normalScale": 1.08
+      },
       "yawDegrees": 0.0,
       "collisionEnabled": false
     },
@@ -264,6 +405,15 @@
       "position": [-166.0, 5.0, -164.0],
       "halfExtents": [20.0, 5.0, 10.0],
       "color": [0.44, 0.47, 0.50, 1.0],
+      "material": {
+        "albedoTexture": "Textures/Final/canberra_civic_facade_albedo.png",
+        "normalTexture": "Textures/Final/canberra_civic_facade_normal.png",
+        "roughnessTexture": "Textures/Final/canberra_civic_facade_roughness.png",
+        "ambientOcclusionTexture": "Textures/Final/canberra_civic_facade_ao.png",
+        "baseColor": [0.94, 0.98, 1.02, 1.0],
+        "roughness": 0.80,
+        "normalScale": 1.04
+      },
       "yawDegrees": 0.0,
       "collisionEnabled": false
     },
@@ -289,6 +439,15 @@
       "position": [-12.0, 6.0, -150.0],
       "halfExtents": [12.0, 6.0, 10.0],
       "color": [0.45, 0.48, 0.52, 1.0],
+      "material": {
+        "albedoTexture": "Textures/Final/canberra_civic_facade_albedo.png",
+        "normalTexture": "Textures/Final/canberra_civic_facade_normal.png",
+        "roughnessTexture": "Textures/Final/canberra_civic_facade_roughness.png",
+        "ambientOcclusionTexture": "Textures/Final/canberra_civic_facade_ao.png",
+        "baseColor": [0.96, 1.00, 1.04, 1.0],
+        "roughness": 0.77,
+        "normalScale": 1.08
+      },
       "yawDegrees": 0.0,
       "collisionEnabled": false
     },
@@ -297,6 +456,15 @@
       "position": [-56.0, 10.0, -194.0],
       "halfExtents": [16.0, 10.0, 12.0],
       "color": [0.45, 0.48, 0.52, 1.0],
+      "material": {
+        "albedoTexture": "Textures/Final/canberra_civic_facade_albedo.png",
+        "normalTexture": "Textures/Final/canberra_civic_facade_normal.png",
+        "roughnessTexture": "Textures/Final/canberra_civic_facade_roughness.png",
+        "ambientOcclusionTexture": "Textures/Final/canberra_civic_facade_ao.png",
+        "baseColor": [0.96, 1.00, 1.04, 1.0],
+        "roughness": 0.78,
+        "normalScale": 1.06
+      },
       "yawDegrees": 12.0,
       "collisionEnabled": false
     },
@@ -305,6 +473,15 @@
       "position": [-84.0, 7.0, -158.0],
       "halfExtents": [13.0, 7.0, 9.0],
       "color": [0.43, 0.46, 0.49, 1.0],
+      "material": {
+        "albedoTexture": "Textures/Final/canberra_civic_facade_albedo.png",
+        "normalTexture": "Textures/Final/canberra_civic_facade_normal.png",
+        "roughnessTexture": "Textures/Final/canberra_civic_facade_roughness.png",
+        "ambientOcclusionTexture": "Textures/Final/canberra_civic_facade_ao.png",
+        "baseColor": [0.94, 0.98, 1.02, 1.0],
+        "roughness": 0.80,
+        "normalScale": 1.04
+      },
       "yawDegrees": 6.0,
       "collisionEnabled": false
     },
@@ -313,6 +490,15 @@
       "position": [-150.0, 6.0, -214.0],
       "halfExtents": [16.0, 6.0, 10.0],
       "color": [0.46, 0.49, 0.53, 1.0],
+      "material": {
+        "albedoTexture": "Textures/Final/canberra_civic_facade_albedo.png",
+        "normalTexture": "Textures/Final/canberra_civic_facade_normal.png",
+        "roughnessTexture": "Textures/Final/canberra_civic_facade_roughness.png",
+        "ambientOcclusionTexture": "Textures/Final/canberra_civic_facade_ao.png",
+        "baseColor": [0.97, 1.00, 1.05, 1.0],
+        "roughness": 0.78,
+        "normalScale": 1.06
+      },
       "yawDegrees": 10.0,
       "collisionEnabled": false
     },
@@ -321,6 +507,15 @@
       "position": [-118.0, 18.0, -166.0],
       "halfExtents": [6.0, 18.0, 6.0],
       "color": [0.50, 0.53, 0.57, 1.0],
+      "material": {
+        "albedoTexture": "Textures/Final/canberra_civic_facade_albedo.png",
+        "normalTexture": "Textures/Final/canberra_civic_facade_normal.png",
+        "roughnessTexture": "Textures/Final/canberra_civic_facade_roughness.png",
+        "ambientOcclusionTexture": "Textures/Final/canberra_civic_facade_ao.png",
+        "baseColor": [0.99, 1.02, 1.06, 1.0],
+        "roughness": 0.76,
+        "normalScale": 1.08
+      },
       "yawDegrees": 0.0
     },
     {
@@ -328,6 +523,15 @@
       "position": [-186.0, 4.5, -176.0],
       "halfExtents": [24.0, 4.5, 8.0],
       "color": [0.44, 0.47, 0.50, 1.0],
+      "material": {
+        "albedoTexture": "Textures/Final/canberra_civic_facade_albedo.png",
+        "normalTexture": "Textures/Final/canberra_civic_facade_normal.png",
+        "roughnessTexture": "Textures/Final/canberra_civic_facade_roughness.png",
+        "ambientOcclusionTexture": "Textures/Final/canberra_civic_facade_ao.png",
+        "baseColor": [0.94, 0.98, 1.02, 1.0],
+        "roughness": 0.80,
+        "normalScale": 1.04
+      },
       "yawDegrees": 8.0,
       "collisionEnabled": false
     }

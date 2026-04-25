@@ -89,6 +89,15 @@ struct SceneUniforms {
     var atmosphereParameters: SIMD4<Float>
     var shadowParameters: SIMD4<Float>
     var motionParameters: SIMD4<Float>
+    var dynamicLightParameters: SIMD4<Float>
+    var dynamicLightPosition0: SIMD4<Float>
+    var dynamicLightColor0: SIMD4<Float>
+    var dynamicLightPosition1: SIMD4<Float>
+    var dynamicLightColor1: SIMD4<Float>
+    var dynamicLightPosition2: SIMD4<Float>
+    var dynamicLightColor2: SIMD4<Float>
+    var dynamicLightPosition3: SIMD4<Float>
+    var dynamicLightColor3: SIMD4<Float>
 }
 
 struct SceneMaterialUniforms {
@@ -102,6 +111,9 @@ struct ScenePostProcessUniforms {
     var highlightTint: SIMD4<Float>
     var gradeParameters: SIMD4<Float>
     var aoParameters: SIMD4<Float>
+    var antiAliasingParameters: SIMD4<Float>
+    var reflectionParameters: SIMD4<Float>
+    var reflectionProbeColor: SIMD4<Float>
 }
 
 struct SkyUniforms {

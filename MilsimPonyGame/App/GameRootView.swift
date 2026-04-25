@@ -43,9 +43,16 @@ struct GameRootView: View {
             instructionText: session.scopeInstructionText,
             presentationText: session.scopePresentationText,
             shotTimingText: session.scopeShotTimingText,
+            shotFeedbackText: session.shotFeedbackText,
             reticleColor: Color(nsColor: session.scopeReticleColor),
             reticleOffset: session.scopeReticleOffset,
-            reticleBloomScale: session.scopeReticleBloomScale
+            recoilOffset: session.scopeRecoilOffset,
+            muzzleFlashStrength: session.muzzleFlashStrength,
+            reticleBloomScale: session.scopeReticleBloomScale,
+            lensDirtOpacity: session.scopeLensDirtOpacity,
+            edgeAberrationOpacity: session.scopeEdgeAberrationOpacity,
+            parallaxCompensationPercent: session.scopeParallaxCompensationPercent,
+            milDotSpacingText: session.scopeMilDotSpacingText
         )
     }
 }
@@ -163,13 +170,9 @@ private struct WindowShellCard<Content: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(title)
-                .font(.system(size: 17, weight: .semibold, design: .monospaced))
-                .foregroundStyle(.white)
+            SDFText(text: title, size: 17, weight: .semibold)
 
-            Text(subtitle)
-                .font(.system(size: 12, weight: .medium, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.76))
+            SDFText(text: subtitle, size: 12, color: .white.opacity(0.76))
 
             content
         }
@@ -211,6 +214,31 @@ private struct WindowActionButton: View {
     }
 }
 
+private struct SDFText: View {
+    let text: String
+    var size: CGFloat
+    var weight: Font.Weight = .medium
+    var color: Color = .white
+    var outlineColor: Color = .black.opacity(0.88)
+    var shadowColor: Color = .black.opacity(0.74)
+    var minimumScaleFactor: CGFloat = 0.58
+    var lineLimit: Int? = 1
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: size, weight: weight, design: .monospaced))
+            .foregroundStyle(color)
+            .lineLimit(lineLimit)
+            .minimumScaleFactor(minimumScaleFactor)
+            .shadow(color: outlineColor, radius: 0, x: -1, y: 0)
+            .shadow(color: outlineColor, radius: 0, x: 1, y: 0)
+            .shadow(color: outlineColor, radius: 0, x: 0, y: -1)
+            .shadow(color: outlineColor, radius: 0, x: 0, y: 1)
+            .shadow(color: shadowColor, radius: 2, x: 0, y: 1)
+            .drawingGroup(opaque: false, colorMode: .linear)
+    }
+}
+
 private struct HostingWindowReader: NSViewRepresentable {
     let onResolve: (NSWindow?) -> Void
 
@@ -243,10 +271,15 @@ struct MissionOverlayWindow: View {
                     maxWidth: 420
                 ) {
                     ForEach(Array(session.overlayLines.enumerated()), id: \.offset) { _, line in
-                        Text(line)
-                            .font(.system(size: 12, weight: .regular, design: .monospaced))
-                            .foregroundStyle(.white.opacity(0.9))
+                        SDFText(
+                            text: line,
+                            size: 12,
+                            weight: .regular,
+                            color: .white.opacity(0.9),
+                            lineLimit: nil
+                        )
                             .frame(maxWidth: .infinity, alignment: .leading)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 .padding(16)
@@ -546,6 +579,25 @@ private struct SettingsControlsPane: View {
                 .tint(Color(red: 0.34, green: 0.74, blue: 0.96))
             }
 
+            VStack(alignment: .leading, spacing: 6) {
+                Text(String(format: "Audio Master %.0f%%", session.audioMasterGain * 100))
+                    .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.92))
+                Slider(
+                    value: Binding(
+                        get: { session.audioMasterGain },
+                        set: { value in
+                            session.enqueueStateChange { state in
+                                state.setAudioMasterGain(value)
+                            }
+                        }
+                    ),
+                    in: 0.0...1.0,
+                    step: 0.05
+                )
+                .tint(Color(red: 0.92, green: 0.58, blue: 0.38))
+            }
+
             Toggle(
                 isOn: Binding(
                     get: { session.invertLookY },
@@ -611,6 +663,11 @@ private struct MenuActionStack: View {
                 }
                 .disabled(!session.canBeginMission)
 
+                WindowActionButton(title: session.savedSessionResumeButtonTitle) {
+                    session.resumeSavedSession()
+                }
+                .disabled(!session.canResumeSavedSession)
+
                 WindowActionButton(title: session.manualRestoreChoiceButtonTitle) {
                     session.previewManualRestoreChoice()
                 }
@@ -625,6 +682,11 @@ private struct MenuActionStack: View {
                     session.armAlternateRouteForNextFreshRun()
                 }
                 .disabled(!session.canArmAlternateRouteActivation)
+
+                WindowActionButton(title: session.collisionAuthoringButtonTitle) {
+                    session.selectNextCollisionVolumeForReview()
+                }
+                .disabled(!session.canInspectCollisionAuthoring)
 
                 WindowActionButton(title: "Settings") {
                     session.openSettings()
@@ -988,6 +1050,7 @@ private struct OverheadMapCanvas: View {
         let fillColor: Color
         let strokeColor: Color
         let lineWidth: CGFloat
+        let isSelected: Bool
     }
 
     private struct ThreatVisual: Identifiable {
@@ -1285,26 +1348,35 @@ private struct OverheadMapCanvas: View {
 
             collisionVisuals = configuration.collisionVolumes.map { volume in
                 let isAuthored = volume.source == "authored"
+                let isSelected = volume.id == snapshot.selectedCollisionVolumeID
                 return CollisionVisual(
                     id: volume.id,
                     footprintPath: collisionFootprintPath(for: volume),
-                    fillColor: isAuthored
+                    fillColor: isSelected
+                        ? Color(red: 1.0, green: 0.88, blue: 0.34).opacity(0.25)
+                        : isAuthored
                         ? Color(red: 0.98, green: 0.48, blue: 0.30).opacity(0.11)
                         : Color(red: 0.96, green: 0.72, blue: 0.32).opacity(0.09),
-                    strokeColor: isAuthored
+                    strokeColor: isSelected
+                        ? Color(red: 1.0, green: 0.94, blue: 0.58).opacity(0.98)
+                        : isAuthored
                         ? Color(red: 1.0, green: 0.58, blue: 0.38).opacity(0.62)
                         : Color(red: 0.96, green: 0.78, blue: 0.36).opacity(0.46),
-                    lineWidth: isAuthored ? 1.25 : 0.9
+                    lineWidth: isSelected ? 2.2 : (isAuthored ? 1.25 : 0.9),
+                    isSelected: isSelected
                 )
             }
 
             threatVisuals = configuration.threatObservers.enumerated().map { index, observer in
-                let observerPoint = point(forX: observer.point.x, z: observer.point.z)
+                let threatState = index < snapshot.threatStates.count ? snapshot.threatStates[index] : nil
+                let observerPoint = point(
+                    forX: threatState?.x ?? observer.point.x,
+                    z: threatState?.z ?? observer.point.z
+                )
                 let rangeSize = CGSize(
                     width: max(CGFloat(observer.range * 2) * scaleX, 10),
                     height: max(CGFloat(observer.range * 2) * scaleY, 10)
                 )
-                let threatState = index < snapshot.threatStates.count ? snapshot.threatStates[index] : nil
                 let palette = threatPalette(for: observer, state: threatState)
 
                 return ThreatVisual(
@@ -1485,7 +1557,11 @@ private struct OverheadMapCanvas: View {
                             context.stroke(
                                 collision.footprintPath,
                                 with: .color(collision.strokeColor),
-                                style: StrokeStyle(lineWidth: collision.lineWidth, lineJoin: .round, dash: [3, 3])
+                                style: StrokeStyle(
+                                    lineWidth: collision.lineWidth,
+                                    lineJoin: .round,
+                                    dash: collision.isSelected ? [] : [3, 3]
+                                )
                             )
                         }
 
@@ -1603,11 +1679,13 @@ private struct OverheadMapCanvas: View {
 
                     ForEach(renderModel.sectorVisuals) { sector in
                         if let label = sector.label {
-                            Text(label)
-                                .font(.system(size: min(9 * canvasScale, 20), weight: .semibold, design: .monospaced))
-                                .foregroundStyle(.white.opacity(0.72))
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.6)
+                            SDFText(
+                                text: label,
+                                size: min(9 * canvasScale, 20),
+                                weight: .semibold,
+                                color: .white.opacity(0.72),
+                                minimumScaleFactor: 0.6
+                            )
                                 .frame(width: sector.labelWidth)
                                 .position(sector.labelPosition)
                         }
@@ -1615,11 +1693,13 @@ private struct OverheadMapCanvas: View {
 
                     ForEach(renderModel.roadVisuals) { road in
                         if let label = road.label {
-                            Text(label)
-                                .font(.system(size: min(8 * canvasScale, 18), weight: .bold, design: .monospaced))
-                                .foregroundStyle(Color(red: 0.95, green: 0.95, blue: 0.97).opacity(0.86))
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.55)
+                            SDFText(
+                                text: label,
+                                size: min(8 * canvasScale, 18),
+                                weight: .bold,
+                                color: Color(red: 0.95, green: 0.95, blue: 0.97).opacity(0.86),
+                                minimumScaleFactor: 0.55
+                            )
                                 .frame(width: road.labelWidth)
                                 .padding(.horizontal, max(5 * canvasScale, 5))
                                 .padding(.vertical, max(2 * canvasScale, 2))
@@ -1632,9 +1712,12 @@ private struct OverheadMapCanvas: View {
                         }
                     }
 
-                    Text("N")
-                        .font(.system(size: min(10 * canvasScale, 20), weight: .bold, design: .monospaced))
-                        .foregroundStyle(.white.opacity(0.82))
+                    SDFText(
+                        text: "N",
+                        size: min(10 * canvasScale, 20),
+                        weight: .bold,
+                        color: .white.opacity(0.82)
+                    )
                         .position(renderModel.northLabelPoint)
                 }
             }
@@ -1760,6 +1843,21 @@ private struct OverheadMapCanvas: View {
                 .foregroundStyle(.white.opacity(0.622))
                 .fixedSize(horizontal: false, vertical: true)
 
+            Text(snapshot.selectedCollisionVolumeLine)
+                .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.66))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(snapshot.collisionValidationLine)
+                .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.64))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(snapshot.collisionExportLine)
+                .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.62))
+                .fixedSize(horizontal: false, vertical: true)
+
             Text(environmentalMotionLine)
                 .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.622))
@@ -1796,6 +1894,36 @@ private struct OverheadMapCanvas: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             Text(lightingArchitectureLine)
+                .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.622))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(timeOfDayLine)
+                .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.622))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(antiAliasingLine)
+                .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.622))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(physicalAtmosphereLine)
+                .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.622))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(indirectRenderingLine)
+                .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.622))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(sdfUILine)
+                .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.622))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(renderGraphLine)
                 .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.622))
                 .fixedSize(horizontal: false, vertical: true)
@@ -1991,6 +2119,30 @@ private struct OverheadMapCanvas: View {
         "Lighting Plan: \(snapshot.configuration.lightingArchitectureStatus) • \(snapshot.configuration.lightingArchitectureSummary)"
     }
 
+    private var timeOfDayLine: String {
+        "Time Of Day: \(snapshot.configuration.timeOfDayStatus) • \(snapshot.configuration.timeOfDaySummary)"
+    }
+
+    private var antiAliasingLine: String {
+        "Anti-Aliasing: \(snapshot.configuration.antiAliasingStatus) • \(snapshot.configuration.antiAliasingSummary)"
+    }
+
+    private var physicalAtmosphereLine: String {
+        "Physical Atmosphere: \(snapshot.configuration.physicalAtmosphereStatus) • \(snapshot.configuration.physicalAtmosphereSummary)"
+    }
+
+    private var indirectRenderingLine: String {
+        "Indirect Rendering: \(snapshot.configuration.indirectRenderingStatus) • \(snapshot.configuration.indirectRenderingSummary)"
+    }
+
+    private var sdfUILine: String {
+        "SDF UI: \(snapshot.configuration.sdfUIStatus) • \(snapshot.configuration.sdfUISummary)"
+    }
+
+    private var renderGraphLine: String {
+        "Render Graph: \(snapshot.configuration.renderGraphStatus) • \(snapshot.configuration.renderGraphSummary)"
+    }
+
     private var blackMountainMaterialLine: String {
         let capture = snapshot.configuration.comparisonStops.first { stop in
             stop.district.localizedCaseInsensitiveContains("Black Mountain")
@@ -2091,9 +2243,16 @@ private struct ScopeOverlay: View {
     let instructionText: String
     let presentationText: String
     let shotTimingText: String
+    let shotFeedbackText: String
     let reticleColor: Color
     let reticleOffset: CGSize
+    let recoilOffset: CGSize
+    let muzzleFlashStrength: CGFloat
     let reticleBloomScale: CGFloat
+    let lensDirtOpacity: CGFloat
+    let edgeAberrationOpacity: CGFloat
+    let parallaxCompensationPercent: Int
+    let milDotSpacingText: String
 
     var body: some View {
         GeometryReader { geometry in
@@ -2112,10 +2271,13 @@ private struct ScopeOverlay: View {
             let armLength = max((diameter * 0.5) - reticleInset - (centerGap * 0.5), 24)
             let armThickness = max(diameter * 0.0028, 1.4)
             let maxReticleTravel = diameter * 0.12
-            let reticleCenterX = centerX + (reticleOffset.width * maxReticleTravel)
-            let reticleCenterY = centerY + (reticleOffset.height * maxReticleTravel)
+            let reticleCenterX = centerX + ((reticleOffset.width + recoilOffset.width) * maxReticleTravel)
+            let reticleCenterY = centerY + ((reticleOffset.height + recoilOffset.height) * maxReticleTravel)
             let bloomDiameter = max(centerGap * (1.0 + (reticleBloomScale * 3.0)), 10)
             let labelY = min(apertureRect.maxY + 52, size.height - 38)
+            let flashWidth = diameter * (0.18 + (muzzleFlashStrength * 0.16))
+            let flashHeight = diameter * (0.08 + (muzzleFlashStrength * 0.08))
+            let edgeOffset = max(diameter * 0.0035 * edgeAberrationOpacity, 0.6)
 
             ZStack {
                 ScopeOcclusionShape(apertureRect: apertureRect)
@@ -2125,6 +2287,16 @@ private struct ScopeOverlay: View {
                     .stroke(Color.black.opacity(0.55), lineWidth: 14)
                     .frame(width: diameter, height: diameter)
                     .position(x: centerX, y: centerY)
+
+                Circle()
+                    .stroke(Color(red: 0.95, green: 0.16, blue: 0.16).opacity(0.20 * edgeAberrationOpacity), lineWidth: 2)
+                    .frame(width: diameter * 0.995, height: diameter * 0.995)
+                    .position(x: centerX - edgeOffset, y: centerY)
+
+                Circle()
+                    .stroke(Color(red: 0.10, green: 0.74, blue: 1.0).opacity(0.20 * edgeAberrationOpacity), lineWidth: 2)
+                    .frame(width: diameter * 1.005, height: diameter * 1.005)
+                    .position(x: centerX + edgeOffset, y: centerY)
 
                 Circle()
                     .stroke(reticleColor.opacity(0.92), lineWidth: 2)
@@ -2140,6 +2312,30 @@ private struct ScopeOverlay: View {
                     .stroke(reticleColor.opacity(0.22), lineWidth: 1)
                     .frame(width: bloomDiameter, height: bloomDiameter)
                     .position(x: reticleCenterX, y: reticleCenterY)
+
+                ForEach(Self.lensDust, id: \.id) { dust in
+                    Circle()
+                        .fill(Color.white.opacity(dust.opacity * lensDirtOpacity))
+                        .frame(width: diameter * dust.size, height: diameter * dust.size)
+                        .blur(radius: diameter * dust.blur)
+                        .position(
+                            x: centerX + (diameter * dust.x),
+                            y: centerY + (diameter * dust.y)
+                        )
+                }
+
+                if muzzleFlashStrength > 0.01 {
+                    Ellipse()
+                        .fill(Color(red: 1.0, green: 0.78, blue: 0.38).opacity(0.72 * muzzleFlashStrength))
+                        .frame(width: flashWidth, height: flashHeight)
+                        .blur(radius: 1.8)
+                        .position(x: centerX, y: apertureRect.maxY - (diameter * 0.18))
+
+                    Ellipse()
+                        .stroke(Color.white.opacity(0.68 * muzzleFlashStrength), lineWidth: 1.4)
+                        .frame(width: flashWidth * 0.58, height: flashHeight * 0.42)
+                        .position(x: centerX, y: apertureRect.maxY - (diameter * 0.18))
+                }
 
                 reticleArm(length: armLength, thickness: armThickness)
                     .position(x: reticleCenterX - ((centerGap + armLength) * 0.5), y: reticleCenterY)
@@ -2174,22 +2370,22 @@ private struct ScopeOverlay: View {
                         .position(x: reticleCenterX, y: reticleCenterY + tickOffset)
                 }
 
+                HStack(spacing: 10) {
+                    SDFText(text: milDotSpacingText, size: 9, color: reticleColor.opacity(0.78))
+                    SDFText(text: "PAR \(parallaxCompensationPercent)%", size: 9, color: reticleColor.opacity(0.78))
+                }
+                .position(x: reticleCenterX, y: reticleCenterY + (centerGap * 3.65))
+
                 VStack(spacing: 5) {
-                    Text(statusText)
-                        .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                        .foregroundStyle(.white.opacity(0.96))
+                    SDFText(text: statusText, size: 12, weight: .semibold, color: .white.opacity(0.96))
 
-                    Text(instructionText)
-                        .font(.system(size: 11, weight: .medium, design: .monospaced))
-                        .foregroundStyle(reticleColor.opacity(0.94))
+                    SDFText(text: instructionText, size: 11, color: reticleColor.opacity(0.94))
 
-                    Text(presentationText)
-                        .font(.system(size: 10, weight: .medium, design: .monospaced))
-                        .foregroundStyle(.white.opacity(0.86))
+                    SDFText(text: presentationText, size: 10, color: .white.opacity(0.86))
 
-                    Text(shotTimingText)
-                        .font(.system(size: 10, weight: .medium, design: .monospaced))
-                        .foregroundStyle(reticleColor.opacity(0.82))
+                    SDFText(text: shotTimingText, size: 10, color: reticleColor.opacity(0.82))
+
+                    SDFText(text: shotFeedbackText, size: 10, color: .white.opacity(0.82))
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 11)
@@ -2208,6 +2404,24 @@ private struct ScopeOverlay: View {
             .fill(reticleColor.opacity(0.94))
             .frame(width: length, height: thickness)
     }
+
+    private struct LensDust: Identifiable {
+        let id: Int
+        let x: CGFloat
+        let y: CGFloat
+        let size: CGFloat
+        let opacity: CGFloat
+        let blur: CGFloat
+    }
+
+    private static let lensDust: [LensDust] = [
+        LensDust(id: 0, x: -0.24, y: -0.19, size: 0.014, opacity: 0.20, blur: 0.0018),
+        LensDust(id: 1, x: -0.11, y: 0.23, size: 0.020, opacity: 0.16, blur: 0.0024),
+        LensDust(id: 2, x: 0.18, y: -0.28, size: 0.012, opacity: 0.22, blur: 0.0016),
+        LensDust(id: 3, x: 0.30, y: 0.12, size: 0.026, opacity: 0.13, blur: 0.0030),
+        LensDust(id: 4, x: -0.33, y: 0.05, size: 0.010, opacity: 0.24, blur: 0.0014),
+        LensDust(id: 5, x: 0.04, y: -0.35, size: 0.018, opacity: 0.14, blur: 0.0028),
+    ]
 }
 
 private struct ScopeOcclusionShape: Shape {
