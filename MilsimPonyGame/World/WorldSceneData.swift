@@ -35,6 +35,11 @@ struct SceneConfiguration: Decodable {
     let environmentalMotion: EnvironmentalMotionConfiguration?
     let materialBreakup: MaterialBreakupConfiguration?
     let surfaceFidelity: SurfaceFidelityConfiguration?
+    let distantLOD: DistantLODConfiguration?
+    let waterReflection: WaterReflectionConfiguration?
+    let packagingAutomation: PackagingAutomationConfiguration?
+    let testerDistribution: TesterDistributionConfiguration?
+    let lightingArchitecture: LightingArchitectureConfiguration?
     let sessionPersistence: SessionPersistenceConfiguration?
     let route: RouteConfiguration
     let reviewPack: ReviewPackConfiguration?
@@ -129,6 +134,10 @@ struct ShadowConfiguration: Decodable {
     let strength: Float?
     let scopeCoverageMultiplier: Float?
     let forwardOffsetMultiplier: Float?
+    let cascadeCount: Int?
+    let cascadeSplits: [Float]?
+    let profileStatus: String?
+    let profileRule: String?
 
     init(
         mapResolution: Int? = 2048,
@@ -137,7 +146,11 @@ struct ShadowConfiguration: Decodable {
         normalBias: Float? = 0.010,
         strength: Float? = 0.72,
         scopeCoverageMultiplier: Float? = 1.25,
-        forwardOffsetMultiplier: Float? = 0.35
+        forwardOffsetMultiplier: Float? = 0.35,
+        cascadeCount: Int? = 1,
+        cascadeSplits: [Float]? = nil,
+        profileStatus: String? = nil,
+        profileRule: String? = nil
     ) {
         self.mapResolution = mapResolution
         self.coverage = coverage
@@ -146,6 +159,10 @@ struct ShadowConfiguration: Decodable {
         self.strength = strength
         self.scopeCoverageMultiplier = scopeCoverageMultiplier
         self.forwardOffsetMultiplier = forwardOffsetMultiplier
+        self.cascadeCount = cascadeCount
+        self.cascadeSplits = cascadeSplits
+        self.profileStatus = profileStatus
+        self.profileRule = profileRule
     }
 }
 
@@ -489,6 +506,146 @@ struct SurfaceFidelityConfiguration: Decodable {
     ) {
         self.status = status
         self.rule = rule
+    }
+}
+
+struct DistantLODConfiguration: Decodable {
+    let status: String?
+    let rule: String?
+    let landmarkTargets: [String]?
+    let impostorStartMeters: Float?
+    let scopeStabilityRule: String?
+
+    init(
+        status: String? = "distant LOD planning pending",
+        rule: String? = "author key landmark impostor metadata before renderer promotion",
+        landmarkTargets: [String]? = nil,
+        impostorStartMeters: Float? = 420.0,
+        scopeStabilityRule: String? = "scope mode keeps stable far silhouettes until impostor swap is implemented"
+    ) {
+        self.status = status
+        self.rule = rule
+        self.landmarkTargets = landmarkTargets
+        self.impostorStartMeters = impostorStartMeters
+        self.scopeStabilityRule = scopeStabilityRule
+    }
+}
+
+struct WaterReflectionConfiguration: Decodable {
+    let status: String?
+    let rule: String?
+    let probeTargets: [String]?
+    let approach: String?
+    let deferredReason: String?
+    let screenSpaceReflectionStatus: String?
+
+    init(
+        status: String? = "water reflection planning pending",
+        rule: String? = "prototype or defer reflection probe after water motion closeout",
+        probeTargets: [String]? = nil,
+        approach: String? = "material probe metadata before SSR",
+        deferredReason: String? = "SSR waits for stable distant LOD and water probe evidence",
+        screenSpaceReflectionStatus: String? = "SSR deferred"
+    ) {
+        self.status = status
+        self.rule = rule
+        self.probeTargets = probeTargets
+        self.approach = approach
+        self.deferredReason = deferredReason
+        self.screenSpaceReflectionStatus = screenSpaceReflectionStatus
+    }
+}
+
+struct PackagingAutomationConfiguration: Decodable {
+    let status: String?
+    let rule: String?
+    let versionPolicy: String?
+    let archivePattern: String?
+    let manifestChecks: [String]?
+    let smokeCommand: String?
+
+    init(
+        status: String? = "packaging automation planning pending",
+        rule: String? = "package release only after version, manifest, archive, and smoke checks pass",
+        versionPolicy: String? = "cycle-based version policy pending",
+        archivePattern: String? = "MilsimPonyGame-v<version>-b<build>-cycle<cycle>-<utc>",
+        manifestChecks: [String]? = nil,
+        smokeCommand: String? = "Tools/package_release.sh --validate-only"
+    ) {
+        self.status = status
+        self.rule = rule
+        self.versionPolicy = versionPolicy
+        self.archivePattern = archivePattern
+        self.manifestChecks = manifestChecks
+        self.smokeCommand = smokeCommand
+    }
+}
+
+struct TesterDistributionConfiguration: Decodable {
+    let status: String?
+    let rule: String?
+    let channel: String?
+    let notarizationStatus: String?
+    let ciPlan: String?
+    let deliveryChecklist: [String]?
+    let sdfUIPlan: String?
+    let smokeCommand: String?
+
+    init(
+        status: String? = "tester distribution planning pending",
+        rule: String? = "share tester builds only after package validation and delivery-plan checks pass",
+        channel: String? = "local-review",
+        notarizationStatus: String? = "notarization workflow planned",
+        ciPlan: String? = "CI packaging gate planned",
+        deliveryChecklist: [String]? = nil,
+        sdfUIPlan: String? = "SDF UI migration scoped for later polish",
+        smokeCommand: String? = "Tools/package_release.sh --check-distribution"
+    ) {
+        self.status = status
+        self.rule = rule
+        self.channel = channel
+        self.notarizationStatus = notarizationStatus
+        self.ciPlan = ciPlan
+        self.deliveryChecklist = deliveryChecklist
+        self.sdfUIPlan = sdfUIPlan
+        self.smokeCommand = smokeCommand
+    }
+}
+
+struct LightingArchitectureConfiguration: Decodable {
+    let status: String?
+    let rule: String?
+    let scenario: String?
+    let timeOfDay: String?
+    let sunPolicy: String?
+    let atmospherePolicy: String?
+    let clusteredLightingDecision: String?
+    let renderGraphDecision: String?
+    let measuredPrerequisites: [String]?
+    let smokeCommand: String?
+
+    init(
+        status: String? = "lighting architecture planning pending",
+        rule: String? = "lock time-of-day, atmosphere, clustered lighting, and render graph decisions before renderer rewrites",
+        scenario: String? = "static Canberra daylight baseline",
+        timeOfDay: String? = "fixed review daylight",
+        sunPolicy: String? = "single authored sun remains shipping path",
+        atmospherePolicy: String? = "authored fog and haze remain data-driven",
+        clusteredLightingDecision: String? = "defer Forward+ until dynamic light counts justify it",
+        renderGraphDecision: String? = "defer render graph until pass-count and dependency pressure are measured",
+        measuredPrerequisites: [String]? = nil,
+        smokeCommand: String? = "Docs/CYCLE_98_SMOKE_TEST.md"
+    ) {
+        self.status = status
+        self.rule = rule
+        self.scenario = scenario
+        self.timeOfDay = timeOfDay
+        self.sunPolicy = sunPolicy
+        self.atmospherePolicy = atmospherePolicy
+        self.clusteredLightingDecision = clusteredLightingDecision
+        self.renderGraphDecision = renderGraphDecision
+        self.measuredPrerequisites = measuredPrerequisites
+        self.smokeCommand = smokeCommand
     }
 }
 

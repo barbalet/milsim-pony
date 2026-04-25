@@ -341,7 +341,7 @@ private struct StoredReviewSessionState: Codable, Equatable {
             return "Restore Choice: hidden / checkpoint target missing"
         }
 
-        return "Restore Choice: preview Restore \(nextCheckpointLabel) or Start Fresh / restore not executable"
+        return "Restore Choice: preview Restore \(nextCheckpointLabel) or Start Fresh / restore requires explicit execution"
     }
 
     func restoreChoiceTargetLabel(currentSceneLabel: String, currentRouteSummary: String) -> String? {
@@ -372,7 +372,7 @@ private struct StoredReviewSessionState: Codable, Equatable {
             return "Restore Selection: pending review for \(targetLabel) / Start Demo remains fresh default"
         }
 
-        return "Restore Selection: reviewed \(targetLabel) / restore still not executable"
+        return "Restore Selection: reviewed \(targetLabel) / restore execution may be requested"
     }
 
     func restoreFreshStartGuardLine(
@@ -417,7 +417,43 @@ private struct StoredReviewSessionState: Codable, Equatable {
             return "Restore Execution Gate: closed / checkpoint target missing"
         }
 
-        return "Restore Execution Gate: closed / restore action not bound in this build"
+        return "Restore Execution Gate: armed / awaiting explicit execution request"
+    }
+
+    func manualRestoreExecutionDesignLine(currentSceneLabel: String, currentRouteSummary: String) -> String {
+        if schemaVersion != 1
+            || sceneLabel != currentSceneLabel
+            || routeSummary != currentRouteSummary {
+            return "Restore Execution Design: blocked / identity preflight must pass before any restore action"
+        }
+        if totalCheckpointCount <= 0
+            || completedCheckpointCount < 0
+            || completedCheckpointCount > totalCheckpointCount {
+            return "Restore Execution Design: blocked / checkpoint bounds preflight failed"
+        }
+        if routeComplete || completedCheckpointCount >= totalCheckpointCount {
+            return "Restore Execution Design: blocked / completed runs start fresh"
+        }
+        guard let nextCheckpointLabel else {
+            return "Restore Execution Design: blocked / target checkpoint missing"
+        }
+
+        return "Restore Execution Design: target \(nextCheckpointLabel) / requires identity, freshness, target, and explicit intent checks"
+    }
+
+    func manualRestoreSafetyCheckLine(currentSceneLabel: String, currentRouteSummary: String, maxAgeSeconds: Int) -> String {
+        let identityOK = schemaVersion == 1
+            && sceneLabel == currentSceneLabel
+            && routeSummary == currentRouteSummary
+        let progressOK = totalCheckpointCount > 0
+            && completedCheckpointCount >= 0
+            && completedCheckpointCount < totalCheckpointCount
+            && !routeComplete
+            && nextCheckpointLabel != nil
+        let ageSeconds = Int(max(Date().timeIntervalSince1970 - savedAt, 0))
+        let freshnessOK = savedAt > 0 && ageSeconds <= maxAgeSeconds
+
+        return "Restore Safety Checks: identity \(identityOK ? "pass" : "fail") / target \(progressOK ? "pass" : "fail") / freshness \(freshnessOK ? "pass" : "fail") / intent token required"
     }
 
     func restoreAuditLine(currentSceneLabel: String, currentRouteSummary: String) -> String {
@@ -620,6 +656,7 @@ private final class ShotFeedbackAudioEngine {
         engine.attach(player)
         engine.connect(player, to: engine.mainMixerNode, format: format)
         engine.mainMixerNode.outputVolume = 0.8
+        engine.prepare()
     }
 
     func playShotCue(cooldownSeconds: Double) {
@@ -668,6 +705,23 @@ private final class ShotFeedbackAudioEngine {
         play(buffer: ambientBasinBuffer)
     }
 
+    func recoverIfNeeded() {
+        queue.async { [weak self] in
+            guard let self else {
+                return
+            }
+
+            do {
+                try self.ensureEngineRunning()
+                if !self.player.isPlaying {
+                    self.player.play()
+                }
+            } catch {
+                NSSound.beep()
+            }
+        }
+    }
+
     private func play(buffer: AVAudioPCMBuffer, after delay: Double = 0) {
         queue.async { [weak self] in
             guard let self else {
@@ -712,6 +766,7 @@ private final class ShotFeedbackAudioEngine {
 
     private func ensureEngineRunning() throws {
         if !engine.isRunning {
+            engine.prepare()
             try engine.start()
         }
     }
@@ -978,9 +1033,11 @@ final class GameSession: ObservableObject {
     private var lastThreatAudioElapsedSeconds: Double = -10
     private var lastFootstepAudioElapsedSeconds: Double = -10
     private var lastAmbientAudioElapsedSeconds: Double = -10
+    private var lastRealtimeRecoveryElapsedSeconds: Double = -10
     private var lastMovementAudioState = "idle"
     private var lastWorldAudioState = "ambient waiting"
     private var lastScopeAudioState = "scope ready"
+    private var sessionAudioState = "session audio waiting"
     private var alternateRouteActivationArmed = false
     private var alternateRouteActivationLine = "Alternate Live Binding: primary route armed"
     private var freshRunHandler: (() -> Void)?
@@ -1077,6 +1134,15 @@ final class GameSession: ObservableObject {
         manualRestoreChoiceTargetLabel != nil
     }
 
+    var canExecuteManualRestore: Bool {
+        guard let targetLabel = manualRestoreChoiceTargetLabel else {
+            return false
+        }
+
+        return reviewedManualRestoreTargetLabel == targetLabel
+            && manualRestoreExecutionProgress != nil
+    }
+
     var canArmAlternateRouteActivation: Bool {
         guard demoFlowState == .title, let mapConfiguration else {
             return false
@@ -1105,6 +1171,14 @@ final class GameSession: ObservableObject {
         }
 
         return "Review Restore Target: \(targetLabel)"
+    }
+
+    var manualRestoreExecutionButtonTitle: String {
+        guard let targetLabel = manualRestoreChoiceTargetLabel else {
+            return "Execute Restore Unavailable"
+        }
+
+        return "Execute Restore: \(targetLabel)"
     }
 
     var activeCommands: Set<InputCommand> {
@@ -1917,8 +1991,10 @@ final class GameSession: ObservableObject {
         resetMissionRuntime()
         if let restoreTarget, freshStartConfirmedRestoreTargetLabel == restoreTarget {
             statusLine = "Fresh run started after reviewing \(restoreTarget) - restore remains disabled"
+            sessionAudioState = "fresh start cue after restore review"
         } else {
             statusLine = "Demo live - move through the current Canberra contact lane and verify scoped hits"
+            sessionAudioState = "fresh run basin bed armed"
         }
         scheduleGameplayInputFocusRecovery()
         rebuildOverlay()
@@ -1970,6 +2046,55 @@ final class GameSession: ObservableObject {
         rebuildOverlay()
     }
 
+    func requestManualRestoreExecution() {
+        guard sceneReady else {
+            statusLine = "Scene data still loading"
+            rebuildOverlay()
+            return
+        }
+
+        guard let targetLabel = manualRestoreChoiceTargetLabel else {
+            statusLine = "Manual restore blocked - no restorable checkpoint target"
+            rebuildOverlay()
+            return
+        }
+
+        guard reviewedManualRestoreTargetLabel == targetLabel else {
+            reviewedManualRestoreTargetLabel = targetLabel
+            restoreReviewExpiryLine = "Restore Review Expiry: tracking \(targetLabel) until explicit execution request"
+            statusLine = "Restore target reviewed: \(targetLabel) - press Execute Restore again to run guarded restore"
+            rebuildOverlay()
+            return
+        }
+
+        guard let restoreProgress = manualRestoreExecutionProgress else {
+            statusLine = "Manual restore blocked - identity, freshness, target, or intent check failed"
+            rebuildOverlay()
+            return
+        }
+
+        guard GameCoreRestoreToCheckpointProgress(Int32(restoreProgress)) else {
+            statusLine = "Manual restore blocked by core checkpoint validation"
+            rebuildOverlay()
+            return
+        }
+
+        isSettingsPresented = false
+        demoFlowState = .playing
+        freshStartConfirmedRestoreTargetLabel = nil
+        restoreBoundaryResetLine = "Restore Boundary Reset: restore executed for \(targetLabel) / review token consumed"
+        restoreReviewExpiryLine = "Restore Review Expiry: consumed \(targetLabel) at guarded restore execution"
+        clearGameplayInputState()
+        refreshSnapshotFromCore()
+        resetThreatFeedbackState()
+        ShotFeedbackAudioEngine.shared.playScopeToggleCue(raised: false)
+        ShotFeedbackAudioEngine.shared.playAmbientBasinBed()
+        sessionAudioState = "manual restore cue + basin bed"
+        statusLine = "Manual restore executed to \(targetLabel)"
+        reviewedManualRestoreTargetLabel = nil
+        rebuildOverlay()
+    }
+
     func resumeDemo() {
         guard sceneReady else {
             return
@@ -1979,6 +2104,7 @@ final class GameSession: ObservableObject {
         demoFlowState = .playing
         clearGameplayInputState()
         statusLine = "Demo resumed"
+        sessionAudioState = "resume keeps live mix"
         scheduleGameplayInputFocusRecovery()
         rebuildOverlay()
     }
@@ -1998,6 +2124,7 @@ final class GameSession: ObservableObject {
         refreshSnapshotFromCore()
         resetThreatFeedbackState()
         statusLine = "Retry from latest checkpoint"
+        sessionAudioState = "checkpoint retry mix reset"
         scheduleGameplayInputFocusRecovery()
         rebuildOverlay()
     }
@@ -2016,6 +2143,7 @@ final class GameSession: ObservableObject {
         )
         resetMissionRuntime()
         statusLine = "Demo restarted from a fresh rehearsal start"
+        sessionAudioState = "restart fresh basin bed armed"
         scheduleGameplayInputFocusRecovery()
         rebuildOverlay()
     }
@@ -2034,6 +2162,7 @@ final class GameSession: ObservableObject {
         )
         resetMissionRuntime()
         statusLine = "Demo briefing ready"
+        sessionAudioState = "briefing mix reset"
         rebuildOverlay()
     }
 
@@ -2256,6 +2385,7 @@ final class GameSession: ObservableObject {
         routeWasFailed = snapshot.routeFailed
         latestSnapshot = snapshot
         refreshObserverDebugStatesFromCore()
+        maintainRealtimeSessionHealth(for: snapshot)
         applyThreatAudioFeedback(for: snapshot)
         applyWorldMovementAudioFeedback(for: snapshot)
         viewportSize = drawableSize
@@ -2298,6 +2428,7 @@ final class GameSession: ObservableObject {
         latestBallisticPrediction = ballisticPrediction
         latestProfilingSnapshot = profiling
         refreshObserverDebugStatesFromCore()
+        maintainRealtimeSessionHealth(for: snapshot)
         applyThreatAudioFeedback(for: snapshot)
         applyWorldMovementAudioFeedback(for: snapshot)
         viewportSize = drawableSize
@@ -2321,6 +2452,20 @@ final class GameSession: ObservableObject {
         refreshOverheadMapSnapshot()
         persistReviewSessionState(from: snapshot)
         rebuildOverlay()
+    }
+
+    private func maintainRealtimeSessionHealth(for snapshot: GameFrameSnapshot) {
+        guard sceneReady, demoFlowState == .playing, menuPanel == nil else {
+            return
+        }
+
+        guard snapshot.elapsedSeconds - lastRealtimeRecoveryElapsedSeconds >= 1.0 else {
+            return
+        }
+
+        lastRealtimeRecoveryElapsedSeconds = snapshot.elapsedSeconds
+        ShotFeedbackAudioEngine.shared.recoverIfNeeded()
+        sessionAudioState = "live recovery heartbeat armed"
     }
 
     func applyRendererFrameTimingUpdate(milliseconds: Double, framesPerSecond: Double, drawableCount: Int) {
@@ -3097,6 +3242,85 @@ final class GameSession: ObservableObject {
         )
     }
 
+    private func scopeCalibrationLine() -> String {
+        guard let snapshot = latestSnapshot else {
+            return "Scope Calibration: waiting for live optic telemetry"
+        }
+
+        let prediction = latestBallisticPrediction
+        let rangeMeters = prediction?.valid == true
+            ? max(prediction?.travelDistanceMeters ?? 0, 0)
+            : max(snapshot.lastShotTravelDistanceMeters, 0)
+        let dropMeters = prediction?.valid == true
+            ? max(prediction?.dropMeters ?? 0, 0)
+            : max(snapshot.lastShotDropMeters, 0)
+        let holdoverMils = rangeMeters > 1
+            ? dropMeters / max(rangeMeters / 1000.0, 0.001)
+            : 0
+        let parallaxPercent = Int((simd_clamp(scopedWeaponSpreadDegrees / 1.6, 0.0, 1.0) * 100).rounded())
+        let edgeStabilityPercent = Int((simd_clamp(scopedWeaponStability - (scopedWeaponSpreadDegrees * 0.08), 0.0, 1.0) * 100).rounded())
+        let breathCue = steadyAimActive
+            ? String(format: "breath held %.1fs", holdBreathSecondsRemaining)
+            : "breath drifting"
+
+        return String(
+            format: "Scope Calibration: %.0fm range / %.2fm drop / %.1f mil hold / parallax %d%% / edge %d%% / %@",
+            rangeMeters,
+            dropMeters,
+            holdoverMils,
+            parallaxPercent,
+            edgeStabilityPercent,
+            breathCue
+        )
+    }
+
+    private func vegetationConcealmentLine() -> String {
+        guard let snapshot = latestSnapshot else {
+            return "Vegetation Concealment: waiting for movement and observer telemetry"
+        }
+
+        let sectorName = currentMapSectorName
+        let sectorHasVegetation = sectorName.localizedCaseInsensitiveContains("Yarralumla")
+            || sectorName.localizedCaseInsensitiveContains("West Basin")
+            || sectorName.localizedCaseInsensitiveContains("Black Mountain")
+            || sectorName.localizedCaseInsensitiveContains("Woden Valley")
+        let sceneVegetationActive = mapConfiguration?.environmentalMotionStatus.localizedCaseInsensitiveContains("vegetation") == true
+            || mapConfiguration?.surfaceFidelityStatus.localizedCaseInsensitiveContains("vegetation") == true
+        let maskedCount = latestObserverDebugStates.filter {
+            !$0.neutralized && $0.inRange && $0.inViewCone && !$0.hasLineOfSight
+        }.count
+        let concealmentState: String
+        if sectorHasVegetation && snapshot.seeingObserverCount > 0 {
+            concealmentState = "screen broken"
+        } else if sectorHasVegetation || maskedCount > 0 {
+            concealmentState = "screening"
+        } else if sceneVegetationActive {
+            concealmentState = "available at vegetated stops"
+        } else {
+            concealmentState = "not active"
+        }
+
+        let traversalState: String
+        if snapshot.sprinting && snapshot.moveSpeed > 0.35 {
+            traversalState = "fast rustle"
+        } else if snapshot.moveSpeed > 0.35 {
+            traversalState = "soft rustle"
+        } else {
+            traversalState = "settled"
+        }
+        let exposureState = snapshot.seeingObserverCount > 0
+            ? "\(snapshot.seeingObserverCount) seeing"
+            : "\(maskedCount) masked"
+
+        return String(
+            format: "Vegetation Concealment: %@ / traversal %@ / %@ / sector %@",
+            concealmentState,
+            traversalState,
+            exposureState,
+            sectorName
+        )
+    }
+
     private func patrolPairFoundationLine() -> String {
         guard let mapConfiguration else {
             return "Patrol Pairs: waiting for authored observer groups"
@@ -3344,6 +3568,58 @@ final class GameSession: ObservableObject {
         )
     }
 
+    private func csmRendererProfileLine() -> String {
+        guard let mapConfiguration else {
+            return "CSM Profile: waiting for scene shadow profile"
+        }
+
+        let frameBaseline = frameTimingLine.replacingOccurrences(of: "Frame: ", with: "frame ")
+        let drawableCount = latestProfilingSnapshot?.sectorCount ?? 0
+        let blockerCount = latestProfilingSnapshot?.collisionVolumeCount ?? 0
+        return String(
+            format: "CSM Profile: %@ / %@ / %@ / %d sectors %d blockers",
+            mapConfiguration.shadowProfileStatus,
+            mapConfiguration.shadowProfileSummary,
+            frameBaseline,
+            drawableCount,
+            blockerCount
+        )
+    }
+
+    private func distantLODAndReflectionLine() -> String {
+        guard let mapConfiguration else {
+            return "LOD Reflection: waiting for scene LOD and water profile"
+        }
+
+        let frameBaseline = frameTimingLine.replacingOccurrences(of: "Frame: ", with: "frame ")
+        return "LOD Reflection: \(mapConfiguration.distantLODStatus) / \(mapConfiguration.distantLODSummary) / \(mapConfiguration.waterReflectionStatus) / \(mapConfiguration.waterReflectionSummary) / \(frameBaseline)"
+    }
+
+    private func packagingAutomationLine() -> String {
+        guard let mapConfiguration else {
+            return "Packaging: waiting for release packaging policy"
+        }
+
+        return "Packaging: \(configuration.releaseDisplayName) / \(mapConfiguration.packagingAutomationStatus) / \(mapConfiguration.packagingAutomationSummary)"
+    }
+
+    private func testerDistributionLine() -> String {
+        guard let mapConfiguration else {
+            return "Tester Delivery: waiting for tester distribution policy"
+        }
+
+        return "Tester Delivery: \(mapConfiguration.testerDistributionStatus) / \(mapConfiguration.testerDistributionSummary)"
+    }
+
+    private func lightingArchitectureLine() -> String {
+        guard let mapConfiguration else {
+            return "Lighting Plan: waiting for time-of-day and renderer architecture decision"
+        }
+
+        let frameBaseline = frameTimingLine.replacingOccurrences(of: "Frame: ", with: "frame ")
+        return "Lighting Plan: \(mapConfiguration.lightingArchitectureStatus) / \(mapConfiguration.lightingArchitectureSummary) / \(frameBaseline)"
+    }
+
     private func coreWorldLine() -> String {
         let sectorCount: Int32 = latestProfilingSnapshot?.sectorCount ?? 0
         let collisionVolumeCount: Int32 = latestProfilingSnapshot?.collisionVolumeCount ?? 0
@@ -3378,6 +3654,8 @@ final class GameSession: ObservableObject {
         let storedReviewScopeLine = restoreReviewScopeLine
         let storedReviewExecutionIntentLine = restoreReviewExecutionIntentLine
         let storedExecutionGateLine = storedReviewRestoreExecutionGateLine ?? "Restore Execution Gate: closed / no persisted review card"
+        let storedExecutionDesignLine = storedReviewManualRestoreExecutionDesignLine ?? "Restore Execution Design: unavailable / no persisted review card"
+        let storedSafetyCheckLine = storedReviewManualRestoreSafetyCheckLine ?? "Restore Safety Checks: unavailable / no persisted review card"
         let storedAuditLine = storedReviewRestoreAuditLine ?? "Restore Audit: no persisted review card"
         let storedFreshnessLine = storedReviewRestoreFreshnessLine ?? "Restore Freshness: no persisted review card"
         let storedRetentionLine = storedReviewRestoreRetentionLine ?? "Restore Retention: no persisted review card"
@@ -3411,11 +3689,14 @@ final class GameSession: ObservableObject {
             storedReviewScopeLine,
             storedReviewExecutionIntentLine,
             storedExecutionGateLine,
+            storedExecutionDesignLine,
+            storedSafetyCheckLine,
             storedAuditLine,
             storedFreshnessLine,
             storedRetentionLine,
             storedCleanupPreviewLine,
             restoreCleanupExecutionLine,
+            "Session Audio: \(sessionAudioState) / world \(lastWorldAudioState) / movement \(lastMovementAudioState) / scope \(lastScopeAudioState)",
             String(
                 format: "Scope: %@ / %.1fx / %.1f deg / x%.1f draw",
                 isScopeActive ? "active" : "ready",
@@ -3443,12 +3724,18 @@ final class GameSession: ObservableObject {
             weaponStatusLine(),
             muzzleFeedbackLine(),
             scopePresentationText,
+            scopeCalibrationLine(),
             scopeShotTimingText,
             threatStatusLine(),
             ballisticsProfileLine(),
             ballisticsPredictionLine(),
             coreProfilingLine(),
             formalProfilingBaselineLine(),
+            csmRendererProfileLine(),
+            distantLODAndReflectionLine(),
+            packagingAutomationLine(),
+            testerDistributionLine(),
+            lightingArchitectureLine(),
             coreWorldLine(),
             String(format: "Optic: %@ / %.1fx", isScopeActive ? "raised" : "lowered", scopeMagnification),
             String(format: "Settings: look x%.2f / %@ / HUD %.0f%%", lookSensitivityScale, invertLookY ? "invert Y" : "standard Y", hudOpacity * 100),
@@ -3478,6 +3765,7 @@ final class GameSession: ObservableObject {
             contentsOf: [
                 observerFeedbackLine(),
                 worldMovementAudioLine(),
+                vegetationConcealmentLine(),
                 alternateRouteActivationLine,
                 patrolPairFoundationLine(),
                 losDebugOverlayLine(),
@@ -3523,6 +3811,10 @@ final class GameSession: ObservableObject {
 
     var allowsGameplayInputFocusCapture: Bool {
         canRecoverGameplayInputFocus
+    }
+
+    var shouldKeepGameplayWindowKey: Bool {
+        sceneReady && demoFlowState == .playing && menuPanel == nil
     }
 
     private func requestInputFocusIfNeeded() {
@@ -3614,6 +3906,34 @@ final class GameSession: ObservableObject {
         )
     }
 
+    private var manualRestoreExecutionProgress: Int? {
+        guard let storedReviewSessionState else {
+            return nil
+        }
+
+        guard storedReviewSessionState.schemaVersion == 1,
+              storedReviewSessionState.sceneLabel == sceneLabel,
+              storedReviewSessionState.routeSummary == routeSummary else {
+            return nil
+        }
+
+        guard storedReviewSessionState.totalCheckpointCount > 0,
+              storedReviewSessionState.completedCheckpointCount >= 0,
+              storedReviewSessionState.completedCheckpointCount < storedReviewSessionState.totalCheckpointCount,
+              !storedReviewSessionState.routeComplete,
+              storedReviewSessionState.nextCheckpointLabel != nil else {
+            return nil
+        }
+
+        let ageSeconds = Int(max(Date().timeIntervalSince1970 - storedReviewSessionState.savedAt, 0))
+        guard storedReviewSessionState.savedAt > 0,
+              ageSeconds <= Self.reviewSessionStateFreshnessWindowSeconds else {
+            return nil
+        }
+
+        return storedReviewSessionState.completedCheckpointCount
+    }
+
     private var storedReviewManualRestoreSelectionLine: String? {
         storedReviewSessionState?.manualRestoreSelectionLine(
             currentSceneLabel: sceneLabel,
@@ -3661,7 +3981,7 @@ final class GameSession: ObservableObject {
         }
 
         if reviewedManualRestoreTargetLabel == targetLabel {
-            return "Restore Review Intent: reviewed \(targetLabel) / not an execution token"
+            return "Restore Review Intent: reviewed \(targetLabel) / explicit execution request may run restore"
         }
 
         return "Restore Review Intent: unreviewed \(targetLabel) / execution gate closed"
@@ -3671,6 +3991,21 @@ final class GameSession: ObservableObject {
         storedReviewSessionState?.restoreExecutionGateLine(
             currentSceneLabel: sceneLabel,
             currentRouteSummary: routeSummary
+        )
+    }
+
+    private var storedReviewManualRestoreExecutionDesignLine: String? {
+        storedReviewSessionState?.manualRestoreExecutionDesignLine(
+            currentSceneLabel: sceneLabel,
+            currentRouteSummary: routeSummary
+        )
+    }
+
+    private var storedReviewManualRestoreSafetyCheckLine: String? {
+        storedReviewSessionState?.manualRestoreSafetyCheckLine(
+            currentSceneLabel: sceneLabel,
+            currentRouteSummary: routeSummary,
+            maxAgeSeconds: Self.reviewSessionStateFreshnessWindowSeconds
         )
     }
 

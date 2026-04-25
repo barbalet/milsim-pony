@@ -7,7 +7,57 @@ project_path="$repo_root/MilsimPonyGame.xcodeproj"
 scheme_name="MilsimPonyGame"
 derived_data_path="${DERIVED_DATA_PATH:-/tmp/MilsimPonyReleaseDerived}"
 artifacts_root="${ARTIFACTS_ROOT:-$repo_root/artifacts/release}"
+manifest_path="$repo_root/MilsimPonyGame/Assets/WorldData/CanberraBootstrap/world_manifest.json"
+release_cycle="${RELEASE_CYCLE:-98}"
+expected_version="${EXPECTED_MARKETING_VERSION:-0.98.0}"
+expected_build="${EXPECTED_BUILD_NUMBER:-98}"
+tester_channel="${TESTER_CHANNEL:-local-review zip}"
+notarization_profile="${NOTARIZATION_PROFILE:-}"
+validate_only=0
+skip_build=0
+check_distribution=0
 timestamp="$(date -u +"%Y%m%d-%H%M%S")"
+release_docs=(
+  "README.md"
+  "Docs/CYCLE_98_SMOKE_TEST.md"
+  "Docs/LIGHTING_ARCHITECTURE_DECISION.md"
+  "Docs/TESTER_DISTRIBUTION_PIPELINE.md"
+  "Docs/DEVELOPMENT_BACKLOG.md"
+)
+
+usage() {
+  cat <<EOF
+Usage: Tools/package_release.sh [--validate-only] [--check-distribution] [--skip-build]
+
+  --validate-only       Validate version policy, world manifest, and release docs without building.
+  --check-distribution  Validate tester handoff inputs and report notarization readiness.
+  --skip-build          Package an already-built Release app from DERIVED_DATA_PATH.
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --validate-only)
+      validate_only=1
+      ;;
+    --skip-build)
+      skip_build=1
+      ;;
+    --check-distribution)
+      check_distribution=1
+      ;;
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+  shift
+done
 
 build_app() {
   xcodebuild \
@@ -37,6 +87,101 @@ git_tree_state() {
   fi
 }
 
+project_setting() {
+  local key="$1"
+  sed -n "s/^[[:space:]]*${key} = \\([^;]*\\);/\\1/p" "$repo_root/MilsimPonyGame.xcodeproj/project.pbxproj" | head -n 1
+}
+
+plist_json_value() {
+  local plist_path="$1"
+  local key_path="$2"
+  plutil -extract "$key_path" raw -o - "$plist_path"
+}
+
+validate_json_file() {
+  local json_path="$1"
+  if [[ ! -f "$json_path" ]]; then
+    echo "Missing JSON file: $json_path" >&2
+    exit 1
+  fi
+  jq empty "$json_path" >/dev/null
+}
+
+validate_release_inputs() {
+  local project_version
+  local project_build
+  local package_root
+  local coordinate_file
+  local scene_file
+  local sector_index
+  local sector_file
+
+  project_version="$(project_setting MARKETING_VERSION)"
+  project_build="$(project_setting CURRENT_PROJECT_VERSION)"
+
+  if [[ "$project_version" != "$expected_version" ]]; then
+    echo "Expected MARKETING_VERSION $expected_version but found $project_version" >&2
+    exit 1
+  fi
+
+  if [[ "$project_build" != "$expected_build" ]]; then
+    echo "Expected CURRENT_PROJECT_VERSION $expected_build but found $project_build" >&2
+    exit 1
+  fi
+
+  validate_json_file "$manifest_path"
+  package_root="$(dirname "$manifest_path")"
+  coordinate_file="$(plist_json_value "$manifest_path" coordinateSystemFile)"
+  scene_file="$(plist_json_value "$manifest_path" sceneFile)"
+  validate_json_file "$package_root/$coordinate_file"
+  validate_json_file "$package_root/$scene_file"
+
+  sector_index=0
+  while sector_file="$(plist_json_value "$manifest_path" "sectorFiles.$sector_index" 2>/dev/null)"; do
+    validate_json_file "$package_root/$sector_file"
+    sector_index=$((sector_index + 1))
+  done
+
+  if [[ "$sector_index" -eq 0 ]]; then
+    echo "World manifest has no sector files" >&2
+    exit 1
+  fi
+
+  for doc_path in "${release_docs[@]}"; do
+    if [[ ! -f "$repo_root/$doc_path" ]]; then
+      echo "Missing release document: $doc_path" >&2
+      exit 1
+    fi
+  done
+
+  printf 'Release inputs validated: v%s build %s / %d sectors / cycle %s docs\n' \
+    "$project_version" "$project_build" "$sector_index" "$release_cycle"
+}
+
+check_distribution_inputs() {
+  validate_release_inputs
+
+  local archive_pattern="MilsimPonyGame-v${expected_version}-b${expected_build}-cycle${release_cycle}-<utc>.zip"
+  local notary_status="notarytool unavailable"
+
+  if command -v xcrun >/dev/null 2>&1 && xcrun notarytool --help >/dev/null 2>&1; then
+    if [[ -n "$notarization_profile" ]]; then
+      notary_status="notarytool available / profile $notarization_profile configured by environment"
+    else
+      notary_status="notarytool available / NOTARIZATION_PROFILE not set"
+    fi
+  fi
+
+  printf 'Tester distribution check:\n'
+  printf '  Channel:        %s\n' "$tester_channel"
+  printf '  Archive:        %s\n' "$archive_pattern"
+  printf '  Tester guide:   Docs/TESTER_DISTRIBUTION_PIPELINE.md\n'
+  printf '  Notarization:   %s\n' "$notary_status"
+  printf '  CI gate:        Tools/package_release.sh --validate-only && Tools/package_release.sh --check-distribution\n'
+  printf '  SDF UI scope:   HUD/map text crispness scoped after tester pipeline\n'
+  printf '  Lighting gate:  Docs/LIGHTING_ARCHITECTURE_DECISION.md\n'
+}
+
 write_manifest() {
   local manifest_path="$1"
   local version="$2"
@@ -54,10 +199,21 @@ Git Commit: $(git_commit)
 Git Tree: $(git_tree_state)
 Derived Data Path: $derived_data_path
 Included App: MilsimPonyGame.app
+Release Cycle: $release_cycle
+Version Policy: marketing $expected_version with cycle build $expected_build
+Archive Pattern: MilsimPonyGame-v${version}-b${build_number}-cycle${release_cycle}-${timestamp}
+World Manifest: MilsimPonyGame/Assets/WorldData/CanberraBootstrap/world_manifest.json
+Tester Channel: $tester_channel
+Notarization Profile: ${notarization_profile:-not configured}
+Distribution Gate: Tools/package_release.sh --check-distribution
+SDF UI Scope: HUD/map text crispness scoped after tester pipeline
+Lighting Architecture: Docs/LIGHTING_ARCHITECTURE_DECISION.md
 Included Docs:
-- ReleaseDocs/CYCLE_9_SMOKE_TEST.md
-- ReleaseDocs/CYCLE_9_RELEASE_CHECKLIST.md
-- ReleaseDocs/CYCLE_9_RELEASE_NOTES.md
+- ReleaseDocs/README.md
+- ReleaseDocs/CYCLE_98_SMOKE_TEST.md
+- ReleaseDocs/LIGHTING_ARCHITECTURE_DECISION.md
+- ReleaseDocs/TESTER_DISTRIBUTION_PIPELINE.md
+- ReleaseDocs/DEVELOPMENT_BACKLOG.md
 EOF
 }
 
@@ -74,7 +230,21 @@ main() {
   local packaged_at
 
   mkdir -p "$artifacts_root"
-  build_app
+
+  if [[ "$check_distribution" -eq 1 ]]; then
+    check_distribution_inputs
+    exit 0
+  fi
+
+  validate_release_inputs
+
+  if [[ "$validate_only" -eq 1 ]]; then
+    exit 0
+  fi
+
+  if [[ "$skip_build" -eq 0 ]]; then
+    build_app
+  fi
 
   app_path="$derived_data_path/Build/Products/Release/MilsimPonyGame.app"
   info_plist="$app_path/Contents/Info.plist"
@@ -84,11 +254,21 @@ main() {
     exit 1
   fi
 
+  if [[ ! -x "$app_path/Contents/MacOS/MilsimPonyGame" ]]; then
+    echo "Release executable not found at $app_path/Contents/MacOS/MilsimPonyGame" >&2
+    exit 1
+  fi
+
   version="$(read_plist_value "$info_plist" CFBundleShortVersionString)"
   build_number="$(read_plist_value "$info_plist" CFBundleVersion)"
   bundle_identifier="$(read_plist_value "$info_plist" CFBundleIdentifier)"
 
-  package_name="MilsimPonyGame-v${version}-b${build_number}-${timestamp}"
+  if [[ "$version" != "$expected_version" || "$build_number" != "$expected_build" ]]; then
+    echo "Built app version $version ($build_number) does not match expected $expected_version ($expected_build)" >&2
+    exit 1
+  fi
+
+  package_name="MilsimPonyGame-v${version}-b${build_number}-cycle${release_cycle}-${timestamp}"
   package_dir="$artifacts_root/$package_name"
   docs_dir="$package_dir/ReleaseDocs"
   zip_path="$package_dir.zip"
@@ -96,11 +276,16 @@ main() {
 
   mkdir -p "$docs_dir"
   ditto "$app_path" "$package_dir/MilsimPonyGame.app"
-  cp "$repo_root/Docs/CYCLE_9_SMOKE_TEST.md" "$docs_dir/"
-  cp "$repo_root/Docs/CYCLE_9_RELEASE_CHECKLIST.md" "$docs_dir/"
-  cp "$repo_root/Docs/CYCLE_9_RELEASE_NOTES.md" "$docs_dir/"
+  for doc_path in "${release_docs[@]}"; do
+    cp "$repo_root/$doc_path" "$docs_dir/"
+  done
   write_manifest "$package_dir/build_manifest.txt" "$version" "$build_number" "$bundle_identifier" "$packaged_at"
   ditto -c -k --keepParent "$package_dir" "$zip_path"
+
+  if [[ ! -d "$package_dir/MilsimPonyGame.app" || ! -x "$package_dir/MilsimPonyGame.app/Contents/MacOS/MilsimPonyGame" || ! -f "$package_dir/build_manifest.txt" || ! -f "$zip_path" ]]; then
+    echo "Package smoke check failed for $package_dir" >&2
+    exit 1
+  fi
 
   printf 'Release package created:\n'
   printf '  App bundle: %s\n' "$package_dir/MilsimPonyGame.app"

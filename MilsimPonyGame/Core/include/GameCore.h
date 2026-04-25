@@ -263,6 +263,7 @@ void GameCoreSetWeaponSteady(bool steady);
 void GameCoreAddLookDelta(float deltaX, float deltaY);
 GameShotFeedback GameCoreRequestFire(void);
 void GameCoreTick(double deltaTime);
+bool GameCoreRestoreToCheckpointProgress(int completedCheckpointCount);
 void GameCoreInitializeNPC(GameNPCState *npc, float x, float y, float z, float yawDegrees, float pitchDegrees);
 void GameCoreConfigureNPCTraversal(GameNPCState *npc, float walkSpeed, float sprintSpeed, float radius);
 void GameCoreSetNPCTarget(GameNPCState *npc, float x, float y, float z, float acceptanceRadius, bool sprinting);

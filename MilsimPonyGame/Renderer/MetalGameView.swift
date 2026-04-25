@@ -3,6 +3,7 @@ import SwiftUI
 
 protocol InputTrackingMetalViewDelegate: AnyObject {
     func inputViewCanCaptureFocus(_ view: InputTrackingMetalView) -> Bool
+    func inputViewShouldRecoverKeyWindow(_ view: InputTrackingMetalView) -> Bool
     func inputView(
         _ view: InputTrackingMetalView,
         keyDidChange keyCode: UInt16,
@@ -95,6 +96,10 @@ struct MetalGameView: NSViewRepresentable {
             session.allowsGameplayInputFocusCapture
         }
 
+        func inputViewShouldRecoverKeyWindow(_ view: InputTrackingMetalView) -> Bool {
+            session.shouldKeepGameplayWindowKey
+        }
+
         func syncInputFocusRequest(with view: InputTrackingMetalView, session: GameSession) {
             guard handledInputFocusRequestID != session.inputFocusRequestID else {
                 return
@@ -116,8 +121,10 @@ final class InputTrackingMetalView: MTKView {
     private weak var observedWindow: NSWindow?
     private var lastMouseLocationInWindow: CGPoint?
     private var focusRetryGeneration = 0
+    private var inputRecoveryTimer: Timer?
 
     deinit {
+        inputRecoveryTimer?.invalidate()
         GameplayInputRouter.shared.detach(self)
         removeWindowObservers()
     }
@@ -187,6 +194,7 @@ final class InputTrackingMetalView: MTKView {
         window?.acceptsMouseMovedEvents = true
         GameplayInputRouter.shared.attach(self)
         installWindowObserversIfNeeded()
+        startInputRecoveryHeartbeatIfNeeded()
 
         guard window != nil else {
             return
@@ -204,6 +212,48 @@ final class InputTrackingMetalView: MTKView {
 
     private var hasInputFocus: Bool {
         window?.isKeyWindow == true && window?.firstResponder === self
+    }
+
+    private func startInputRecoveryHeartbeatIfNeeded() {
+        guard inputRecoveryTimer == nil else {
+            return
+        }
+
+        let timer = Timer(timeInterval: 0.75, repeats: true) { [weak self] _ in
+            self?.recoverInputPipelineIfNeeded()
+        }
+        timer.tolerance = 0.20
+        RunLoop.main.add(timer, forMode: .common)
+        inputRecoveryTimer = timer
+    }
+
+    private func recoverInputPipelineIfNeeded() {
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { [weak self] in
+                self?.recoverInputPipelineIfNeeded()
+            }
+            return
+        }
+
+        guard let window, window.isVisible, NSApp.isActive else {
+            return
+        }
+
+        window.acceptsMouseMovedEvents = true
+        GameplayInputRouter.shared.attach(self)
+
+        if window.isKeyWindow {
+            guard !hasInputFocus else {
+                return
+            }
+
+            captureInputFocus(retryIfNeeded: false)
+            return
+        }
+
+        if inputDelegate?.inputViewShouldRecoverKeyWindow(self) == true {
+            captureInputFocus(retryIfNeeded: false)
+        }
     }
 
     private func captureInputFocus(retryIfNeeded: Bool) {

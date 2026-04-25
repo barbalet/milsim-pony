@@ -616,6 +616,11 @@ private struct MenuActionStack: View {
                 }
                 .disabled(!session.canPreviewManualRestoreChoice)
 
+                WindowActionButton(title: session.manualRestoreExecutionButtonTitle) {
+                    session.requestManualRestoreExecution()
+                }
+                .disabled(!session.canExecuteManualRestore)
+
                 WindowActionButton(title: session.alternateRouteActivationButtonTitle) {
                     session.armAlternateRouteForNextFreshRun()
                 }
@@ -977,6 +982,14 @@ private struct OverheadMapCanvas: View {
         let rotation: Angle
     }
 
+    private struct CollisionVisual: Identifiable {
+        let id: String
+        let footprintPath: Path
+        let fillColor: Color
+        let strokeColor: Color
+        let lineWidth: CGFloat
+    }
+
     private struct ThreatVisual: Identifiable {
         let id: String
         let center: CGPoint
@@ -1002,6 +1015,7 @@ private struct OverheadMapCanvas: View {
         let gridPath: Path
         let sectorVisuals: [SectorVisual]
         let roadVisuals: [RoadVisual]
+        let collisionVisuals: [CollisionVisual]
         let threatVisuals: [ThreatVisual]
         let alternateRoutePaths: [Path]
         let routePath: Path
@@ -1174,6 +1188,34 @@ private struct OverheadMapCanvas: View {
                 }
             }
 
+            func collisionFootprintPath(for volume: SceneMapCollisionVolume) -> Path {
+                let yawRadians = volume.yawDegrees * (.pi / 180.0)
+                let forwardX = sinf(yawRadians) * volume.halfDepth
+                let forwardZ = cosf(yawRadians) * volume.halfDepth
+                let rightX = cosf(yawRadians) * volume.halfWidth
+                let rightZ = -sinf(yawRadians) * volume.halfWidth
+                let centerX = volume.centerPoint.x
+                let centerZ = volume.centerPoint.z
+                let corners: [CGPoint] = [
+                    point(forX: centerX - rightX - forwardX, z: centerZ - rightZ - forwardZ),
+                    point(forX: centerX + rightX - forwardX, z: centerZ + rightZ - forwardZ),
+                    point(forX: centerX + rightX + forwardX, z: centerZ + rightZ + forwardZ),
+                    point(forX: centerX - rightX + forwardX, z: centerZ - rightZ + forwardZ)
+                ]
+
+                return Path { path in
+                    guard let first = corners.first else {
+                        return
+                    }
+
+                    path.move(to: first)
+                    for corner in corners.dropFirst() {
+                        path.addLine(to: corner)
+                    }
+                    path.closeSubpath()
+                }
+            }
+
             func checkpointColor(for checkpoint: SceneMapCheckpoint, index: Int) -> Color {
                 if index < snapshot.completedCheckpointCount {
                     return Color(red: 0.36, green: 0.86, blue: 0.58)
@@ -1238,6 +1280,21 @@ private struct OverheadMapCanvas: View {
                     labelPosition: midpoint,
                     labelWidth: max(labelWidth - roadLabelInset, 40),
                     rotation: .degrees(Double(-road.yawDegrees))
+                )
+            }
+
+            collisionVisuals = configuration.collisionVolumes.map { volume in
+                let isAuthored = volume.source == "authored"
+                return CollisionVisual(
+                    id: volume.id,
+                    footprintPath: collisionFootprintPath(for: volume),
+                    fillColor: isAuthored
+                        ? Color(red: 0.98, green: 0.48, blue: 0.30).opacity(0.11)
+                        : Color(red: 0.96, green: 0.72, blue: 0.32).opacity(0.09),
+                    strokeColor: isAuthored
+                        ? Color(red: 1.0, green: 0.58, blue: 0.38).opacity(0.62)
+                        : Color(red: 0.96, green: 0.78, blue: 0.36).opacity(0.46),
+                    lineWidth: isAuthored ? 1.25 : 0.9
                 )
             }
 
@@ -1423,6 +1480,15 @@ private struct OverheadMapCanvas: View {
                             )
                         }
 
+                        for collision in renderModel.collisionVisuals {
+                            context.fill(collision.footprintPath, with: .color(collision.fillColor))
+                            context.stroke(
+                                collision.footprintPath,
+                                with: .color(collision.strokeColor),
+                                style: StrokeStyle(lineWidth: collision.lineWidth, lineJoin: .round, dash: [3, 3])
+                            )
+                        }
+
                         for threat in renderModel.threatVisuals {
                             let threatRangePath = Path(ellipseIn: threat.rangeRect)
                             context.fill(
@@ -1581,6 +1647,7 @@ private struct OverheadMapCanvas: View {
             ) {
                 legendItem(color: .white.opacity(0.92), label: "Spawn")
                 legendItem(color: Color(red: 0.84, green: 0.86, blue: 0.90), label: "Roads")
+                legendItem(color: Color(red: 1.0, green: 0.58, blue: 0.38), label: "Collision")
                 legendItem(color: Color(red: 0.36, green: 0.86, blue: 0.58), label: "Cleared")
                 legendItem(color: Color(red: 0.94, green: 0.84, blue: 0.40), label: "Route")
                 legendItem(color: Color(red: 0.34, green: 0.78, blue: 0.96), label: "Alt Preview")
@@ -1688,12 +1755,47 @@ private struct OverheadMapCanvas: View {
                 .foregroundStyle(.white.opacity(0.622))
                 .fixedSize(horizontal: false, vertical: true)
 
+            Text(collisionPreviewLine)
+                .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.622))
+                .fixedSize(horizontal: false, vertical: true)
+
             Text(environmentalMotionLine)
                 .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.622))
                 .fixedSize(horizontal: false, vertical: true)
 
+            Text(shadowProfileLine)
+                .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.622))
+                .fixedSize(horizontal: false, vertical: true)
+
             Text(surfaceFidelityLine)
+                .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.622))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(distantLODLine)
+                .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.622))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(waterReflectionLine)
+                .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.622))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(packagingAutomationLine)
+                .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.622))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(testerDistributionLine)
+                .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.622))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(lightingArchitectureLine)
                 .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.622))
                 .fixedSize(horizontal: false, vertical: true)
@@ -1851,12 +1953,42 @@ private struct OverheadMapCanvas: View {
         "Collision Authoring: \(snapshot.configuration.collisionAuthoringStatus) • \(snapshot.configuration.collisionAuthoringRule)"
     }
 
+    private var collisionPreviewLine: String {
+        let authoredCount = snapshot.configuration.collisionVolumes.filter { $0.source == "authored" }.count
+        let grayboxCount = snapshot.configuration.collisionVolumes.count - authoredCount
+        return "Collision Preview: \(snapshot.configuration.collisionVolumes.count) blocker footprints • \(authoredCount) authored / \(grayboxCount) graybox • \(snapshot.configuration.collisionAuthoringAudit)"
+    }
+
     private var environmentalMotionLine: String {
         "Environmental Motion: \(snapshot.configuration.environmentalMotionStatus) • \(snapshot.configuration.environmentalMotionWindSummary)"
     }
 
+    private var shadowProfileLine: String {
+        "Shadow Profile: \(snapshot.configuration.shadowProfileStatus) • \(snapshot.configuration.shadowProfileSummary)"
+    }
+
     private var surfaceFidelityLine: String {
         "Surface Fidelity: \(snapshot.configuration.surfaceFidelityStatus) • \(snapshot.configuration.surfaceFidelitySummary)"
+    }
+
+    private var distantLODLine: String {
+        "Distant LOD: \(snapshot.configuration.distantLODStatus) • \(snapshot.configuration.distantLODSummary)"
+    }
+
+    private var waterReflectionLine: String {
+        "Water Reflection: \(snapshot.configuration.waterReflectionStatus) • \(snapshot.configuration.waterReflectionSummary)"
+    }
+
+    private var packagingAutomationLine: String {
+        "Packaging: \(snapshot.configuration.packagingAutomationStatus) • \(snapshot.configuration.packagingAutomationSummary)"
+    }
+
+    private var testerDistributionLine: String {
+        "Tester Delivery: \(snapshot.configuration.testerDistributionStatus) • \(snapshot.configuration.testerDistributionSummary)"
+    }
+
+    private var lightingArchitectureLine: String {
+        "Lighting Plan: \(snapshot.configuration.lightingArchitectureStatus) • \(snapshot.configuration.lightingArchitectureSummary)"
     }
 
     private var blackMountainMaterialLine: String {

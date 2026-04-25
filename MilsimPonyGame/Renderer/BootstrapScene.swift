@@ -71,6 +71,10 @@ struct SceneShadowSettings {
     let strength: Float
     let scopeCoverageMultiplier: Float
     let forwardOffsetMultiplier: Float
+    let cascadeCount: Int
+    let cascadeSplits: [Float]
+    let profileStatus: String
+    let profileRule: String
 }
 
 struct ScenePostProcessSettings {
@@ -380,6 +384,17 @@ struct SceneMapSector: Identifiable {
     }
 }
 
+struct SceneMapCollisionVolume: Identifiable {
+    let id: String
+    let displayName: String
+    let sectorName: String
+    let centerPoint: SceneMapPoint
+    let halfWidth: Float
+    let halfDepth: Float
+    let yawDegrees: Float
+    let source: String
+}
+
 struct SceneMapConfiguration {
     let sceneName: String
     let minX: Float
@@ -390,6 +405,7 @@ struct SceneMapConfiguration {
     let spawnYawDegrees: Float
     let sectors: [SceneMapSector]
     let roads: [SceneMapRoad]
+    let collisionVolumes: [SceneMapCollisionVolume]
     let checkpoints: [SceneMapCheckpoint]
     let routeName: String
     let routeStartLabel: String
@@ -437,9 +453,27 @@ struct SceneMapConfiguration {
     let environmentalMotionStatus: String
     let environmentalMotionRule: String
     let environmentalMotionWindSummary: String
+    let shadowProfileStatus: String
+    let shadowProfileRule: String
+    let shadowProfileSummary: String
     let surfaceFidelityStatus: String
     let surfaceFidelityRule: String
     let surfaceFidelitySummary: String
+    let distantLODStatus: String
+    let distantLODRule: String
+    let distantLODSummary: String
+    let waterReflectionStatus: String
+    let waterReflectionRule: String
+    let waterReflectionSummary: String
+    let packagingAutomationStatus: String
+    let packagingAutomationRule: String
+    let packagingAutomationSummary: String
+    let testerDistributionStatus: String
+    let testerDistributionRule: String
+    let testerDistributionSummary: String
+    let lightingArchitectureStatus: String
+    let lightingArchitectureRule: String
+    let lightingArchitectureSummary: String
     let sessionPersistenceStatus: String
     let sessionPersistenceRule: String
     let sessionPersistenceSummary: String
@@ -880,7 +914,13 @@ final class BootstrapScene {
                     routeHandoffLine(),
                     collisionAuthoringLine(),
                     environmentalMotionLine(),
+                    shadowProfileLine(),
                     surfaceFidelityLine(),
+                    distantLODLine(),
+                    waterReflectionLine(),
+                    packagingAutomationLine(),
+                    testerDistributionLine(),
+                    lightingArchitectureLine(),
                     blackMountainMaterialCloseoutLine(),
                     westBasinWaterCloseoutLine(),
                     sessionPersistenceLine(),
@@ -921,7 +961,13 @@ final class BootstrapScene {
             routeHandoffLine(),
             collisionAuthoringLine(),
             environmentalMotionLine(),
+            shadowProfileLine(),
             surfaceFidelityLine(),
+            distantLODLine(),
+            waterReflectionLine(),
+            packagingAutomationLine(),
+            testerDistributionLine(),
+            lightingArchitectureLine(),
             blackMountainMaterialCloseoutLine(),
             westBasinWaterCloseoutLine(),
             sessionPersistenceLine(),
@@ -1273,8 +1319,32 @@ final class BootstrapScene {
         "Environmental Motion: \(mapConfiguration.environmentalMotionStatus) / \(mapConfiguration.environmentalMotionWindSummary)"
     }
 
+    private func shadowProfileLine() -> String {
+        "Shadow Profile: \(mapConfiguration.shadowProfileStatus) / \(mapConfiguration.shadowProfileSummary)"
+    }
+
     private func surfaceFidelityLine() -> String {
         "Surface Fidelity: \(mapConfiguration.surfaceFidelityStatus) / \(mapConfiguration.surfaceFidelitySummary)"
+    }
+
+    private func distantLODLine() -> String {
+        "Distant LOD: \(mapConfiguration.distantLODStatus) / \(mapConfiguration.distantLODSummary)"
+    }
+
+    private func waterReflectionLine() -> String {
+        "Water Reflection: \(mapConfiguration.waterReflectionStatus) / \(mapConfiguration.waterReflectionSummary)"
+    }
+
+    private func packagingAutomationLine() -> String {
+        "Packaging: \(mapConfiguration.packagingAutomationStatus) / \(mapConfiguration.packagingAutomationSummary)"
+    }
+
+    private func testerDistributionLine() -> String {
+        "Tester Delivery: \(mapConfiguration.testerDistributionStatus) / \(mapConfiguration.testerDistributionSummary)"
+    }
+
+    private func lightingArchitectureLine() -> String {
+        "Lighting Plan: \(mapConfiguration.lightingArchitectureStatus) / \(mapConfiguration.lightingArchitectureSummary)"
     }
 
     private func blackMountainMaterialCloseoutLine() -> String {
@@ -1512,6 +1582,7 @@ final class BootstrapScene {
             spawnYawDegrees: spawn.yawDegrees,
             sectors: mapConfigurationTemplate.sectors,
             roads: mapConfigurationTemplate.roads,
+            collisionVolumes: mapConfigurationTemplate.collisionVolumes,
             checkpoints: activeMapCheckpoints,
             routeName: activeRouteName,
             routeStartLabel: activeStartLabel,
@@ -1573,9 +1644,27 @@ final class BootstrapScene {
             environmentalMotionStatus: mapConfigurationTemplate.environmentalMotionStatus,
             environmentalMotionRule: mapConfigurationTemplate.environmentalMotionRule,
             environmentalMotionWindSummary: mapConfigurationTemplate.environmentalMotionWindSummary,
+            shadowProfileStatus: mapConfigurationTemplate.shadowProfileStatus,
+            shadowProfileRule: mapConfigurationTemplate.shadowProfileRule,
+            shadowProfileSummary: mapConfigurationTemplate.shadowProfileSummary,
             surfaceFidelityStatus: mapConfigurationTemplate.surfaceFidelityStatus,
             surfaceFidelityRule: mapConfigurationTemplate.surfaceFidelityRule,
             surfaceFidelitySummary: mapConfigurationTemplate.surfaceFidelitySummary,
+            distantLODStatus: mapConfigurationTemplate.distantLODStatus,
+            distantLODRule: mapConfigurationTemplate.distantLODRule,
+            distantLODSummary: mapConfigurationTemplate.distantLODSummary,
+            waterReflectionStatus: mapConfigurationTemplate.waterReflectionStatus,
+            waterReflectionRule: mapConfigurationTemplate.waterReflectionRule,
+            waterReflectionSummary: mapConfigurationTemplate.waterReflectionSummary,
+            packagingAutomationStatus: mapConfigurationTemplate.packagingAutomationStatus,
+            packagingAutomationRule: mapConfigurationTemplate.packagingAutomationRule,
+            packagingAutomationSummary: mapConfigurationTemplate.packagingAutomationSummary,
+            testerDistributionStatus: mapConfigurationTemplate.testerDistributionStatus,
+            testerDistributionRule: mapConfigurationTemplate.testerDistributionRule,
+            testerDistributionSummary: mapConfigurationTemplate.testerDistributionSummary,
+            lightingArchitectureStatus: mapConfigurationTemplate.lightingArchitectureStatus,
+            lightingArchitectureRule: mapConfigurationTemplate.lightingArchitectureRule,
+            lightingArchitectureSummary: mapConfigurationTemplate.lightingArchitectureSummary,
             sessionPersistenceStatus: mapConfigurationTemplate.sessionPersistenceStatus,
             sessionPersistenceRule: mapConfigurationTemplate.sessionPersistenceRule,
             sessionPersistenceSummary: mapConfigurationTemplate.sessionPersistenceSummary,
@@ -2094,6 +2183,11 @@ private final class ScenePackageBuilder {
         let environmentalMotion = sceneConfiguration.environmentalMotion ?? EnvironmentalMotionConfiguration()
         let materialBreakup = sceneConfiguration.materialBreakup ?? MaterialBreakupConfiguration()
         let surfaceFidelity = sceneConfiguration.surfaceFidelity ?? SurfaceFidelityConfiguration()
+        let distantLOD = sceneConfiguration.distantLOD ?? DistantLODConfiguration()
+        let waterReflection = sceneConfiguration.waterReflection ?? WaterReflectionConfiguration()
+        let packagingAutomation = sceneConfiguration.packagingAutomation ?? PackagingAutomationConfiguration()
+        let testerDistribution = sceneConfiguration.testerDistribution ?? TesterDistributionConfiguration()
+        let lightingArchitecture = sceneConfiguration.lightingArchitecture ?? LightingArchitectureConfiguration()
         let sessionPersistence = sceneConfiguration.sessionPersistence ?? SessionPersistenceConfiguration()
         let materialBreakupRoadDecalDensity = simd_clamp(materialBreakup.roadDecalDensity ?? 0.55, 0.0, 2.0)
         let materialBreakupRoadScuffStrength = simd_clamp(materialBreakup.roadScuffStrength ?? 0.42, 0.0, 1.0)
@@ -2110,7 +2204,14 @@ private final class ScenePackageBuilder {
             normalBias: max(shadowConfiguration.normalBias ?? 0.010, 0.0),
             strength: min(max(shadowConfiguration.strength ?? 0.72, 0.0), 1.0),
             scopeCoverageMultiplier: max(shadowConfiguration.scopeCoverageMultiplier ?? 1.25, 1.0),
-            forwardOffsetMultiplier: min(max(shadowConfiguration.forwardOffsetMultiplier ?? 0.35, 0.0), 1.0)
+            forwardOffsetMultiplier: min(max(shadowConfiguration.forwardOffsetMultiplier ?? 0.35, 0.0), 1.0),
+            cascadeCount: min(max(shadowConfiguration.cascadeCount ?? 1, 1), 4),
+            cascadeSplits: Self.normalizedCascadeSplits(
+                shadowConfiguration.cascadeSplits,
+                count: min(max(shadowConfiguration.cascadeCount ?? 1, 1), 4)
+            ),
+            profileStatus: shadowConfiguration.profileStatus ?? "single-map shadow baseline active; CSM profile pending",
+            profileRule: shadowConfiguration.profileRule ?? "profile current shadow coverage before promoting to cascades"
         )
         let postProcessSettings = ScenePostProcessSettings(
             exposureBias: postProcessConfiguration.exposureBias ?? 0.18,
@@ -2549,8 +2650,19 @@ private final class ScenePackageBuilder {
                 collisionAuthoring: collisionAuthoring,
                 collisionCount: collisionCount,
                 environmentalMotion: environmentalMotion,
+                shadowSettings: shadowSettings,
                 surfaceFidelity: surfaceFidelity,
                 surfaceFidelitySummary: surfaceFidelitySummary,
+                distantLOD: distantLOD,
+                distantLODSummary: Self.distantLODSummary(distantLOD),
+                waterReflection: waterReflection,
+                waterReflectionSummary: Self.waterReflectionSummary(waterReflection),
+                packagingAutomation: packagingAutomation,
+                packagingAutomationSummary: Self.packagingAutomationSummary(packagingAutomation),
+                testerDistribution: testerDistribution,
+                testerDistributionSummary: Self.testerDistributionSummary(testerDistribution),
+                lightingArchitecture: lightingArchitecture,
+                lightingArchitectureSummary: Self.lightingArchitectureSummary(lightingArchitecture),
                 sessionPersistence: sessionPersistence,
                 sessionPersistenceSummary: sessionPersistenceSummary,
                 reviewPack: reviewPack,
@@ -2612,8 +2724,19 @@ private final class ScenePackageBuilder {
         collisionAuthoring: CollisionAuthoringConfiguration,
         collisionCount: Int,
         environmentalMotion: EnvironmentalMotionConfiguration,
+        shadowSettings: SceneShadowSettings,
         surfaceFidelity: SurfaceFidelityConfiguration,
         surfaceFidelitySummary: String,
+        distantLOD: DistantLODConfiguration,
+        distantLODSummary: String,
+        waterReflection: WaterReflectionConfiguration,
+        waterReflectionSummary: String,
+        packagingAutomation: PackagingAutomationConfiguration,
+        packagingAutomationSummary: String,
+        testerDistribution: TesterDistributionConfiguration,
+        testerDistributionSummary: String,
+        lightingArchitecture: LightingArchitectureConfiguration,
+        lightingArchitectureSummary: String,
         sessionPersistence: SessionPersistenceConfiguration,
         sessionPersistenceSummary: String,
         reviewPack: ReviewPackConfiguration,
@@ -2647,6 +2770,45 @@ private final class ScenePackageBuilder {
                     yawDegrees: road.yawDegrees ?? 0
                 )
             }
+        }
+        let mapCollisionVolumes = loadedSectors.flatMap { sector -> [SceneMapCollisionVolume] in
+            let grayboxVolumes = sector.grayboxBlocks.compactMap { block -> SceneMapCollisionVolume? in
+                guard block.collisionEnabled ?? true else {
+                    return nil
+                }
+
+                return SceneMapCollisionVolume(
+                    id: "\(sector.id).graybox.\(block.name)",
+                    displayName: block.name,
+                    sectorName: sector.displayName,
+                    centerPoint: SceneMapPoint(
+                        x: block.positionVector.x,
+                        z: block.positionVector.z
+                    ),
+                    halfWidth: block.halfExtentsVector.x,
+                    halfDepth: block.halfExtentsVector.z,
+                    yawDegrees: block.yawDegrees ?? 0,
+                    source: "graybox"
+                )
+            }
+
+            let authoredVolumes = sector.collisionVolumes.map { volume in
+                SceneMapCollisionVolume(
+                    id: "\(sector.id).authored.\(volume.name)",
+                    displayName: volume.name,
+                    sectorName: sector.displayName,
+                    centerPoint: SceneMapPoint(
+                        x: volume.positionVector.x,
+                        z: volume.positionVector.z
+                    ),
+                    halfWidth: volume.halfExtentsVector.x,
+                    halfDepth: volume.halfExtentsVector.z,
+                    yawDegrees: volume.yawDegrees ?? 0,
+                    source: "authored"
+                )
+            }
+
+            return grayboxVolumes + authoredVolumes
         }
         let mapCheckpoints = checkpoints.map { checkpoint in
             SceneMapCheckpoint(
@@ -2816,6 +2978,7 @@ private final class ScenePackageBuilder {
             spawnYawDegrees: spawn.yawDegrees,
             sectors: mapSectors,
             roads: mapRoads,
+            collisionVolumes: mapCollisionVolumes,
             checkpoints: mapCheckpoints,
             routeName: routeName,
             routeStartLabel: routeStartLabel,
@@ -2867,9 +3030,27 @@ private final class ScenePackageBuilder {
             environmentalMotionStatus: environmentalMotion.status ?? "environmental motion pending",
             environmentalMotionRule: environmentalMotion.rule ?? "scene uses default terrain breeze",
             environmentalMotionWindSummary: environmentalMotionWindSummary(environmentalMotion),
+            shadowProfileStatus: shadowSettings.profileStatus,
+            shadowProfileRule: shadowSettings.profileRule,
+            shadowProfileSummary: Self.shadowProfileSummary(shadowSettings),
             surfaceFidelityStatus: surfaceFidelity.status ?? "surface fidelity review pending",
             surfaceFidelityRule: surfaceFidelity.rule ?? "review environmental motion, water, SSAO, decals, and material breakup together",
             surfaceFidelitySummary: surfaceFidelitySummary,
+            distantLODStatus: distantLOD.status ?? "distant LOD planning pending",
+            distantLODRule: distantLOD.rule ?? "author key landmark impostor metadata before renderer promotion",
+            distantLODSummary: distantLODSummary,
+            waterReflectionStatus: waterReflection.status ?? "water reflection planning pending",
+            waterReflectionRule: waterReflection.rule ?? "prototype or defer reflection probe after water motion closeout",
+            waterReflectionSummary: waterReflectionSummary,
+            packagingAutomationStatus: packagingAutomation.status ?? "packaging automation planning pending",
+            packagingAutomationRule: packagingAutomation.rule ?? "package release only after version, manifest, archive, and smoke checks pass",
+            packagingAutomationSummary: packagingAutomationSummary,
+            testerDistributionStatus: testerDistribution.status ?? "tester distribution planning pending",
+            testerDistributionRule: testerDistribution.rule ?? "share tester builds only after package validation and delivery-plan checks pass",
+            testerDistributionSummary: testerDistributionSummary,
+            lightingArchitectureStatus: lightingArchitecture.status ?? "lighting architecture planning pending",
+            lightingArchitectureRule: lightingArchitecture.rule ?? "lock time-of-day, atmosphere, clustered lighting, and render graph decisions before renderer rewrites",
+            lightingArchitectureSummary: lightingArchitectureSummary,
             sessionPersistenceStatus: sessionPersistence.status ?? "session persistence planning pending",
             sessionPersistenceRule: sessionPersistence.rule ?? "capture route, checkpoint, difficulty, map, and review state before save/resume activation",
             sessionPersistenceSummary: sessionPersistenceSummary,
@@ -2919,6 +3100,125 @@ private final class ScenePackageBuilder {
             simd_clamp(configuration.vegetationResponse ?? 1.0, 0.0, 2.0),
             simd_clamp(configuration.shorelineRippleStrength ?? 0.18, 0.0, 1.5),
             simd_clamp(configuration.waterSurfaceResponse ?? 0.72, 0.0, 2.0)
+        )
+    }
+
+    private static func normalizedCascadeSplits(_ splits: [Float]?, count: Int) -> [Float] {
+        let targetCount = max(count, 1)
+        let authoredSplits = splits ?? []
+        var normalized: [Float] = []
+        for index in 0..<targetCount {
+            let fallback = Float(index + 1) / Float(targetCount)
+            let value = index < authoredSplits.count ? authoredSplits[index] : fallback
+            normalized.append(simd_clamp(value, 0.02, 1.0))
+        }
+        normalized[targetCount - 1] = 1.0
+        return normalized.sorted()
+    }
+
+    private static func shadowProfileSummary(_ settings: SceneShadowSettings) -> String {
+        let splitSummary = settings.cascadeSplits
+            .map { String(format: "%.2f", $0) }
+            .joined(separator: "/")
+        return String(
+            format: "%d planned cascades / %dpx current map / %.0fm base %.0fm scoped coverage / splits %@ / bias %.3f normal %.3f",
+            settings.cascadeCount,
+            settings.mapResolution,
+            settings.coverage,
+            settings.coverage * settings.scopeCoverageMultiplier,
+            splitSummary,
+            settings.depthBias,
+            settings.normalBias
+        )
+    }
+
+    private static func distantLODSummary(_ configuration: DistantLODConfiguration) -> String {
+        let targets = configuration.landmarkTargets ?? []
+        let targetSummary = targets.isEmpty
+            ? "no landmarks authored"
+            : targets.prefix(4).joined(separator: ", ")
+        let extraCount = max(targets.count - 4, 0)
+        let extraSummary = extraCount > 0 ? " +\(extraCount)" : ""
+        return String(
+            format: "%d targets / impostor %.0fm / %@%@ / %@",
+            targets.count,
+            max(configuration.impostorStartMeters ?? 420.0, 1.0),
+            targetSummary,
+            extraSummary,
+            configuration.scopeStabilityRule ?? "scope mode keeps stable far silhouettes until impostor swap is implemented"
+        )
+    }
+
+    private static func waterReflectionSummary(_ configuration: WaterReflectionConfiguration) -> String {
+        let targets = configuration.probeTargets ?? []
+        let targetSummary = targets.isEmpty
+            ? "no probe targets authored"
+            : targets.prefix(3).joined(separator: ", ")
+        let extraCount = max(targets.count - 3, 0)
+        let extraSummary = extraCount > 0 ? " +\(extraCount)" : ""
+        return String(
+            format: "%d probes / %@%@ / %@ / %@",
+            targets.count,
+            targetSummary,
+            extraSummary,
+            configuration.approach ?? "material probe metadata before SSR",
+            configuration.screenSpaceReflectionStatus ?? "SSR deferred"
+        )
+    }
+
+    private static func packagingAutomationSummary(_ configuration: PackagingAutomationConfiguration) -> String {
+        let checks = configuration.manifestChecks ?? []
+        let checkSummary = checks.isEmpty
+            ? "manifest checks pending"
+            : checks.prefix(3).joined(separator: ", ")
+        let extraCount = max(checks.count - 3, 0)
+        let extraSummary = extraCount > 0 ? " +\(extraCount)" : ""
+        return String(
+            format: "%@ / %@ / checks %@%@ / %@",
+            configuration.versionPolicy ?? "cycle-based version policy pending",
+            configuration.archivePattern ?? "MilsimPonyGame-v<version>-b<build>-cycle<cycle>-<utc>",
+            checkSummary,
+            extraSummary,
+            configuration.smokeCommand ?? "Tools/package_release.sh --validate-only"
+        )
+    }
+
+    private static func testerDistributionSummary(_ configuration: TesterDistributionConfiguration) -> String {
+        let checklist = configuration.deliveryChecklist ?? []
+        let checklistSummary = checklist.isEmpty
+            ? "delivery checklist pending"
+            : checklist.prefix(3).joined(separator: ", ")
+        let extraCount = max(checklist.count - 3, 0)
+        let extraSummary = extraCount > 0 ? " +\(extraCount)" : ""
+        return String(
+            format: "%@ / %@ / %@ / %@%@ / %@ / %@",
+            configuration.channel ?? "local-review",
+            configuration.notarizationStatus ?? "notarization workflow planned",
+            configuration.ciPlan ?? "CI packaging gate planned",
+            checklistSummary,
+            extraSummary,
+            configuration.sdfUIPlan ?? "SDF UI migration scoped for later polish",
+            configuration.smokeCommand ?? "Tools/package_release.sh --check-distribution"
+        )
+    }
+
+    private static func lightingArchitectureSummary(_ configuration: LightingArchitectureConfiguration) -> String {
+        let prerequisites = configuration.measuredPrerequisites ?? []
+        let prerequisiteSummary = prerequisites.isEmpty
+            ? "measured prerequisites pending"
+            : prerequisites.prefix(3).joined(separator: ", ")
+        let extraCount = max(prerequisites.count - 3, 0)
+        let extraSummary = extraCount > 0 ? " +\(extraCount)" : ""
+        return String(
+            format: "%@ / %@ / %@ / %@ / %@ / %@%@ / %@",
+            configuration.scenario ?? "static Canberra daylight baseline",
+            configuration.timeOfDay ?? "fixed review daylight",
+            configuration.sunPolicy ?? "single authored sun remains shipping path",
+            configuration.clusteredLightingDecision ?? "defer Forward+ until dynamic light counts justify it",
+            configuration.renderGraphDecision ?? "defer render graph until pass-count and dependency pressure are measured",
+            prerequisiteSummary,
+            extraSummary,
+            configuration.smokeCommand ?? "Docs/CYCLE_98_SMOKE_TEST.md"
         )
     }
 
@@ -4087,7 +4387,11 @@ private enum FallbackSceneFactory {
                     normalBias: 0.010,
                     strength: 0.72,
                     scopeCoverageMultiplier: 1.25,
-                    forwardOffsetMultiplier: 0.35
+                    forwardOffsetMultiplier: 0.35,
+                    cascadeCount: 1,
+                    cascadeSplits: [1.0],
+                    profileStatus: "fallback single-map shadow profile",
+                    profileRule: "fallback scene cannot validate CSM coverage"
                 ),
                 postProcess: ScenePostProcessSettings(
                     exposureBias: 0.18,
@@ -4130,6 +4434,7 @@ private enum FallbackSceneFactory {
                 spawnYawDegrees: 0,
                 sectors: [],
                 roads: [],
+                collisionVolumes: [],
                 checkpoints: [],
                 routeName: "Fallback Route",
                 routeStartLabel: "Fallback start",
@@ -4177,9 +4482,27 @@ private enum FallbackSceneFactory {
                 environmentalMotionStatus: "environmental motion unavailable",
                 environmentalMotionRule: "fallback scene has no authored terrain motion",
                 environmentalMotionWindSummary: "fallback scene has no authored terrain motion / wind 0.00 gust 0.00",
+                shadowProfileStatus: "shadow profile unavailable",
+                shadowProfileRule: "fallback scene has no CSM profile target",
+                shadowProfileSummary: "fallback single shadow map / no cascade split proof",
                 surfaceFidelityStatus: "surface fidelity unavailable",
                 surfaceFidelityRule: "fallback scene has no environmental fidelity stack",
                 surfaceFidelitySummary: "fallback scene has no surface fidelity stack",
+                distantLODStatus: "distant LOD unavailable",
+                distantLODRule: "fallback scene has no landmark impostor targets",
+                distantLODSummary: "0 targets / fallback has no LOD proof",
+                waterReflectionStatus: "water reflection unavailable",
+                waterReflectionRule: "fallback scene has no water probe targets",
+                waterReflectionSummary: "0 probes / fallback has no reflection proof",
+                packagingAutomationStatus: "packaging automation unavailable",
+                packagingAutomationRule: "fallback scene has no release packaging contract",
+                packagingAutomationSummary: "no version policy / no archive policy / no manifest validation",
+                testerDistributionStatus: "tester distribution unavailable",
+                testerDistributionRule: "fallback scene has no tester handoff contract",
+                testerDistributionSummary: "no tester channel / notarization unplanned / SDF UI scope unavailable",
+                lightingArchitectureStatus: "lighting architecture unavailable",
+                lightingArchitectureRule: "fallback scene has no time-of-day or lighting plan",
+                lightingArchitectureSummary: "static fallback daylight / no clustered lighting or render graph decision",
                 sessionPersistenceStatus: "session persistence unavailable",
                 sessionPersistenceRule: "fallback scene has no resumable route state",
                 sessionPersistenceSummary: "fallback scene has no session persistence plan",

@@ -1795,6 +1795,40 @@ void GameCoreTick(double deltaTime) {
     }
 }
 
+bool GameCoreRestoreToCheckpointProgress(int completedCheckpointCount) {
+    if (!gameState.bootstrapped) {
+        GameCoreBootstrap("implicit");
+        return false;
+    }
+
+    if (gameState.routeCheckpointCount <= 0) {
+        return false;
+    }
+
+    if (completedCheckpointCount < 0 || completedCheckpointCount >= gameState.routeCheckpointCount) {
+        return false;
+    }
+
+    GameCoreResetDetectionState(false);
+    gameState.routeFailed = false;
+    gameState.routeComplete = false;
+    gameState.completedCheckpointCount = completedCheckpointCount;
+    gameState.restartCount += 1;
+    GameCoreUpdateRespawnAnchorForProgress();
+    GameCoreRestartFromRespawnAnchor();
+    GameCoreUpdateRouteProgress();
+    GameCoreUpdateDetection(0);
+    GameCoreResetProfilingCounters();
+    printf(
+        "[GameCore] Manual restore to progress %d at %.2f %.2f %.2f\n",
+        completedCheckpointCount,
+        gameState.respawnX,
+        gameState.respawnY,
+        gameState.respawnZ
+    );
+    return true;
+}
+
 static void GameCoreAdvanceNPCSimulationStep(GameNPCState *npc, float deltaTime) {
     static const float clockwiseOffsets[] = {0.0f, 22.5f, -22.5f, 45.0f, -45.0f, 67.5f, -67.5f, 90.0f, -90.0f, 135.0f, -135.0f, 180.0f};
     static const float counterOffsets[] = {0.0f, -22.5f, 22.5f, -45.0f, 45.0f, -67.5f, 67.5f, -90.0f, 90.0f, -135.0f, 135.0f, 180.0f};

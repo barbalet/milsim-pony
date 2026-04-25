@@ -1,10 +1,10 @@
 {
-  "cycleLabel": "Cycle 89 Third Rehearsal Route Authoring",
-  "sceneName": "Canberra Third Rehearsal Route Authoring Validation",
+  "cycleLabel": "Cycle 98 Time-Of-Day And Lighting Architecture Decision",
+  "sceneName": "Canberra Lighting Architecture Decision",
   "planningNotes": [
-    "Plan: cycle 89 adds the third rehearsal route as authored data with map preview, threat geometry, and readiness metadata.",
-    "Breakdown: preserve the cycle 85 through 88 live-bindable selected alternate while adding a second alternate candidate that proves the map can carry more than one preview route at once.",
-    "Reference: carry the cycle 28 group-observer baseline, cycle 29 observer-audio feedback, cycle 30 mission hooks, cycles 31 through 50 alternate-route staging, cycle 51 collision-authoring readiness, cycles 52 through 57 environmental fidelity work, cycle 58 persistence-readiness reporting, cycle 59 last-review persistence, cycle 60 resume-card context, cycle 61 guardrails, cycle 62 restore-target preview, cycle 63 readiness report, cycle 64 manual arming, cycle 65 prompt contract, cycle 66 execution gate, cycle 67 audit trail, cycle 68 freshness policy, cycle 69 retention policy, cycle 70 cleanup preview, cycle 71 stale-card cleanup execution, cycle 72 restore-choice preview, cycle 73 restore-selection audit, cycle 74 fresh-start guard, cycle 75 boundary reset, cycle 76 review expiry, cycle 77 review scope, cycle 78 review intent, cycle 79 weapon-feel profiling, cycle 80 scoped-rifle presentation, cycle 81 patrol-pair foundation, cycle 82 LOS debug, cycle 83 scan-halt-resume behavior, cycle 84 audio bed, cycle 85 alternate live binding, cycle 86 map accuracy, cycle 87 Black Mountain closeout, and cycle 88 West Basin closeout forward as the basis for multi-route authoring."
+    "Plan: cycle 98 locks the time-of-day and lighting architecture decision with a data-authored daylight scenario, measured prerequisites, clustered-lighting deferral, and render-graph modernization gate.",
+    "Breakdown: preserve the cycle 85 through 97 route, map, material, collision-preview, restore-execution, session-audio, scope-calibration, concealment, CSM-profile, LOD, reflection-probe, packaging-validation, and tester-delivery state while surfacing lighting architecture readiness in the live readouts.",
+    "Reference: carry the cycle 28 group-observer baseline, cycle 29 observer-audio feedback, cycle 30 mission hooks, cycles 31 through 50 alternate-route staging, cycle 51 collision-authoring readiness, cycles 52 through 57 environmental fidelity work, cycle 58 persistence-readiness reporting, cycle 59 last-review persistence, cycle 60 resume-card context, cycle 61 guardrails, cycle 62 restore-target preview, cycle 63 readiness report, cycle 64 manual arming, cycle 65 prompt contract, cycle 66 execution gate, cycle 67 audit trail, cycle 68 freshness policy, cycle 69 retention policy, cycle 70 cleanup preview, cycle 71 stale-card cleanup execution, cycle 72 restore-choice preview, cycle 73 restore-selection audit, cycle 74 fresh-start guard, cycle 75 boundary reset, cycle 76 review expiry, cycle 77 review scope, cycle 78 review intent, cycle 79 weapon-feel profiling, cycle 80 scoped-rifle presentation, cycle 81 patrol-pair foundation, cycle 82 LOS debug, cycle 83 scan-halt-resume behavior, cycle 84 audio bed, cycle 85 alternate live binding, cycle 86 map accuracy, cycle 87 Black Mountain closeout, cycle 88 West Basin closeout, cycle 89 third-route authoring, cycle 90 collision preview, cycle 91 restore execution design, cycle 92 guarded manual restore, cycle 93 scope/concealment polish, cycle 94 CSM profiling, cycle 95 LOD/reflection evidence, cycle 96 packaging automation, and cycle 97 tester distribution forward as the basis for lighting architecture."
   ],
   "spawn": {
     "label": "Woden Town Centre Staging",
@@ -129,7 +129,11 @@
     "normalBias": 0.010,
     "strength": 0.72,
     "scopeCoverageMultiplier": 1.35,
-    "forwardOffsetMultiplier": 0.42
+    "forwardOffsetMultiplier": 0.42,
+    "cascadeCount": 3,
+    "cascadeSplits": [0.12, 0.34, 1.0],
+    "profileStatus": "CSM readiness profile active; single shadow map remains the shipping path",
+    "profileRule": "profile scoped coverage, split targets, bias, sector count, blocker count, and frame timing before allocating cascade textures"
   },
   "postProcess": {
     "exposureBias": 0.24,
@@ -161,8 +165,8 @@
     "holdBreathRecoverySeconds": 5.4
   },
   "environmentalMotion": {
-    "status": "West Basin water and vegetation closeout active; route binding unchanged",
-    "rule": "drive West Basin vegetation, shoreline, and lake-surface motion from scene-authored wind controls",
+    "status": "Scope and concealment polish active; West Basin water and vegetation closeout retained",
+    "rule": "drive vegetation screening, traversal rustle cues, shoreline, and lake-surface motion from scene-authored wind controls",
     "windDirection": [0.78, -0.62],
     "windStrength": 0.78,
     "gustStrength": 0.42,
@@ -178,12 +182,87 @@
     "landmarkBreakupStrength": 0.56
   },
   "surfaceFidelity": {
-    "status": "West Basin vegetation and water closeout active",
-    "rule": "review West Basin vegetation response, shoreline ripple, lake water material response, promenade hardscape, road decals, and district facade breakup as one readable Canberra surface stack"
+    "status": "Scope calibration and vegetation concealment closeout active",
+    "rule": "review scope range/drop/hold/parallax cues together with West Basin vegetation response, shoreline ripple, lake water material response, promenade hardscape, road decals, and district facade breakup"
+  },
+  "distantLOD": {
+    "status": "landmark LOD metadata active; renderer swap not enabled",
+    "rule": "track far-field impostor candidates before changing scoped drawables",
+    "landmarkTargets": [
+      "Woden towers",
+      "Civic skyline",
+      "Black Mountain / Telstra Tower",
+      "Bruce AIS saddle",
+      "Belconnen town centre",
+      "West Basin shoreline massing"
+    ],
+    "impostorStartMeters": 430.0,
+    "scopeStabilityRule": "scope mode keeps full meshes until impostor cards pass skyline pop review"
+  },
+  "waterReflection": {
+    "status": "reflection probe metadata active; SSR deferred",
+    "rule": "prototype West Basin water/glass reflection approach as probe metadata before screen-space reflections",
+    "probeTargets": [
+      "West Basin lake surface",
+      "Commonwealth Avenue west shoreline",
+      "Yarralumla promenade hardscape",
+      "Belconnen lake approach"
+    ],
+    "approach": "static local reflection probe plus material roughness fallback before SSR",
+    "deferredReason": "SSR waits for stable LOD/impostor proof to avoid scoped shimmer",
+    "screenSpaceReflectionStatus": "SSR deferred with probe evidence"
+  },
+  "packagingAutomation": {
+    "status": "cycle 98 packaging validation retained",
+    "rule": "release packages must pass manifest validation, version policy, archive naming, and package-content smoke checks before tester sharing",
+    "versionPolicy": "cycle build number 98 / marketing version 0.98.0",
+    "archivePattern": "MilsimPonyGame-v0.98.0-b98-cycle98-<utc>",
+    "manifestChecks": [
+      "world manifest JSON lints",
+      "coordinate system file resolves",
+      "scene file resolves and lints",
+      "all sector files resolve and lint",
+      "cycle 98 release docs exist"
+    ],
+    "smokeCommand": "Tools/package_release.sh --validate-only"
+  },
+  "testerDistribution": {
+    "status": "tester distribution pipeline scripted; notarization remains credential-gated",
+    "rule": "tester builds require validation, current handoff docs, notarization readiness notes, and SDF UI scope before sharing",
+    "channel": "local-review zip with documented notarization handoff",
+    "notarizationStatus": "notarytool check scripted; submission waits for Apple credentials and Metal release toolchain",
+    "ciPlan": "CI gate runs validate-only and distribution check before package upload",
+    "deliveryChecklist": [
+      "validate world manifest and release docs",
+      "build/package signed release when Metal toolchain is installed",
+      "notarize or record credential/toolchain blocker",
+      "share zip plus tester distribution guide",
+      "collect startup, route, scope, map, and packaging feedback"
+    ],
+    "sdfUIPlan": "SDF font/UI migration scoped to HUD/map text crispness after tester pipeline is stable",
+    "smokeCommand": "Tools/package_release.sh --check-distribution"
+  },
+  "lightingArchitecture": {
+    "status": "lighting architecture decision locked; static daylight scenario remains shipping path",
+    "rule": "keep authored single-sun daylight while measuring pass count, dynamic-light need, atmosphere range, and scope stability before clustered lighting or render graph work",
+    "scenario": "Canberra fixed daylight review",
+    "timeOfDay": "13:40 clear late-summer review light",
+    "sunPolicy": "single authored sun drives sky, shadow, terrain, and material lighting for cycle 98",
+    "atmospherePolicy": "data-authored fog, haze, exposure, and sky colors remain the minimal time-of-day scenario path",
+    "clusteredLightingDecision": "Forward+ deferred until dynamic light count exceeds authored sun plus diagnostic markers",
+    "renderGraphDecision": "render graph deferred until CSM, postprocess, water reflections, and capture passes require explicit dependency scheduling",
+    "measuredPrerequisites": [
+      "frame timing line remains visible",
+      "CSM profile reports cascade prerequisites",
+      "LOD/reflection line reports shimmer blockers",
+      "tester packaging gates remain scripted",
+      "scope skyline readability remains stable"
+    ],
+    "smokeCommand": "Docs/CYCLE_98_SMOKE_TEST.md"
   },
   "sessionPersistence": {
-    "status": "alternate route live binding active; runtime restore still pending",
-    "rule": "keep restore review intent non-executable while allowing selected alternate checkpoint binding only from a fresh-run boundary"
+    "status": "guarded manual restore execution active; session audio polish reporting live",
+    "rule": "allow checkpoint restore only after identity, freshness, target, and explicit user intent checks pass"
   },
   "route": {
     "name": "Canberra Combat-Lane Rehearsal",
@@ -625,9 +704,9 @@
     "handoffRule": "bind alternate route only from briefing or restart boundary"
   },
   "collisionAuthoring": {
-    "status": "collision authoring inventory staged; active route unchanged",
-    "rule": "review sector blockers before editing alternate-route checkpoint ownership",
-    "audit": "runtime blocker count is surfaced beside route preflight metadata",
+    "status": "collision preview active; active route unchanged",
+    "rule": "inspect blocker footprints on the overhead map before editing alternate-route checkpoint ownership",
+    "audit": "runtime blocker count and map footprints are surfaced beside route preflight metadata",
     "blockerScope": "graybox blocker volumes and authored sector collision volumes"
   },
   "alternateRoutes": [
