@@ -1,10 +1,10 @@
 {
-  "cycleLabel": "Cycle 70 Restore Cleanup Preview",
-  "sceneName": "Canberra Restore Cleanup Preview Validation",
+  "cycleLabel": "Cycle 89 Third Rehearsal Route Authoring",
+  "sceneName": "Canberra Third Rehearsal Route Authoring Validation",
   "planningNotes": [
-    "Plan: cycle 70 adds a restore-cleanup preview report while the live Woden-to-Belconnen route remains the only bound playable route.",
-    "Breakdown: preserve the cycle 69 restore-retention policy while previewing whether a future cleanup action would clear stale review cards, without deleting anything.",
-    "Reference: carry the cycle 28 group-observer baseline, cycle 29 observer-audio feedback, cycle 30 mission hooks, cycles 31 through 50 alternate-route staging, cycle 51 collision-authoring readiness, cycles 52 through 57 environmental fidelity work, cycle 58 persistence-readiness reporting, cycle 59 last-review persistence, cycle 60 resume-card context, cycle 61 guardrails, cycle 62 restore-target preview, cycle 63 readiness report, cycle 64 manual arming, cycle 65 prompt contract, cycle 66 execution gate, cycle 67 audit trail, cycle 68 freshness policy, and cycle 69 retention policy forward as the foundation for capture packaging."
+    "Plan: cycle 89 adds the third rehearsal route as authored data with map preview, threat geometry, and readiness metadata.",
+    "Breakdown: preserve the cycle 85 through 88 live-bindable selected alternate while adding a second alternate candidate that proves the map can carry more than one preview route at once.",
+    "Reference: carry the cycle 28 group-observer baseline, cycle 29 observer-audio feedback, cycle 30 mission hooks, cycles 31 through 50 alternate-route staging, cycle 51 collision-authoring readiness, cycles 52 through 57 environmental fidelity work, cycle 58 persistence-readiness reporting, cycle 59 last-review persistence, cycle 60 resume-card context, cycle 61 guardrails, cycle 62 restore-target preview, cycle 63 readiness report, cycle 64 manual arming, cycle 65 prompt contract, cycle 66 execution gate, cycle 67 audit trail, cycle 68 freshness policy, cycle 69 retention policy, cycle 70 cleanup preview, cycle 71 stale-card cleanup execution, cycle 72 restore-choice preview, cycle 73 restore-selection audit, cycle 74 fresh-start guard, cycle 75 boundary reset, cycle 76 review expiry, cycle 77 review scope, cycle 78 review intent, cycle 79 weapon-feel profiling, cycle 80 scoped-rifle presentation, cycle 81 patrol-pair foundation, cycle 82 LOS debug, cycle 83 scan-halt-resume behavior, cycle 84 audio bed, cycle 85 alternate live binding, cycle 86 map accuracy, cycle 87 Black Mountain closeout, and cycle 88 West Basin closeout forward as the basis for multi-route authoring."
   ],
   "spawn": {
     "label": "Woden Town Centre Staging",
@@ -161,29 +161,29 @@
     "holdBreathRecoverySeconds": 5.4
   },
   "environmentalMotion": {
-    "status": "water surface motion active; route binding unchanged",
-    "rule": "drive vegetation, shoreline, and lake-surface motion from scene-authored wind controls",
+    "status": "West Basin water and vegetation closeout active; route binding unchanged",
+    "rule": "drive West Basin vegetation, shoreline, and lake-surface motion from scene-authored wind controls",
     "windDirection": [0.78, -0.62],
-    "windStrength": 0.72,
-    "gustStrength": 0.34,
-    "vegetationResponse": 1.12,
-    "shorelineRippleStrength": 0.26,
-    "waterSurfaceResponse": 0.86
+    "windStrength": 0.78,
+    "gustStrength": 0.42,
+    "vegetationResponse": 1.34,
+    "shorelineRippleStrength": 0.42,
+    "waterSurfaceResponse": 1.08
   },
   "materialBreakup": {
-    "status": "landmark material breakup active; route binding unchanged",
-    "rule": "generate low-profile mesh scuffs and named landmark facade variation without changing collision or route markers",
+    "status": "West Basin shoreline material closeout active; route binding unchanged",
+    "rule": "use source-backed terrain, promenade, facade, road, and water material assignments on West Basin and Yarralumla without changing collision or route markers",
     "roadDecalDensity": 0.72,
     "roadScuffStrength": 0.48,
-    "landmarkBreakupStrength": 0.42
+    "landmarkBreakupStrength": 0.56
   },
   "surfaceFidelity": {
-    "status": "surface fidelity closeout active; route binding unchanged",
-    "rule": "review vegetation, wind, water, SSAO, road decals, and landmark breakup as one readable Canberra surface stack"
+    "status": "West Basin vegetation and water closeout active",
+    "rule": "review West Basin vegetation response, shoreline ripple, lake water material response, promenade hardscape, road decals, and district facade breakup as one readable Canberra surface stack"
   },
   "sessionPersistence": {
-    "status": "restore cleanup preview report active; runtime restore still pending",
-    "rule": "preview future stale-card cleanup while keeping persisted review state untouched in this build"
+    "status": "alternate route live binding active; runtime restore still pending",
+    "rule": "keep restore review intent non-executable while allowing selected alternate checkpoint binding only from a fresh-run boundary"
   },
   "route": {
     "name": "Canberra Combat-Lane Rehearsal",
@@ -341,8 +341,9 @@
     "textureLibrary": "Canberra Texture Library",
     "captureFormat": "Open the map on district handoffs, raise the 4x scope on skyline stops, and use the pause shell for route-proof captures.",
     "openRisks": [
-      "Dedicated west-basin and Black Mountain close-up photo references are still lighter than the Woden and Civic source set.",
-      "Several landmark massing blocks still rely on the shared Canberra concrete material instead of district-specific facade sources.",
+      "Belconnen still needs the same explicit district material closeout now applied to Black Mountain and West Basin.",
+      "The third rehearsal route is authored and previewed, but it is not the selected live-bindable alternate until future route-selection UI can choose among candidates.",
+      "West Basin reflections remain material-and-motion based until the later reflection probe cycle.",
       "Comparison capture flow is still checklist-driven rather than a scripted screenshot export."
     ],
     "comparisonStops": [
@@ -384,16 +385,16 @@
       {
         "checkpointID": "west_basin_promenade_review",
         "district": "West Basin",
-        "sourceFocus": "West-basin shoreline references",
+        "sourceFocus": "West Basin shoreline, water, and vegetation closeout",
         "combatLane": "West-basin embankment lane",
-        "captureNote": "Capture Commonwealth Avenue west and the shoreline handoff into Yarralumla."
+        "captureNote": "Capture Commonwealth Avenue west, West Basin water motion, promenade hardscape, and Yarralumla vegetation response in one frame."
       },
       {
         "checkpointID": "black_mountain_scope_perch",
         "district": "Black Mountain",
-        "sourceFocus": "Black Mountain skyline references",
+        "sourceFocus": "Black Mountain/Telstra/Bruce material closeout",
         "combatLane": "North-west overwatch lane",
-        "captureNote": "Raise the scope and frame Telstra Tower plus the Bruce saddle."
+        "captureNote": "Raise the scope and frame Telstra concrete, Black Mountain dry-grass slopes, and Bruce/AIS facade breakup together."
       },
       {
         "checkpointID": "belconnen_town_centre_review",
@@ -412,8 +413,8 @@
     ]
   },
   "combatRehearsal": {
-    "title": "Canberra Cycle 70 Restore Cleanup Preview",
-    "summary": "Live Woden-to-Belconnen contact pass with paired observer relays, expanded alert audio, mission-script checkpoint hooks, active-route loader staging, staged alternate-route metrics, binding-gate validation, briefing-only selection locking, guarded alternate-route activation, primary-route rollback guarding, staged-route commit gating, non-mutating alternate-route dry-run comparison, promotion-readiness review, promotion-audit reporting, restart-boundary rehearsal, handoff-arming preview, handoff-confirmation reporting, release-gate reporting, live-switch preflight reporting, collision-authoring readiness reporting, scene-authored wind, shoreline, lake-surface motion, screen-space surface-depth, road material-breakup, landmark facade variation, surface-fidelity closeout reporting, session-persistence readiness reporting, last-review state persistence, review-resume capture context, review-persistence guardrails, restore-target previewing, restore-readiness reporting, manual-restore arming, manual-restore prompt contract reporting, restore-execution gate reporting, restore-audit trail reporting, restore-freshness policy reporting, restore-retention policy reporting, and restore-cleanup preview reporting layered over the full atlas route.",
+    "title": "Canberra Cycle 89 Third Rehearsal Route Authoring",
+    "summary": "Live Canberra contact pass with a third authored rehearsal route, multi-route map previews, new north-west threat geometry, route-readiness metadata, West Basin shoreline material assignments, water material response, vegetation wind response, West Basin capture notes, Black Mountain/Telstra/Bruce source-backed material assignments, Black Mountain material capture notes, active-route map accuracy reporting, selected alternate route checkpoint binding, briefing-only alternate arming, active alternate route map metadata, primary-route fallback reporting, procedural footsteps, scope raise/lower cues, basin ambience, alert-aware audio mix reporting, patrol scan-halt-resume behavior, active scan arcs, scan cycle timing, alert halts, relay handoffs, resume reporting, LOS debug reporting, focus-observer scan-state labels, scan arc/yaw/pitch telemetry, blocked-sample counts, relay-state counts, authored patrol-pair metadata, shared observer route IDs, lead/wing roles, formation spacing validation, paired observer relays, expanded alert audio, scoped mil-dot reticle ticks, holdover and parallax optic text, recoil recovery reporting, crack-thump shot timing, rifle shot telemetry, muzzle-flash placeholder reporting, miss classification, formal frame/core/LOS/world profiling baseline, mission-script checkpoint hooks, active-route loader staging, staged alternate-route metrics, binding-gate validation, briefing-only selection locking, guarded alternate-route activation, primary-route rollback guarding, staged-route commit gating, non-mutating alternate-route dry-run comparison, promotion-readiness review, promotion-audit reporting, restart-boundary rehearsal, handoff-arming preview, handoff-confirmation reporting, release-gate reporting, live-switch preflight reporting, collision-authoring readiness reporting, scene-authored wind, shoreline, lake-surface motion, screen-space surface-depth, road material-breakup, landmark facade variation, surface-fidelity closeout reporting, session-persistence readiness reporting, last-review state persistence, review-resume capture context, review-persistence guardrails, restore-target previewing, restore-readiness reporting, manual-restore arming, manual-restore prompt contract reporting, restore-choice preview reporting, restore-selection audit reporting, restore fresh-start guard reporting, restore boundary reset reporting, restore review-expiry reporting, restore review-scope reporting, restore review-intent reporting, restore-execution gate reporting, restore-audit trail reporting, restore-freshness policy reporting, restore-retention policy reporting, restore-cleanup preview reporting, and guarded stale-card cleanup execution layered over the full atlas route.",
     "exposureGuide": "Open ground is intentional; move between named cover screens before raising the optic on skyline-heavy checkpoints.",
     "recoveryRule": "If suspicion spikes, break line of sight, re-anchor on the nearest cover screen, and retry the current lane from the latest checkpoint rather than freelancing a shortcut.",
     "contactStops": [
@@ -593,19 +594,19 @@
     "selectedAlternateRouteID": "east_basin_to_belconnen_probe",
     "selectedAlternateRouteLabel": "East Basin To Belconnen Probe",
     "bindingStatus": "primary route bound",
-    "loaderStatus": "alternate route live-switch preflight staged",
-    "validationStatus": "staged alternate route eligible; live switch disabled",
+    "loaderStatus": "selected alternate route live binding available; third route preview authored",
+    "validationStatus": "two staged alternate routes eligible for map accuracy review",
     "validationRule": "requires 3+ markers, 100m+ planned distance, and 2+ sectors",
-    "selectionStatus": "briefing selection locked; live switch disabled",
+    "selectionStatus": "briefing selection can arm selected alternate",
     "selectionRule": "route choice may change only from briefing before a run starts",
-    "activationStatus": "activation guard armed; primary route still live",
-    "activationRule": "selected alternate route may activate only on a fresh run boundary after loader binding",
+    "activationStatus": "fresh-run activation available",
+    "activationRule": "selected alternate route may activate only from the title briefing before live movement",
     "rollbackStatus": "rollback guard armed; primary route remains recoverable",
     "rollbackRule": "failed alternate binding returns to the primary route before checkpoint order changes",
-    "commitStatus": "commit gate staged; checkpoint sequence unchanged",
-    "commitRule": "commit selected alternate route only after validation, activation, and rollback guards pass",
+    "commitStatus": "commit gate live with route footer verification",
+    "commitRule": "commit selected alternate route only before live movement input begins, then verify map markers and route footer agree",
     "dryRunStatus": "dry run staged; active route not mutated",
-    "dryRunRule": "compare selected alternate checkpoint order against the active route before commit",
+    "dryRunRule": "compare selected alternate checkpoint order and preview-only third-route order against the active route before commit",
     "promotionStatus": "promotion readiness staged; active route still locked",
     "promotionRule": "promote selected alternate only after dry-run review passes and commit remains staged",
     "auditStatus": "promotion audit passed for review; live binding unchanged",
@@ -618,9 +619,9 @@
     "confirmationRule": "confirm selected alternate handoff only as review metadata until live switch is implemented",
     "releaseStatus": "release gate staged; live switch still disabled",
     "releaseRule": "release alternate route only after future live-switch code exists and primary rollback is proven",
-    "preflightStatus": "live-switch preflight staged; active binding unchanged",
-    "preflightRule": "preflight may validate selected alternate readiness but must not mutate checkpoint order",
-    "handoffStatus": "restart-safe handoff planned; checkpoint order unchanged",
+    "preflightStatus": "live-switch preflight passed for selected alternate",
+    "preflightRule": "preflight validates selected alternate before checkpoint order is rebound",
+    "handoffStatus": "restart-safe handoff implemented for selected alternate",
     "handoffRule": "bind alternate route only from briefing or restart boundary"
   },
   "collisionAuthoring": {
@@ -646,10 +647,10 @@
         "ginninderra_drive_review"
       ],
       "routeType": "preview-candidate",
-      "authoringStatus": "map-preview ready; activation waits for dedicated route selection and checkpoint ownership",
+      "authoringStatus": "map-preview ready; first live binding can arm at briefing boundary",
       "selectionMode": "briefing-locked candidate",
-      "selectionStatus": "dry run ready; not live-bound",
-      "activationRule": "selectable after briefing route choice can bind alternate checkpoint ownership",
+      "selectionStatus": "live binding ready from briefing",
+      "activationRule": "selectable from briefing before Start Demo binds alternate checkpoint ownership",
       "checkpointOwnershipStatus": "ownership split ready",
       "sharedCheckpointIDs": [
         "east_basin_lookout",
@@ -661,6 +662,37 @@
         "west_basin_promenade_review",
         "black_mountain_scope_perch",
         "belconnen_town_centre_review"
+      ]
+    },
+    {
+      "id": "west_basin_to_ginninderra_shore_thread",
+      "name": "West Basin To Ginninderra Shore Thread",
+      "summary": "Third rehearsal route candidate that starts at the West Basin promenade, threads the Black Mountain western shoulder, pressures the Belconnen Way handoff, and exits along Ginninderra with distinct north-west watcher coverage.",
+      "startCheckpointID": "west_basin_promenade_review",
+      "goalCheckpointID": "ginninderra_drive_review",
+      "checkpointIDs": [
+        "west_basin_promenade_review",
+        "telstra_tower_frame",
+        "black_mountain_scope_perch",
+        "belconnen_way_overlook",
+        "belconnen_town_centre_review",
+        "ginninderra_drive_review"
+      ],
+      "routeType": "third-route-authoring",
+      "authoringStatus": "authored preview ready; selection waits for multi-candidate route UI",
+      "selectionMode": "preview-only third candidate",
+      "selectionStatus": "ready for map and threat-geometry review",
+      "activationRule": "not live-bindable until route selection can choose between multiple alternate candidates",
+      "checkpointOwnershipStatus": "third-route ownership authored",
+      "sharedCheckpointIDs": [
+        "west_basin_promenade_review",
+        "black_mountain_scope_perch",
+        "belconnen_town_centre_review",
+        "ginninderra_drive_review"
+      ],
+      "exclusiveCheckpointIDs": [
+        "telstra_tower_frame",
+        "belconnen_way_overlook"
       ]
     }
   ],
@@ -679,9 +711,14 @@
         "suspicionPerSecond": 0.20,
         "groupID": "woden_pair",
         "groupRelayRangeMeters": 20.0,
+        "patrolRouteID": "woden_scope_screen_patrol",
+        "patrolRole": "lead",
+        "formationSpacingMeters": 16.0,
         "alertMemorySeconds": 2.8,
         "alertedFieldOfViewDegrees": 80.0,
         "turnRateDegreesPerSecond": 92.0,
+        "scanArcDegrees": 30.0,
+        "scanCycleSeconds": 5.0,
         "markerColor": [0.92, 0.46, 0.30, 0.94]
       },
       {
@@ -695,9 +732,14 @@
         "suspicionPerSecond": 0.16,
         "groupID": "woden_pair",
         "groupRelayRangeMeters": 20.0,
+        "patrolRouteID": "woden_scope_screen_patrol",
+        "patrolRole": "wing",
+        "formationSpacingMeters": 16.0,
         "alertMemorySeconds": 2.8,
         "alertedFieldOfViewDegrees": 80.0,
         "turnRateDegreesPerSecond": 92.0,
+        "scanArcDegrees": 24.0,
+        "scanCycleSeconds": 5.6,
         "markerColor": [0.94, 0.50, 0.34, 0.94]
       },
       {
@@ -722,9 +764,14 @@
         "suspicionPerSecond": 0.19,
         "groupID": "east_basin_pair",
         "groupRelayRangeMeters": 24.0,
+        "patrolRouteID": "east_basin_shore_patrol",
+        "patrolRole": "lead",
+        "formationSpacingMeters": 14.0,
         "alertMemorySeconds": 3.0,
         "alertedFieldOfViewDegrees": 78.0,
         "turnRateDegreesPerSecond": 88.0,
+        "scanArcDegrees": 32.0,
+        "scanCycleSeconds": 5.8,
         "markerColor": [0.94, 0.50, 0.34, 0.94]
       },
       {
@@ -738,9 +785,14 @@
         "suspicionPerSecond": 0.17,
         "groupID": "east_basin_pair",
         "groupRelayRangeMeters": 24.0,
+        "patrolRouteID": "east_basin_shore_patrol",
+        "patrolRole": "wing",
+        "formationSpacingMeters": 14.0,
         "alertMemorySeconds": 3.0,
         "alertedFieldOfViewDegrees": 78.0,
         "turnRateDegreesPerSecond": 88.0,
+        "scanArcDegrees": 26.0,
+        "scanCycleSeconds": 6.2,
         "markerColor": [0.94, 0.52, 0.36, 0.94]
       },
       {
@@ -765,9 +817,14 @@
         "suspicionPerSecond": 0.21,
         "groupID": "civic_pair",
         "groupRelayRangeMeters": 20.0,
+        "patrolRouteID": "civic_grid_patrol",
+        "patrolRole": "lead",
+        "formationSpacingMeters": 15.0,
         "alertMemorySeconds": 2.6,
         "alertedFieldOfViewDegrees": 82.0,
         "turnRateDegreesPerSecond": 96.0,
+        "scanArcDegrees": 28.0,
+        "scanCycleSeconds": 4.8,
         "markerColor": [0.96, 0.54, 0.34, 0.94]
       },
       {
@@ -781,9 +838,14 @@
         "suspicionPerSecond": 0.18,
         "groupID": "civic_pair",
         "groupRelayRangeMeters": 20.0,
+        "patrolRouteID": "civic_grid_patrol",
+        "patrolRole": "wing",
+        "formationSpacingMeters": 15.0,
         "alertMemorySeconds": 2.6,
         "alertedFieldOfViewDegrees": 82.0,
         "turnRateDegreesPerSecond": 96.0,
+        "scanArcDegrees": 28.0,
+        "scanCycleSeconds": 5.4,
         "markerColor": [0.96, 0.58, 0.36, 0.94]
       },
       {
@@ -796,6 +858,48 @@
         "fieldOfViewDegrees": 50.0,
         "suspicionPerSecond": 0.18,
         "markerColor": [0.94, 0.50, 0.32, 0.94]
+      },
+      {
+        "id": "west_basin_shore_thread_watch",
+        "label": "West Basin Shore Thread Watch",
+        "position": [-104.0, 1.8, -48.0],
+        "yawDegrees": 328.0,
+        "pitchDegrees": -4.0,
+        "range": 26.0,
+        "fieldOfViewDegrees": 46.0,
+        "suspicionPerSecond": 0.17,
+        "groupID": "third_route_shore_pair",
+        "groupRelayRangeMeters": 20.0,
+        "patrolRouteID": "west_basin_ginninderra_thread_patrol",
+        "patrolRole": "lead",
+        "formationSpacingMeters": 12.0,
+        "alertMemorySeconds": 2.6,
+        "alertedFieldOfViewDegrees": 76.0,
+        "turnRateDegreesPerSecond": 86.0,
+        "scanArcDegrees": 24.0,
+        "scanCycleSeconds": 5.4,
+        "markerColor": [0.72, 0.58, 0.96, 0.94]
+      },
+      {
+        "id": "ginninderra_shore_thread_watch",
+        "label": "Ginninderra Shore Thread Watch",
+        "position": [-166.0, 2.0, -202.0],
+        "yawDegrees": 58.0,
+        "pitchDegrees": -4.0,
+        "range": 24.0,
+        "fieldOfViewDegrees": 48.0,
+        "suspicionPerSecond": 0.18,
+        "groupID": "third_route_shore_pair",
+        "groupRelayRangeMeters": 22.0,
+        "patrolRouteID": "west_basin_ginninderra_thread_patrol",
+        "patrolRole": "wing",
+        "formationSpacingMeters": 12.0,
+        "alertMemorySeconds": 2.8,
+        "alertedFieldOfViewDegrees": 78.0,
+        "turnRateDegreesPerSecond": 88.0,
+        "scanArcDegrees": 26.0,
+        "scanCycleSeconds": 5.8,
+        "markerColor": [0.76, 0.60, 0.98, 0.94]
       },
       {
         "id": "black_mountain_watch",
@@ -819,9 +923,14 @@
         "suspicionPerSecond": 0.20,
         "groupID": "belconnen_pair",
         "groupRelayRangeMeters": 22.0,
+        "patrolRouteID": "belconnen_interchange_patrol",
+        "patrolRole": "lead",
+        "formationSpacingMeters": 13.0,
         "alertMemorySeconds": 2.8,
         "alertedFieldOfViewDegrees": 78.0,
         "turnRateDegreesPerSecond": 90.0,
+        "scanArcDegrees": 30.0,
+        "scanCycleSeconds": 5.2,
         "markerColor": [0.94, 0.50, 0.32, 0.94]
       },
       {
@@ -835,9 +944,14 @@
         "suspicionPerSecond": 0.17,
         "groupID": "belconnen_pair",
         "groupRelayRangeMeters": 22.0,
+        "patrolRouteID": "belconnen_interchange_patrol",
+        "patrolRole": "wing",
+        "formationSpacingMeters": 13.0,
         "alertMemorySeconds": 2.8,
         "alertedFieldOfViewDegrees": 78.0,
         "turnRateDegreesPerSecond": 90.0,
+        "scanArcDegrees": 24.0,
+        "scanCycleSeconds": 5.8,
         "markerColor": [0.94, 0.54, 0.34, 0.94]
       },
       {

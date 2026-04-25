@@ -61,6 +61,8 @@ typedef struct GameThreatObserver {
     float alertMemorySeconds;
     float alertedFieldOfViewDegrees;
     float turnRateDegreesPerSecond;
+    float scanArcDegrees;
+    float scanCycleSeconds;
 } GameThreatObserver;
 
 typedef struct GameBallisticsConfiguration {
@@ -129,9 +131,13 @@ typedef struct GameObserverDebugState {
     float coneThreshold;
     float suspicionPerSecond;
     float alertSecondsRemaining;
+    float scanArcDegrees;
+    float scanCycleSeconds;
+    float scanPhaseSeconds;
     bool neutralized;
     bool alerted;
     bool supportingGroup;
+    bool scanHalted;
     bool inRange;
     bool inViewCone;
     bool hasLineOfSight;

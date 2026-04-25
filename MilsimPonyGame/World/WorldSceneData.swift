@@ -275,9 +275,14 @@ struct ThreatObserverConfiguration: Decodable {
     let suspicionPerSecond: Float
     let groupID: String?
     let groupRelayRangeMeters: Float?
+    let patrolRouteID: String?
+    let patrolRole: String?
+    let formationSpacingMeters: Float?
     let alertMemorySeconds: Float?
     let alertedFieldOfViewDegrees: Float?
     let turnRateDegreesPerSecond: Float?
+    let scanArcDegrees: Float?
+    let scanCycleSeconds: Float?
     let markerColor: [Float]?
 
     init(
@@ -291,9 +296,14 @@ struct ThreatObserverConfiguration: Decodable {
         suspicionPerSecond: Float,
         groupID: String? = nil,
         groupRelayRangeMeters: Float? = nil,
+        patrolRouteID: String? = nil,
+        patrolRole: String? = nil,
+        formationSpacingMeters: Float? = nil,
         alertMemorySeconds: Float? = 2.4,
         alertedFieldOfViewDegrees: Float? = 74.0,
         turnRateDegreesPerSecond: Float? = 78.0,
+        scanArcDegrees: Float? = 28.0,
+        scanCycleSeconds: Float? = 5.2,
         markerColor: [Float]? = nil
     ) {
         self.id = id
@@ -306,9 +316,14 @@ struct ThreatObserverConfiguration: Decodable {
         self.suspicionPerSecond = suspicionPerSecond
         self.groupID = groupID
         self.groupRelayRangeMeters = groupRelayRangeMeters
+        self.patrolRouteID = patrolRouteID
+        self.patrolRole = patrolRole
+        self.formationSpacingMeters = formationSpacingMeters
         self.alertMemorySeconds = alertMemorySeconds
         self.alertedFieldOfViewDegrees = alertedFieldOfViewDegrees
         self.turnRateDegreesPerSecond = turnRateDegreesPerSecond
+        self.scanArcDegrees = scanArcDegrees
+        self.scanCycleSeconds = scanCycleSeconds
         self.markerColor = markerColor
     }
 
@@ -1188,7 +1203,9 @@ enum WorldRuntimeConversions {
                     observer.alertedFieldOfViewDegrees ?? 74.0,
                     observer.fieldOfViewDegrees
                 ),
-                turnRateDegreesPerSecond: max(observer.turnRateDegreesPerSecond ?? 78.0, 0.0)
+                turnRateDegreesPerSecond: max(observer.turnRateDegreesPerSecond ?? 78.0, 0.0),
+                scanArcDegrees: max(observer.scanArcDegrees ?? (resolvedGroupIndex > 0 ? 28.0 : 0.0), 0.0),
+                scanCycleSeconds: max(observer.scanCycleSeconds ?? 5.2, 0.0)
             )
         }
     }

@@ -41,6 +41,8 @@ struct GameRootView: View {
         ScopeOverlay(
             statusText: session.scopeStatusText,
             instructionText: session.scopeInstructionText,
+            presentationText: session.scopePresentationText,
+            shotTimingText: session.scopeShotTimingText,
             reticleColor: Color(nsColor: session.scopeReticleColor),
             reticleOffset: session.scopeReticleOffset,
             reticleBloomScale: session.scopeReticleBloomScale
@@ -191,6 +193,9 @@ private struct WindowActionButton: View {
             Text(title)
                 .font(.system(size: 12, weight: .semibold, design: .monospaced))
                 .foregroundStyle(.white)
+                .lineLimit(2)
+                .minimumScaleFactor(0.72)
+                .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 10)
                 .background(
@@ -606,6 +611,16 @@ private struct MenuActionStack: View {
                 }
                 .disabled(!session.canBeginMission)
 
+                WindowActionButton(title: session.manualRestoreChoiceButtonTitle) {
+                    session.previewManualRestoreChoice()
+                }
+                .disabled(!session.canPreviewManualRestoreChoice)
+
+                WindowActionButton(title: session.alternateRouteActivationButtonTitle) {
+                    session.armAlternateRouteForNextFreshRun()
+                }
+                .disabled(!session.canArmAlternateRouteActivation)
+
                 WindowActionButton(title: "Settings") {
                     session.openSettings()
                 }
@@ -988,7 +1003,7 @@ private struct OverheadMapCanvas: View {
         let sectorVisuals: [SectorVisual]
         let roadVisuals: [RoadVisual]
         let threatVisuals: [ThreatVisual]
-        let alternateRoutePath: Path
+        let alternateRoutePaths: [Path]
         let routePath: Path
         let clearedRoutePath: Path
         let spawnRect: CGRect
@@ -1253,13 +1268,11 @@ private struct OverheadMapCanvas: View {
             }
             routePath = Self.polylinePath(from: checkpointPoints)
 
-            if let alternateRoute = configuration.alternateRoutes.first {
+            alternateRoutePaths = configuration.alternateRoutes.map { alternateRoute in
                 let alternateRoutePoints = alternateRoute.checkpointPoints.map { checkpointPoint in
                     point(forX: checkpointPoint.x, z: checkpointPoint.z)
                 }
-                alternateRoutePath = Self.polylinePath(from: alternateRoutePoints)
-            } else {
-                alternateRoutePath = Path()
+                return Self.polylinePath(from: alternateRoutePoints)
             }
 
             let clearedCheckpointCount = min(snapshot.completedCheckpointCount, configuration.checkpoints.count)
@@ -1437,11 +1450,16 @@ private struct OverheadMapCanvas: View {
                             with: .color(Color(red: 0.94, green: 0.84, blue: 0.40).opacity(0.72)),
                             style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round, dash: [6, 4])
                         )
-                        context.stroke(
-                            renderModel.alternateRoutePath,
-                            with: .color(Color(red: 0.34, green: 0.78, blue: 0.96).opacity(0.62)),
-                            style: StrokeStyle(lineWidth: 2.1, lineCap: .round, lineJoin: .round, dash: [2, 5])
-                        )
+                        for (index, alternateRoutePath) in renderModel.alternateRoutePaths.enumerated() {
+                            let alternateColor = index.isMultiple(of: 2)
+                                ? Color(red: 0.34, green: 0.78, blue: 0.96)
+                                : Color(red: 0.74, green: 0.62, blue: 0.96)
+                            context.stroke(
+                                alternateRoutePath,
+                                with: .color(alternateColor.opacity(0.62)),
+                                style: StrokeStyle(lineWidth: 2.1, lineCap: .round, lineJoin: .round, dash: [2, 5])
+                            )
+                        }
                         context.stroke(
                             renderModel.clearedRoutePath,
                             with: .color(Color(red: 0.36, green: 0.86, blue: 0.58).opacity(0.90)),
@@ -1590,6 +1608,11 @@ private struct OverheadMapCanvas: View {
                 .foregroundStyle(.white.opacity(0.65))
                 .fixedSize(horizontal: false, vertical: true)
 
+            Text(mapAccuracyLine)
+                .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.645))
+                .fixedSize(horizontal: false, vertical: true)
+
             Text(routeValidationLine)
                 .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.64))
@@ -1675,6 +1698,16 @@ private struct OverheadMapCanvas: View {
                 .foregroundStyle(.white.opacity(0.622))
                 .fixedSize(horizontal: false, vertical: true)
 
+            Text(blackMountainMaterialLine)
+                .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.622))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(westBasinWaterLine)
+                .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.622))
+                .fixedSize(horizontal: false, vertical: true)
+
             Text(sessionPersistenceLine)
                 .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.622))
@@ -1753,6 +1786,11 @@ private struct OverheadMapCanvas: View {
         return "Active Route: \(snapshot.configuration.activeRouteLabel) • staged \(staged) • \(snapshot.configuration.routeBindingStatus) • \(snapshot.configuration.routeLoaderStatus)"
     }
 
+    private var mapAccuracyLine: String {
+        let nextLabel = snapshot.nextCheckpointLabel ?? "route complete"
+        return "Map Accuracy: \(snapshot.configuration.activeRouteLabel) • \(snapshot.configuration.checkpoints.count) markers • \(snapshot.configuration.threatObservers.count) threat rings • next \(nextLabel) • footer \(Int(snapshot.configuration.routePlannedDistanceMeters.rounded()))m"
+    }
+
     private var routeValidationLine: String {
         "Route Validation: \(snapshot.configuration.routeValidationStatus) • \(snapshot.configuration.routeValidationRule)"
     }
@@ -1821,6 +1859,20 @@ private struct OverheadMapCanvas: View {
         "Surface Fidelity: \(snapshot.configuration.surfaceFidelityStatus) • \(snapshot.configuration.surfaceFidelitySummary)"
     }
 
+    private var blackMountainMaterialLine: String {
+        let capture = snapshot.configuration.comparisonStops.first { stop in
+            stop.district.localizedCaseInsensitiveContains("Black Mountain")
+        }?.captureNote ?? "capture Telstra Tower, Black Mountain, and Bruce material reads"
+        return "Black Mountain Materials: Telstra/Bruce source-backed • \(snapshot.configuration.textureLibrary) • \(capture)"
+    }
+
+    private var westBasinWaterLine: String {
+        let capture = snapshot.configuration.comparisonStops.first { stop in
+            stop.district.localizedCaseInsensitiveContains("West Basin")
+        }?.captureNote ?? "capture West Basin shoreline, water motion, and vegetation response"
+        return "West Basin Materials: shoreline/water/vegetation • \(snapshot.configuration.environmentalMotionWindSummary) • \(capture)"
+    }
+
     private var sessionPersistenceLine: String {
         "Session Persistence: \(snapshot.configuration.sessionPersistenceStatus) • \(snapshot.configuration.sessionPersistenceSummary)"
     }
@@ -1852,11 +1904,15 @@ private struct OverheadMapCanvas: View {
 
     private var alternateRouteLine: String {
         guard let route = snapshot.configuration.alternateRoutes.first else {
-            return "Alt Routes: no second rehearsal route authored"
+            return "Alt Routes: no additional rehearsal routes authored"
         }
 
         let previewCount = route.checkpointPoints.count
-        return "Alt Preview: \(route.name) • \(route.routeType) • \(previewCount) markers • \(Int(route.plannedDistanceMeters.rounded()))m • \(route.sectorNames.count) sectors • \(route.startCheckpointLabel) -> \(route.goalCheckpointLabel) • \(route.selectionMode) • \(route.selectionStatus) • \(route.checkpointOwnershipStatus) • shared \(route.sharedCheckpointLabels.count) / owned \(route.exclusiveCheckpointLabels.count) • \(route.activationRule)"
+        let routeCount = snapshot.configuration.alternateRoutes.count
+        let additionalRouteSummary = snapshot.configuration.alternateRoutes.dropFirst().first.map { nextRoute in
+            " • next \(nextRoute.name) • \(nextRoute.checkpointPoints.count) markers • \(Int(nextRoute.plannedDistanceMeters.rounded()))m"
+        } ?? ""
+        return "Alt Preview: \(routeCount) candidates • selected \(route.name) • \(route.routeType) • \(previewCount) markers • \(Int(route.plannedDistanceMeters.rounded()))m • \(route.sectorNames.count) sectors • \(route.startCheckpointLabel) -> \(route.goalCheckpointLabel) • \(route.selectionMode) • \(route.selectionStatus) • \(route.checkpointOwnershipStatus) • shared \(route.sharedCheckpointLabels.count) / owned \(route.exclusiveCheckpointLabels.count) • \(route.activationRule)\(additionalRouteSummary)"
     }
 
     private var threatMapLine: String {
@@ -1901,6 +1957,8 @@ private struct OverheadMapCanvas: View {
 private struct ScopeOverlay: View {
     let statusText: String
     let instructionText: String
+    let presentationText: String
+    let shotTimingText: String
     let reticleColor: Color
     let reticleOffset: CGSize
     let reticleBloomScale: CGFloat
@@ -1970,7 +2028,21 @@ private struct ScopeOverlay: View {
                     .frame(width: 6, height: 6)
                     .position(x: reticleCenterX, y: reticleCenterY)
 
-                VStack(spacing: 6) {
+                ForEach([-3, -2, -1, 1, 2, 3], id: \.self) { tick in
+                    let tickOffset = CGFloat(tick) * centerGap * 0.72
+                    let tickSize: CGFloat = abs(tick) == 3 ? 3 : 4
+                    Circle()
+                        .fill(reticleColor.opacity(abs(tick) == 3 ? 0.56 : 0.82))
+                        .frame(width: tickSize, height: tickSize)
+                        .position(x: reticleCenterX + tickOffset, y: reticleCenterY)
+
+                    Circle()
+                        .fill(reticleColor.opacity(abs(tick) == 3 ? 0.56 : 0.82))
+                        .frame(width: tickSize, height: tickSize)
+                        .position(x: reticleCenterX, y: reticleCenterY + tickOffset)
+                }
+
+                VStack(spacing: 5) {
                     Text(statusText)
                         .font(.system(size: 12, weight: .semibold, design: .monospaced))
                         .foregroundStyle(.white.opacity(0.96))
@@ -1978,9 +2050,17 @@ private struct ScopeOverlay: View {
                     Text(instructionText)
                         .font(.system(size: 11, weight: .medium, design: .monospaced))
                         .foregroundStyle(reticleColor.opacity(0.94))
+
+                    Text(presentationText)
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.86))
+
+                    Text(shotTimingText)
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundStyle(reticleColor.opacity(0.82))
                 }
                 .padding(.horizontal, 14)
-                .padding(.vertical, 10)
+                .padding(.vertical, 11)
                 .background(.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 14, style: .continuous)

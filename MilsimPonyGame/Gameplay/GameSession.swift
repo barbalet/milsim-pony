@@ -323,6 +323,82 @@ private struct StoredReviewSessionState: Codable, Equatable {
         return "Manual Restore Prompt: future choice Restore \(nextCheckpointLabel) or Start Fresh / start fresh locked"
     }
 
+    func manualRestoreChoiceLine(currentSceneLabel: String, currentRouteSummary: String) -> String {
+        if schemaVersion != 1
+            || sceneLabel != currentSceneLabel
+            || routeSummary != currentRouteSummary {
+            return "Restore Choice: hidden / stored run identity not current"
+        }
+        if totalCheckpointCount <= 0
+            || completedCheckpointCount < 0
+            || completedCheckpointCount > totalCheckpointCount {
+            return "Restore Choice: hidden / checkpoint progress invalid"
+        }
+        if routeComplete || completedCheckpointCount >= totalCheckpointCount {
+            return "Restore Choice: hidden / completed run starts fresh"
+        }
+        guard let nextCheckpointLabel else {
+            return "Restore Choice: hidden / checkpoint target missing"
+        }
+
+        return "Restore Choice: preview Restore \(nextCheckpointLabel) or Start Fresh / restore not executable"
+    }
+
+    func restoreChoiceTargetLabel(currentSceneLabel: String, currentRouteSummary: String) -> String? {
+        let choiceLine = manualRestoreChoiceLine(
+            currentSceneLabel: currentSceneLabel,
+            currentRouteSummary: currentRouteSummary
+        )
+        guard choiceLine.hasPrefix("Restore Choice: preview Restore ") else {
+            return nil
+        }
+
+        return nextCheckpointLabel
+    }
+
+    func manualRestoreSelectionLine(
+        currentSceneLabel: String,
+        currentRouteSummary: String,
+        reviewedTargetLabel: String?
+    ) -> String {
+        guard let targetLabel = restoreChoiceTargetLabel(
+            currentSceneLabel: currentSceneLabel,
+            currentRouteSummary: currentRouteSummary
+        ) else {
+            return "Restore Selection: unavailable / Start Demo remains fresh"
+        }
+
+        guard reviewedTargetLabel == targetLabel else {
+            return "Restore Selection: pending review for \(targetLabel) / Start Demo remains fresh default"
+        }
+
+        return "Restore Selection: reviewed \(targetLabel) / restore still not executable"
+    }
+
+    func restoreFreshStartGuardLine(
+        currentSceneLabel: String,
+        currentRouteSummary: String,
+        reviewedTargetLabel: String?,
+        freshStartTargetLabel: String?
+    ) -> String {
+        guard let targetLabel = restoreChoiceTargetLabel(
+            currentSceneLabel: currentSceneLabel,
+            currentRouteSummary: currentRouteSummary
+        ) else {
+            return "Restore Fresh Start: unavailable / Start Demo remains fresh"
+        }
+
+        if freshStartTargetLabel == targetLabel {
+            return "Restore Fresh Start: confirmed over \(targetLabel) / no checkpoint restore"
+        }
+
+        if reviewedTargetLabel == targetLabel {
+            return "Restore Fresh Start: awaiting Start Demo for reviewed \(targetLabel)"
+        }
+
+        return "Restore Fresh Start: pending restore-target review / Start Demo remains fresh"
+    }
+
     func restoreExecutionGateLine(currentSceneLabel: String, currentRouteSummary: String) -> String {
         if schemaVersion != 1
             || sceneLabel != currentSceneLabel
@@ -393,6 +469,28 @@ private struct StoredReviewSessionState: Codable, Equatable {
         return "Restore Cleanup Preview: no cleanup needed / review card retained"
     }
 
+    func shouldClearForRestoreCleanup(maxAgeSeconds: Int) -> Bool {
+        guard savedAt > 0 else {
+            return true
+        }
+
+        let ageSeconds = max(Int(Date().timeIntervalSince1970 - savedAt), 0)
+        return ageSeconds > maxAgeSeconds
+    }
+
+    func restoreCleanupExecutionLine(maxAgeSeconds: Int) -> String {
+        guard savedAt > 0 else {
+            return "Restore Cleanup: cleared stale review card / missing saved timestamp"
+        }
+
+        let ageSeconds = max(Int(Date().timeIntervalSince1970 - savedAt), 0)
+        if ageSeconds > maxAgeSeconds {
+            return "Restore Cleanup: cleared stale review card / saved \(ageSeconds)s ago"
+        }
+
+        return "Restore Cleanup: no cleanup needed / review card retained"
+    }
+
     static func == (lhs: StoredReviewSessionState, rhs: StoredReviewSessionState) -> Bool {
         lhs.schemaVersion == rhs.schemaVersion
             && lhs.sceneLabel == rhs.sceneLabel
@@ -427,6 +525,10 @@ private final class ShotFeedbackAudioEngine {
     private let alertDangerBuffer: AVAudioPCMBuffer
     private let alertRelayBuffer: AVAudioPCMBuffer
     private let alertClearBuffer: AVAudioPCMBuffer
+    private let footstepBuffer: AVAudioPCMBuffer
+    private let scopeRaiseBuffer: AVAudioPCMBuffer
+    private let scopeLowerBuffer: AVAudioPCMBuffer
+    private let ambientBasinBuffer: AVAudioPCMBuffer
 
     private init() {
         shotBuffer = Self.makeBuffer(format: format, duration: 0.22) { time, noise in
@@ -488,6 +590,32 @@ private final class ShotFeedbackAudioEngine {
             let tone = (sin(2.0 * .pi * 420.0 * time * glide) * 0.16) + (sin(2.0 * .pi * 315.0 * time) * 0.08)
             return tone * envelope
         }
+        footstepBuffer = Self.makeBuffer(format: format, duration: 0.09) { time, noise in
+            let attack = min(time / 0.006, 1.0)
+            let envelope = attack * exp(-32.0 * time)
+            let sole = sin(2.0 * .pi * 92.0 * time) * 0.12
+            let gravel = noise * 0.18 * exp(-46.0 * time)
+            return (sole + gravel) * envelope
+        }
+        scopeRaiseBuffer = Self.makeBuffer(format: format, duration: 0.12) { time, noise in
+            let envelope = exp(-20.0 * time)
+            let glass = sin(2.0 * .pi * 920.0 * time) * 0.10
+            let cloth = noise * 0.07 * exp(-35.0 * time)
+            return (glass + cloth) * envelope
+        }
+        scopeLowerBuffer = Self.makeBuffer(format: format, duration: 0.10) { time, noise in
+            let envelope = exp(-24.0 * time)
+            let glass = sin(2.0 * .pi * 640.0 * time) * 0.08
+            let cloth = noise * 0.06 * exp(-38.0 * time)
+            return (glass + cloth) * envelope
+        }
+        ambientBasinBuffer = Self.makeBuffer(format: format, duration: 1.85) { time, noise in
+            let swell = 0.50 + (sin(2.0 * .pi * 0.21 * time) * 0.50)
+            let wind = noise * 0.018 * (0.55 + (swell * 0.45))
+            let distantLow = sin(2.0 * .pi * 68.0 * time) * 0.006
+            let shore = sin(2.0 * .pi * 0.82 * time) * 0.012
+            return wind + distantLow + shore
+        }
 
         engine.attach(player)
         engine.connect(player, to: engine.mainMixerNode, format: format)
@@ -526,6 +654,18 @@ private final class ShotFeedbackAudioEngine {
 
     func playAlertClearCue() {
         play(buffer: alertClearBuffer)
+    }
+
+    func playFootstepCue() {
+        play(buffer: footstepBuffer)
+    }
+
+    func playScopeToggleCue(raised: Bool) {
+        play(buffer: raised ? scopeRaiseBuffer : scopeLowerBuffer)
+    }
+
+    func playAmbientBasinBed() {
+        play(buffer: ambientBasinBuffer)
     }
 
     private func play(buffer: AVAudioPCMBuffer, after delay: Double = 0) {
@@ -675,13 +815,20 @@ private struct ObserverLOSDebugState {
     let label: String
     let distanceMeters: Float
     let rangeMeters: Float
+    let fieldOfViewDegrees: Float
+    let yawDegrees: Float
+    let pitchDegrees: Float
     let viewDot: Float
     let coneThreshold: Float
     let suspicionPerSecond: Float
     let alertSecondsRemaining: Float
+    let scanArcDegrees: Float
+    let scanCycleSeconds: Float
+    let scanPhaseSeconds: Float
     let neutralized: Bool
     let alerted: Bool
     let supportingGroup: Bool
+    let scanHalted: Bool
     let inRange: Bool
     let inViewCone: Bool
     let hasLineOfSight: Bool
@@ -735,6 +882,34 @@ private struct ObserverLOSDebugState {
             return "off-axis"
         }
         return "out of range"
+    }
+
+    var scanStateLabel: String {
+        if neutralized {
+            return "neutralized"
+        }
+        if seeingPlayer {
+            return "tracking"
+        }
+        if supportingGroup {
+            return "relay scan"
+        }
+        if alerted {
+            return "memory scan"
+        }
+        if inRange && inViewCone && !hasLineOfSight {
+            return "blocked scan"
+        }
+        if inRange && !inViewCone {
+            return "off-axis sweep"
+        }
+        if inRange {
+            return "open sweep"
+        }
+        if scanArcDegrees > 0 {
+            return "resume sweep"
+        }
+        return "idle sweep"
     }
 }
 
@@ -801,19 +976,38 @@ final class GameSession: ObservableObject {
     private var lastThreatSupportingCount = 0
     private var lastThreatAudibleState = "quiet"
     private var lastThreatAudioElapsedSeconds: Double = -10
+    private var lastFootstepAudioElapsedSeconds: Double = -10
+    private var lastAmbientAudioElapsedSeconds: Double = -10
+    private var lastMovementAudioState = "idle"
+    private var lastWorldAudioState = "ambient waiting"
+    private var lastScopeAudioState = "scope ready"
+    private var alternateRouteActivationArmed = false
+    private var alternateRouteActivationLine = "Alternate Live Binding: primary route armed"
     private var freshRunHandler: (() -> Void)?
     private var pendingOverlayLines: [String]?
     private var isOverlayPublishScheduled = false
     private var storedReviewSessionState: StoredReviewSessionState?
+    private var restoreCleanupExecutionLine: String
+    private var reviewedManualRestoreTargetLabel: String?
+    private var freshStartConfirmedRestoreTargetLabel: String?
+    private var restoreBoundaryResetLine: String
+    private var restoreReviewExpiryLine: String
 
     init(configuration: LaunchConfiguration) {
         let storedSettings = Self.loadStoredSettings()
+        var storedReviewSessionState = Self.loadStoredReviewSessionState()
+        let restoreCleanupExecutionLine = Self.applyRestoreCleanup(to: &storedReviewSessionState)
         self.configuration = configuration
         self.hudOpacity = storedSettings.hudOpacity
         self.invertLookY = storedSettings.invertLookY
         self.lookSensitivityScale = storedSettings.lookSensitivityScale
         self.difficultyPreset = storedSettings.difficultyPreset
-        self.storedReviewSessionState = Self.loadStoredReviewSessionState()
+        self.storedReviewSessionState = storedReviewSessionState
+        self.restoreCleanupExecutionLine = restoreCleanupExecutionLine
+        self.reviewedManualRestoreTargetLabel = nil
+        self.freshStartConfirmedRestoreTargetLabel = nil
+        self.restoreBoundaryResetLine = "Restore Boundary Reset: pending / no restore review cleared this run"
+        self.restoreReviewExpiryLine = "Restore Review Expiry: pending / no restore review tracked this run"
 
         configuration.bootMode.withCString { bootMode in
             GameCoreBootstrap(bootMode)
@@ -877,6 +1071,40 @@ final class GameSession: ObservableObject {
 
     var canBeginMission: Bool {
         sceneReady
+    }
+
+    var canPreviewManualRestoreChoice: Bool {
+        manualRestoreChoiceTargetLabel != nil
+    }
+
+    var canArmAlternateRouteActivation: Bool {
+        guard demoFlowState == .title, let mapConfiguration else {
+            return false
+        }
+
+        return mapConfiguration.selectedAlternateRouteID != nil
+            && mapConfiguration.activeRouteID != mapConfiguration.selectedAlternateRouteID
+            && !alternateRouteActivationArmed
+    }
+
+    var alternateRouteActivationButtonTitle: String {
+        guard let label = mapConfiguration?.selectedAlternateRouteLabel else {
+            return "Alternate Route Unavailable"
+        }
+
+        if alternateRouteActivationArmed {
+            return "Alternate Armed: \(label)"
+        }
+
+        return "Arm Alternate Route: \(label)"
+    }
+
+    var manualRestoreChoiceButtonTitle: String {
+        guard let targetLabel = manualRestoreChoiceTargetLabel else {
+            return "Restore Preview Unavailable"
+        }
+
+        return "Review Restore Target: \(targetLabel)"
     }
 
     var activeCommands: Set<InputCommand> {
@@ -1010,6 +1238,78 @@ final class GameSession: ObservableObject {
                 ? "Click or press F to fire / release E to recover breath / Space lowers scope"
                 : "Click or press F to fire / hold E to steady / Space lowers scope")
             : "Raise scope on the contact and skyline markers"
+    }
+
+    var scopePresentationText: String {
+        guard isScopeActive else {
+            return String(format: "Optic: %.1fx mil reticle ready", scopeMagnification)
+        }
+
+        let parallaxPercent = Int((simd_clamp(scopedWeaponSpreadDegrees / 1.6, 0.0, 1.0) * 100).rounded())
+        let recoilText: String
+        if
+            let snapshot = latestSnapshot,
+            snapshot.shotCount > 0,
+            snapshot.lastShotElapsedSeconds >= 0
+        {
+            let shotAgeSeconds = max(snapshot.elapsedSeconds - snapshot.lastShotElapsedSeconds, 0)
+            let recoveryDurationSeconds = max(Double(snapshot.weaponCycleSeconds) * 0.85, 0.25)
+            let recoilPercent = Int((max(1.0 - (shotAgeSeconds / recoveryDurationSeconds), 0) * 100).rounded())
+            recoilText = String(format: "recoil %d%%", recoilPercent)
+        } else {
+            recoilText = "recoil settled"
+        }
+
+        let holdoverMils: Float
+        if let prediction = latestBallisticPrediction, prediction.valid, prediction.travelDistanceMeters > 1 {
+            let rangeKilometers = max(prediction.travelDistanceMeters / 1000.0, 0.001)
+            holdoverMils = prediction.dropMeters / rangeKilometers
+        } else {
+            holdoverMils = 0
+        }
+
+        return String(
+            format: "Optic: mil %.1f hold / parallax %d%% / %@",
+            holdoverMils,
+            parallaxPercent,
+            recoilText
+        )
+    }
+
+    var scopeShotTimingText: String {
+        guard
+            isScopeActive,
+            let snapshot = latestSnapshot,
+            snapshot.shotCount > 0,
+            snapshot.lastShotElapsedSeconds >= 0
+        else {
+            return "Shot Timing: crack-thump armed"
+        }
+
+        let shotAgeSeconds = max(snapshot.elapsedSeconds - snapshot.lastShotElapsedSeconds, 0)
+        let crackLeadSeconds = min(max(Double(snapshot.lastShotFlightTimeSeconds) * 0.18, 0.03), 0.24)
+        let thumpSeconds = max(Double(snapshot.lastShotFlightTimeSeconds), crackLeadSeconds)
+        let thumpState = shotAgeSeconds < thumpSeconds
+            ? String(format: "thump in %.2fs", thumpSeconds - shotAgeSeconds)
+            : "thump resolved"
+        let resultLabel: String
+        if snapshot.lastShotHitObserver {
+            resultLabel = observerLabel(for: snapshot.lastShotObserverIndex) ?? "observer hit"
+        } else if snapshot.lastShotHitCollisionVolume {
+            resultLabel = "blocker"
+        } else if snapshot.lastShotHitGround {
+            resultLabel = "ground"
+        } else {
+            resultLabel = "clear miss"
+        }
+
+        return String(
+            format: "Shot Timing: crack %.2fs / %@ / %@ %.0fm",
+            crackLeadSeconds,
+            thumpState,
+            resultLabel,
+            snapshot.lastShotTravelDistanceMeters
+        )
     }
 
     var scopeReticleColor: NSColor {
@@ -1153,13 +1453,20 @@ final class GameSession: ObservableObject {
                 label: observerLabel(for: Int32(index)) ?? "observer \(index + 1)",
                 distanceMeters: state.distanceMeters,
                 rangeMeters: state.rangeMeters,
+                fieldOfViewDegrees: state.fieldOfViewDegrees,
+                yawDegrees: state.yawDegrees,
+                pitchDegrees: state.pitchDegrees,
                 viewDot: state.viewDot,
                 coneThreshold: state.coneThreshold,
                 suspicionPerSecond: state.suspicionPerSecond,
                 alertSecondsRemaining: state.alertSecondsRemaining,
+                scanArcDegrees: state.scanArcDegrees,
+                scanCycleSeconds: state.scanCycleSeconds,
+                scanPhaseSeconds: state.scanPhaseSeconds,
                 neutralized: state.neutralized,
                 alerted: state.alerted,
                 supportingGroup: state.supportingGroup,
+                scanHalted: state.scanHalted,
                 inRange: state.inRange,
                 inViewCone: state.inViewCone,
                 hasLineOfSight: state.hasLineOfSight,
@@ -1259,6 +1566,42 @@ final class GameSession: ObservableObject {
             ShotFeedbackAudioEngine.shared.playAlertClearCue()
             noteCuePlayed()
         }
+    }
+
+    private func applyWorldMovementAudioFeedback(for snapshot: GameFrameSnapshot) {
+        guard sceneReady, demoFlowState == .playing, menuPanel == nil else {
+            lastMovementAudioState = "paused"
+            lastWorldAudioState = "ambient paused"
+            return
+        }
+
+        let ambientInterval = snapshot.alertedObserverCount > 0 || snapshot.seeingObserverCount > 0 ? 1.35 : 1.75
+        if snapshot.elapsedSeconds - lastAmbientAudioElapsedSeconds > ambientInterval {
+            ShotFeedbackAudioEngine.shared.playAmbientBasinBed()
+            lastAmbientAudioElapsedSeconds = snapshot.elapsedSeconds
+            lastWorldAudioState = threatAudibleState(for: snapshot) == "quiet"
+                ? "basin bed"
+                : "basin bed + \(threatAudibleState(for: snapshot))"
+        }
+
+        let moving = snapshot.grounded && snapshot.moveSpeed > 0.35
+        guard moving else {
+            lastMovementAudioState = snapshot.grounded ? "idle grounded" : "airborne muted"
+            return
+        }
+
+        let speedRatio = snapshot.sprintSpeed > 0
+            ? simd_clamp(snapshot.moveSpeed / snapshot.sprintSpeed, 0.0, 1.0)
+            : 0.0
+        let stepInterval = max(0.26, 0.58 - (Double(speedRatio) * 0.24))
+        if snapshot.elapsedSeconds - lastFootstepAudioElapsedSeconds >= stepInterval {
+            ShotFeedbackAudioEngine.shared.playFootstepCue()
+            lastFootstepAudioElapsedSeconds = snapshot.elapsedSeconds
+        }
+
+        lastMovementAudioState = snapshot.sprinting
+            ? String(format: "sprint steps %.2fs", stepInterval)
+            : String(format: "walk steps %.2fs", stepInterval)
     }
 
     private func threatAudibleState(for snapshot: GameFrameSnapshot) -> String {
@@ -1460,7 +1803,9 @@ final class GameSession: ObservableObject {
         sceneSummary = summary
         sceneDetails = details
         sceneReady = true
-        statusLine = "Demo briefing ready"
+        if demoFlowState == .title {
+            statusLine = "Demo briefing ready"
+        }
         self.overlayTitle = overlayTitle
         scopeLabel = scopeConfiguration.label ?? "4x Scope"
         scopeMagnification = max(scopeConfiguration.magnification, 1.0)
@@ -1476,6 +1821,7 @@ final class GameSession: ObservableObject {
         ballisticLaunchHeightOffsetMeters = ballisticsSettings.launchHeightOffsetMeters
         self.detectionFailThreshold = max(detectionFailThreshold, 0.1)
         self.mapConfiguration = mapConfiguration
+        updateAlternateRouteActivationLine(from: mapConfiguration)
         applyDifficultyPresetToCore(announceChange: false)
         rebuildOverlay()
     }
@@ -1493,8 +1839,24 @@ final class GameSession: ObservableObject {
 
     func noteMapConfiguration(_ configuration: SceneMapConfiguration) {
         mapConfiguration = configuration
+        updateAlternateRouteActivationLine(from: configuration)
         refreshOverheadMapSnapshot()
         rebuildOverlay()
+    }
+
+    private func updateAlternateRouteActivationLine(from configuration: SceneMapConfiguration) {
+        if configuration.activeRouteID == configuration.selectedAlternateRouteID,
+           let routeLabel = configuration.selectedAlternateRouteLabel {
+            alternateRouteActivationLine = "Alternate Live Binding: active \(routeLabel) / checkpoints rebound"
+            return
+        }
+
+        if alternateRouteActivationArmed, let routeLabel = configuration.selectedAlternateRouteLabel {
+            alternateRouteActivationLine = "Alternate Live Binding: armed \(routeLabel) / waits for fresh-run boundary"
+            return
+        }
+
+        alternateRouteActivationLine = "Alternate Live Binding: primary route active / alternate staged"
     }
 
     func setFreshRunHandler(_ handler: @escaping () -> Void) {
@@ -1542,10 +1904,69 @@ final class GameSession: ObservableObject {
         }
 
         isSettingsPresented = false
+        if alternateRouteActivationArmed {
+            freshRunHandler?()
+        }
         demoFlowState = .playing
+        let restoreTarget = manualRestoreChoiceTargetLabel
+        if reviewedManualRestoreTargetLabel == restoreTarget {
+            freshStartConfirmedRestoreTargetLabel = restoreTarget
+        } else {
+            freshStartConfirmedRestoreTargetLabel = nil
+        }
         resetMissionRuntime()
-        statusLine = "Demo live - move through the current Canberra contact lane and verify scoped hits"
+        if let restoreTarget, freshStartConfirmedRestoreTargetLabel == restoreTarget {
+            statusLine = "Fresh run started after reviewing \(restoreTarget) - restore remains disabled"
+        } else {
+            statusLine = "Demo live - move through the current Canberra contact lane and verify scoped hits"
+        }
         scheduleGameplayInputFocusRecovery()
+        rebuildOverlay()
+    }
+
+    func armAlternateRouteForNextFreshRun() {
+        guard sceneReady else {
+            statusLine = "Scene data still loading"
+            rebuildOverlay()
+            return
+        }
+
+        guard let routeLabel = mapConfiguration?.selectedAlternateRouteLabel else {
+            statusLine = "No staged alternate route is available"
+            rebuildOverlay()
+            return
+        }
+
+        alternateRouteActivationArmed = true
+        alternateRouteActivationLine = "Alternate Live Binding: armed \(routeLabel) / waits for fresh-run boundary"
+        statusLine = "Alternate route armed for next Start Demo: \(routeLabel)"
+        rebuildOverlay()
+    }
+
+    func consumeAlternateRouteActivationRequest() -> Bool {
+        defer {
+            alternateRouteActivationArmed = false
+        }
+
+        return alternateRouteActivationArmed
+    }
+
+    func previewManualRestoreChoice() {
+        guard sceneReady else {
+            statusLine = "Scene data still loading"
+            rebuildOverlay()
+            return
+        }
+
+        guard let targetLabel = manualRestoreChoiceTargetLabel else {
+            statusLine = "No restorable review target is available"
+            rebuildOverlay()
+            return
+        }
+
+        reviewedManualRestoreTargetLabel = targetLabel
+        restoreReviewExpiryLine = "Restore Review Expiry: tracking \(targetLabel) until target or boundary changes"
+        statusLine = "Restore target reviewed: \(targetLabel) - Start Demo still begins fresh"
         rebuildOverlay()
     }
 
@@ -1589,6 +2010,10 @@ final class GameSession: ObservableObject {
         freshRunHandler?()
         isSettingsPresented = false
         demoFlowState = .playing
+        clearManualRestoreReviewState(
+            reason: "restart boundary",
+            fallback: "Restore Boundary Reset: restart boundary clean / no restore review carried"
+        )
         resetMissionRuntime()
         statusLine = "Demo restarted from a fresh rehearsal start"
         scheduleGameplayInputFocusRecovery()
@@ -1603,6 +2028,10 @@ final class GameSession: ObservableObject {
         freshRunHandler?()
         isSettingsPresented = false
         demoFlowState = .title
+        clearManualRestoreReviewState(
+            reason: "briefing boundary",
+            fallback: "Restore Boundary Reset: briefing boundary clean / no restore review carried"
+        )
         resetMissionRuntime()
         statusLine = "Demo briefing ready"
         rebuildOverlay()
@@ -1828,6 +2257,7 @@ final class GameSession: ObservableObject {
         latestSnapshot = snapshot
         refreshObserverDebugStatesFromCore()
         applyThreatAudioFeedback(for: snapshot)
+        applyWorldMovementAudioFeedback(for: snapshot)
         viewportSize = drawableSize
         refreshOverheadMapSnapshot()
         persistReviewSessionState(from: snapshot)
@@ -1869,6 +2299,7 @@ final class GameSession: ObservableObject {
         latestProfilingSnapshot = profiling
         refreshObserverDebugStatesFromCore()
         applyThreatAudioFeedback(for: snapshot)
+        applyWorldMovementAudioFeedback(for: snapshot)
         viewportSize = drawableSize
         briefingSummary = briefing.summary
         briefingDetails = briefing.details
@@ -2135,6 +2566,8 @@ final class GameSession: ObservableObject {
 
         isScopeActive.toggle()
         GameCoreSetWeaponScoped(isScopeActive)
+        ShotFeedbackAudioEngine.shared.playScopeToggleCue(raised: isScopeActive)
+        lastScopeAudioState = isScopeActive ? "scope raised cue" : "scope lowered cue"
         if isScopeActive {
             GameCoreSetWeaponSteady(pressedCommands.contains(.steadyAim))
         } else {
@@ -2219,6 +2652,19 @@ final class GameSession: ObservableObject {
         if let storedReviewManualRestorePromptLine {
             lines.append(storedReviewManualRestorePromptLine)
         }
+        if let storedReviewManualRestoreChoiceLine {
+            lines.append(storedReviewManualRestoreChoiceLine)
+        }
+        if let storedReviewManualRestoreSelectionLine {
+            lines.append(storedReviewManualRestoreSelectionLine)
+        }
+        if let storedReviewRestoreFreshStartGuardLine {
+            lines.append(storedReviewRestoreFreshStartGuardLine)
+        }
+        lines.append(restoreBoundaryResetLine)
+        lines.append(restoreReviewExpiryLine)
+        lines.append(restoreReviewScopeLine)
+        lines.append(restoreReviewExecutionIntentLine)
         if let storedReviewRestoreExecutionGateLine {
             lines.append(storedReviewRestoreExecutionGateLine)
         }
@@ -2234,6 +2680,7 @@ final class GameSession: ObservableObject {
         if let storedReviewRestoreCleanupPreviewLine {
             lines.append(storedReviewRestoreCleanupPreviewLine)
         }
+        lines.append(restoreCleanupExecutionLine)
         let reviewLines = sceneDetails.filter { detail in
             detail.hasPrefix("Review Pack:")
                 || detail.hasPrefix("Reference Pack:")
@@ -2534,6 +2981,43 @@ final class GameSession: ObservableObject {
         )
     }
 
+    private func muzzleFeedbackLine() -> String {
+        guard let snapshot = latestSnapshot else {
+            return "Muzzle Feedback: waiting for live rifle telemetry"
+        }
+
+        guard snapshot.shotCount > 0, snapshot.lastShotElapsedSeconds >= 0 else {
+            return "Muzzle Feedback: flash idle placeholder / recoil settled / no shot trace"
+        }
+
+        let shotAgeSeconds = max(snapshot.elapsedSeconds - snapshot.lastShotElapsedSeconds, 0)
+        let flashPercent = Int((max(1.0 - (shotAgeSeconds / 0.18), 0) * 100).rounded())
+        let recoveryDurationSeconds = max(Double(snapshot.weaponCycleSeconds) * 0.85, 0.25)
+        let recoilPercent = Int((max(1.0 - (shotAgeSeconds / recoveryDurationSeconds), 0) * 100).rounded())
+        let recoilState = snapshot.weaponCooldownSeconds > 0.01
+            ? String(format: "recovering %.2fs", snapshot.weaponCooldownSeconds)
+            : "settled"
+        let resultLabel: String
+        if snapshot.lastShotHitObserver {
+            resultLabel = observerLabel(for: snapshot.lastShotObserverIndex) ?? "observer hit"
+        } else if snapshot.lastShotHitCollisionVolume {
+            resultLabel = "blocker strike"
+        } else if snapshot.lastShotHitGround {
+            resultLabel = "ground strike"
+        } else {
+            resultLabel = "clear miss"
+        }
+
+        return String(
+            format: "Muzzle Feedback: flash %d%% placeholder / recoil %d%% %@ / last %@ %.0fm",
+            flashPercent,
+            recoilPercent,
+            recoilState,
+            resultLabel,
+            snapshot.lastShotTravelDistanceMeters
+        )
+    }
+
     private func threatStatusLine() -> String {
         guard let snapshot = latestSnapshot else {
             return "Threat: waiting for live observer state"
@@ -2598,6 +3082,174 @@ final class GameSession: ObservableObject {
         )
     }
 
+    private func worldMovementAudioLine() -> String {
+        guard let snapshot = latestSnapshot else {
+            return "World Audio: waiting for movement and basin mix"
+        }
+
+        return String(
+            format: "World Audio: %@ / %@ / %@ / threat %@ / speed %.2f",
+            lastMovementAudioState,
+            lastScopeAudioState,
+            lastWorldAudioState,
+            threatAudibleState(for: snapshot),
+            snapshot.moveSpeed
+        )
+    }
+
+    private func patrolPairFoundationLine() -> String {
+        guard let mapConfiguration else {
+            return "Patrol Pairs: waiting for authored observer groups"
+        }
+
+        let groupedObservers = Dictionary(grouping: mapConfiguration.threatObservers.enumerated().filter { _, observer in
+            guard let groupID = observer.groupID?.trimmingCharacters(in: .whitespacesAndNewlines) else {
+                return false
+            }
+            return !groupID.isEmpty
+        }) { _, observer in
+            observer.groupID ?? ""
+        }
+        let patrolPairs = groupedObservers
+            .filter { _, observers in observers.count >= 2 }
+            .sorted { lhs, rhs in lhs.key < rhs.key }
+
+        guard !patrolPairs.isEmpty else {
+            return "Patrol Pairs: no paired observer groups authored"
+        }
+
+        let focusPair = patrolPairs.first { _, observers in
+            observers.contains { index, _ in
+                index < latestObserverDebugStates.count
+                    && !latestObserverDebugStates[index].neutralized
+                    && (latestObserverDebugStates[index].seeingPlayer || latestObserverDebugStates[index].alerted)
+            }
+        } ?? patrolPairs[0]
+
+        let groupID = focusPair.key
+        let observers = focusPair.value.sorted { lhs, rhs in lhs.offset < rhs.offset }
+        let activeCount = observers.filter { index, _ in
+            index >= latestObserverDebugStates.count || !latestObserverDebugStates[index].neutralized
+        }.count
+        let routeID = observers.compactMap { $0.element.patrolRouteID }.first ?? "static-route"
+        let roles = observers
+            .compactMap { $0.element.patrolRole }
+            .joined(separator: "+")
+        let authoredSpacing = observers.compactMap { $0.element.formationSpacingMeters }
+        let spacingMeters: Float
+        if !authoredSpacing.isEmpty {
+            spacingMeters = authoredSpacing.reduce(0, +) / Float(authoredSpacing.count)
+        } else if observers.count >= 2 {
+            let first = observers[0].element.point
+            let second = observers[1].element.point
+            let deltaX = second.x - first.x
+            let deltaZ = second.z - first.z
+            spacingMeters = sqrtf((deltaX * deltaX) + (deltaZ * deltaZ))
+        } else {
+            spacingMeters = 0
+        }
+        let displayGroup = groupID
+            .replacingOccurrences(of: "_", with: " ")
+            .capitalized
+
+        return String(
+            format: "Patrol Pairs: %d authored / %@ %d/%d active / route %@ / roles %@ / %.0fm spacing",
+            patrolPairs.count,
+            displayGroup,
+            activeCount,
+            observers.count,
+            routeID,
+            roles.isEmpty ? "unassigned" : roles,
+            spacingMeters
+        )
+    }
+
+    private func losDebugOverlayLine() -> String {
+        guard !latestObserverDebugStates.isEmpty else {
+            return "LOS Debug: waiting for observer samples"
+        }
+
+        let activeStates = latestObserverDebugStates.filter { !$0.neutralized }
+        let trackingCount = activeStates.filter(\.seeingPlayer).count
+        let relayCount = activeStates.filter(\.supportingGroup).count
+        let blockedCount = activeStates.filter { $0.inRange && $0.inViewCone && !$0.hasLineOfSight }.count
+        let offAxisCount = activeStates.filter { $0.inRange && !$0.inViewCone }.count
+        let openSampleCount = activeStates.filter { $0.hasLineOfSight }.count
+
+        return String(
+            format: "LOS Debug: %d tracking / %d relay / %d blocked samples / %d off-axis / %d open",
+            trackingCount,
+            relayCount,
+            blockedCount,
+            offAxisCount,
+            openSampleCount
+        )
+    }
+
+    private func scanStateOverlayLine() -> String {
+        guard let focusState = prominentObserverDebugStates(limit: 1).first else {
+            return "Scan State: waiting for focus observer"
+        }
+
+        let viewDot = focusState.viewDot >= -0.999 ? focusState.viewDot : -1.0
+        return String(
+            format: "Scan State: %@ / %@ / arc %.0fdeg / fov %.0fdeg / yaw %.0f pitch %.0f / dot %.2f thresh %.2f",
+            focusState.label,
+            focusState.scanStateLabel,
+            focusState.scanArcDegrees,
+            focusState.fieldOfViewDegrees,
+            focusState.yawDegrees,
+            focusState.pitchDegrees,
+            viewDot,
+            focusState.coneThreshold
+        )
+    }
+
+    private func scanHaltResumeLine() -> String {
+        guard !latestObserverDebugStates.isEmpty else {
+            return "Scan Halt Resume: waiting for patrol observers"
+        }
+
+        let patrolStates = latestObserverDebugStates.filter { $0.scanArcDegrees > 0 && !$0.neutralized }
+        guard !patrolStates.isEmpty else {
+            return "Scan Halt Resume: no patrol scan arcs active"
+        }
+
+        let haltedCount = patrolStates.filter(\.scanHalted).count
+        let relayHandoffCount = patrolStates.filter { $0.scanHalted && $0.supportingGroup }.count
+        let resumeCount = patrolStates.count - haltedCount
+        let focusState = patrolStates
+            .sorted {
+                if $0.scanHalted != $1.scanHalted {
+                    return $0.scanHalted && !$1.scanHalted
+                }
+                return $0.distanceMeters < $1.distanceMeters
+            }
+            .first
+        let focusSummary: String
+        if let focusState {
+            let phasePercent = focusState.scanCycleSeconds > 0
+                ? Int(((focusState.scanPhaseSeconds / focusState.scanCycleSeconds) * 100).rounded())
+                : 0
+            focusSummary = String(
+                format: "%@ %@ phase %d%%",
+                focusState.label,
+                focusState.scanHalted ? "halted" : "resuming",
+                phasePercent
+            )
+        } else {
+            focusSummary = "no focus"
+        }
+
+        return String(
+            format: "Scan Halt Resume: %d halted / %d resume / %d relay handoff / %@",
+            haltedCount,
+            resumeCount,
+            relayHandoffCount,
+            focusSummary
+        )
+    }
+
     private func difficultyTelemetryLine() -> String {
         String(
             format: "Difficulty: %@ / fail %.2f / obs x%.2f / decay x%.2f / cycle x%.2f",
@@ -2618,34 +3270,37 @@ final class GameSession: ObservableObject {
         return candidates.enumerated().map { offset, state in
             if state.seeingPlayer {
                 return String(
-                    format: "LOS %d: %@ / %.0fm / %@ / +%.2f sus/s",
+                    format: "LOS %d: %@ / %.0fm / %@ / arc %.0fdeg / +%.2f sus/s",
                     offset + 1,
                     state.label,
                     state.distanceMeters,
-                    state.statusLabel,
+                    state.scanStateLabel,
+                    state.fieldOfViewDegrees,
                     state.suspicionPerSecond
                 )
             }
 
             if state.alerted {
                 return String(
-                    format: "LOS %d: %@ / %.0fm / %@ / %.1fs memory",
+                    format: "LOS %d: %@ / %.0fm / %@ / arc %.0fdeg / %.1fs memory",
                     offset + 1,
                     state.label,
                     state.distanceMeters,
-                    state.statusLabel,
+                    state.scanStateLabel,
+                    state.fieldOfViewDegrees,
                     state.alertSecondsRemaining
                 )
             }
 
             let viewDot = state.viewDot >= -0.999 ? state.viewDot : -1.0
             return String(
-                format: "LOS %d: %@ / %.0fm of %.0fm / %@ / dot %.2f",
+                format: "LOS %d: %@ / %.0fm of %.0fm / %@ / arc %.0fdeg / dot %.2f",
                 offset + 1,
                 state.label,
                 state.distanceMeters,
                 state.rangeMeters,
-                state.statusLabel,
+                state.scanStateLabel,
+                state.fieldOfViewDegrees,
                 viewDot
             )
         }
@@ -2663,6 +3318,29 @@ final class GameSession: ObservableObject {
             movementStepCount,
             lineOfSightTestCount,
             lineOfSightSampleCount
+        )
+    }
+
+    private func formalProfilingBaselineLine() -> String {
+        let simulationStepCount: Int32 = latestProfilingSnapshot?.simulationStepCount ?? 0
+        let movementStepCount: Int32 = latestProfilingSnapshot?.movementStepCount ?? 0
+        let lineOfSightTestCount: Int32 = latestProfilingSnapshot?.lineOfSightTestCount ?? 0
+        let lineOfSightSampleCount: Int32 = latestProfilingSnapshot?.lineOfSightSampleCount ?? 0
+        let sectorCount: Int32 = latestProfilingSnapshot?.sectorCount ?? 0
+        let collisionVolumeCount: Int32 = latestProfilingSnapshot?.collisionVolumeCount ?? 0
+        let groundSurfaceCount: Int32 = latestProfilingSnapshot?.groundSurfaceCount ?? 0
+        let frameBaseline = frameTimingLine.replacingOccurrences(of: "Frame: ", with: "frame ")
+
+        return String(
+            format: "Profile Baseline: %@ / core %d sim %d move / LOS %d tests %d samples / world %d sectors %d blockers %d surfaces",
+            frameBaseline,
+            simulationStepCount,
+            movementStepCount,
+            lineOfSightTestCount,
+            lineOfSightSampleCount,
+            sectorCount,
+            collisionVolumeCount,
+            groundSurfaceCount
         )
     }
 
@@ -2692,6 +3370,13 @@ final class GameSession: ObservableObject {
         let storedReadinessLine = storedReviewRestoreReadinessLine ?? "Restore Readiness: no persisted review card to inspect yet"
         let storedArmingLine = storedReviewManualRestoreArmingLine ?? "Manual Restore Arm: no persisted review card to inspect yet"
         let storedPromptLine = storedReviewManualRestorePromptLine ?? "Manual Restore Prompt: hidden until a review card is persisted"
+        let storedChoiceLine = storedReviewManualRestoreChoiceLine ?? "Restore Choice: hidden / no persisted review card"
+        let storedSelectionLine = storedReviewManualRestoreSelectionLine ?? "Restore Selection: unavailable / no persisted review card"
+        let storedFreshStartLine = storedReviewRestoreFreshStartGuardLine ?? "Restore Fresh Start: unavailable / no persisted review card"
+        let storedBoundaryResetLine = restoreBoundaryResetLine
+        let storedReviewExpiryLine = restoreReviewExpiryLine
+        let storedReviewScopeLine = restoreReviewScopeLine
+        let storedReviewExecutionIntentLine = restoreReviewExecutionIntentLine
         let storedExecutionGateLine = storedReviewRestoreExecutionGateLine ?? "Restore Execution Gate: closed / no persisted review card"
         let storedAuditLine = storedReviewRestoreAuditLine ?? "Restore Audit: no persisted review card"
         let storedFreshnessLine = storedReviewRestoreFreshnessLine ?? "Restore Freshness: no persisted review card"
@@ -2718,11 +3403,19 @@ final class GameSession: ObservableObject {
             storedReadinessLine,
             storedArmingLine,
             storedPromptLine,
+            storedChoiceLine,
+            storedSelectionLine,
+            storedFreshStartLine,
+            storedBoundaryResetLine,
+            storedReviewExpiryLine,
+            storedReviewScopeLine,
+            storedReviewExecutionIntentLine,
             storedExecutionGateLine,
             storedAuditLine,
             storedFreshnessLine,
             storedRetentionLine,
             storedCleanupPreviewLine,
+            restoreCleanupExecutionLine,
             String(
                 format: "Scope: %@ / %.1fx / %.1f deg / x%.1f draw",
                 isScopeActive ? "active" : "ready",
@@ -2748,10 +3441,14 @@ final class GameSession: ObservableObject {
                 snapshot?.lookSensitivity ?? 0
             ),
             weaponStatusLine(),
+            muzzleFeedbackLine(),
+            scopePresentationText,
+            scopeShotTimingText,
             threatStatusLine(),
             ballisticsProfileLine(),
             ballisticsPredictionLine(),
             coreProfilingLine(),
+            formalProfilingBaselineLine(),
             coreWorldLine(),
             String(format: "Optic: %@ / %.1fx", isScopeActive ? "raised" : "lowered", scopeMagnification),
             String(format: "Settings: look x%.2f / %@ / HUD %.0f%%", lookSensitivityScale, invertLookY ? "invert Y" : "standard Y", hudOpacity * 100),
@@ -2777,8 +3474,18 @@ final class GameSession: ObservableObject {
             String(format: "Mouse Delta: %.1f %.1f", lastMouseDelta.width, lastMouseDelta.height),
             String(format: "Uptime: %.2fs", snapshot?.elapsedSeconds ?? 0),
         ]
-        metricLines.insert(contentsOf: lineOfSightDebugLines(limit: 3), at: 7)
-        metricLines.insert(observerFeedbackLine(), at: 7)
+        metricLines.insert(
+            contentsOf: [
+                observerFeedbackLine(),
+                worldMovementAudioLine(),
+                alternateRouteActivationLine,
+                patrolPairFoundationLine(),
+                losDebugOverlayLine(),
+                scanStateOverlayLine(),
+                scanHaltResumeLine()
+            ] + lineOfSightDebugLines(limit: 3),
+            at: 7
+        )
 
         publishOverlayLines(
             headerLines + sceneDetails + briefingDetails + routeDetails + evasionDetails + streamingDetails + metricLines
@@ -2893,6 +3600,73 @@ final class GameSession: ObservableObject {
         )
     }
 
+    private var storedReviewManualRestoreChoiceLine: String? {
+        storedReviewSessionState?.manualRestoreChoiceLine(
+            currentSceneLabel: sceneLabel,
+            currentRouteSummary: routeSummary
+        )
+    }
+
+    private var manualRestoreChoiceTargetLabel: String? {
+        storedReviewSessionState?.restoreChoiceTargetLabel(
+            currentSceneLabel: sceneLabel,
+            currentRouteSummary: routeSummary
+        )
+    }
+
+    private var storedReviewManualRestoreSelectionLine: String? {
+        storedReviewSessionState?.manualRestoreSelectionLine(
+            currentSceneLabel: sceneLabel,
+            currentRouteSummary: routeSummary,
+            reviewedTargetLabel: reviewedManualRestoreTargetLabel
+        )
+    }
+
+    private var storedReviewRestoreFreshStartGuardLine: String? {
+        storedReviewSessionState?.restoreFreshStartGuardLine(
+            currentSceneLabel: sceneLabel,
+            currentRouteSummary: routeSummary,
+            reviewedTargetLabel: reviewedManualRestoreTargetLabel,
+            freshStartTargetLabel: freshStartConfirmedRestoreTargetLabel
+        )
+    }
+
+    private var restoreReviewScopeLine: String {
+        guard storedReviewSessionState != nil else {
+            return "Restore Review Scope: runtime-only / no persisted review card"
+        }
+
+        guard let targetLabel = manualRestoreChoiceTargetLabel else {
+            return "Restore Review Scope: runtime-only / no restorable target"
+        }
+
+        if reviewedManualRestoreTargetLabel == targetLabel || freshStartConfirmedRestoreTargetLabel == targetLabel {
+            return "Restore Review Scope: runtime-only review of \(targetLabel) / not persisted"
+        }
+
+        return "Restore Review Scope: persisted target \(targetLabel) / review not stored"
+    }
+
+    private var restoreReviewExecutionIntentLine: String {
+        guard storedReviewSessionState != nil else {
+            return "Restore Review Intent: none / no persisted review card"
+        }
+
+        guard let targetLabel = manualRestoreChoiceTargetLabel else {
+            return "Restore Review Intent: none / no restorable target"
+        }
+
+        if freshStartConfirmedRestoreTargetLabel == targetLabel {
+            return "Restore Review Intent: fresh start confirmed for \(targetLabel) / no restore token"
+        }
+
+        if reviewedManualRestoreTargetLabel == targetLabel {
+            return "Restore Review Intent: reviewed \(targetLabel) / not an execution token"
+        }
+
+        return "Restore Review Intent: unreviewed \(targetLabel) / execution gate closed"
+    }
+
     private var storedReviewRestoreExecutionGateLine: String? {
         storedReviewSessionState?.restoreExecutionGateLine(
             currentSceneLabel: sceneLabel,
@@ -2917,6 +3691,33 @@ final class GameSession: ObservableObject {
 
     private var storedReviewRestoreCleanupPreviewLine: String? {
         storedReviewSessionState?.restoreCleanupPreviewLine(maxAgeSeconds: Self.reviewSessionStateFreshnessWindowSeconds)
+    }
+
+    private static func applyRestoreCleanup(to state: inout StoredReviewSessionState?) -> String {
+        guard let storedState = state else {
+            return "Restore Cleanup: no persisted review card"
+        }
+
+        let line = storedState.restoreCleanupExecutionLine(maxAgeSeconds: reviewSessionStateFreshnessWindowSeconds)
+        if storedState.shouldClearForRestoreCleanup(maxAgeSeconds: reviewSessionStateFreshnessWindowSeconds) {
+            UserDefaults.standard.removeObject(forKey: reviewSessionStateDefaultsKey)
+            state = nil
+        }
+
+        return line
+    }
+
+    private func clearManualRestoreReviewState(reason: String, fallback: String) {
+        guard reviewedManualRestoreTargetLabel != nil || freshStartConfirmedRestoreTargetLabel != nil else {
+            restoreBoundaryResetLine = fallback
+            return
+        }
+
+        let targetLabel = freshStartConfirmedRestoreTargetLabel ?? reviewedManualRestoreTargetLabel ?? "restore target"
+        reviewedManualRestoreTargetLabel = nil
+        freshStartConfirmedRestoreTargetLabel = nil
+        restoreBoundaryResetLine = "Restore Boundary Reset: cleared \(targetLabel) at \(reason) / restore remains disabled"
+        restoreReviewExpiryLine = "Restore Review Expiry: cleared \(targetLabel) at \(reason)"
     }
 
     private func persistReviewSessionState(from snapshot: GameFrameSnapshot) {
@@ -2955,10 +3756,46 @@ final class GameSession: ObservableObject {
             return
         }
 
+        refreshManualRestoreReviewExpiry(for: state)
         storedReviewSessionState = state
+        restoreCleanupExecutionLine = state.restoreCleanupExecutionLine(
+            maxAgeSeconds: Self.reviewSessionStateFreshnessWindowSeconds
+        )
         if let data = try? JSONEncoder().encode(state) {
             UserDefaults.standard.set(data, forKey: Self.reviewSessionStateDefaultsKey)
         }
+    }
+
+    private func refreshManualRestoreReviewExpiry(for state: StoredReviewSessionState) {
+        let currentTargetLabel = state.restoreChoiceTargetLabel(
+            currentSceneLabel: sceneLabel,
+            currentRouteSummary: routeSummary
+        )
+        guard reviewedManualRestoreTargetLabel != nil || freshStartConfirmedRestoreTargetLabel != nil else {
+            if let currentTargetLabel {
+                restoreReviewExpiryLine = "Restore Review Expiry: ready for \(currentTargetLabel) review"
+            } else {
+                restoreReviewExpiryLine = "Restore Review Expiry: inactive / no restorable target"
+            }
+            return
+        }
+
+        let trackedTargetLabel = freshStartConfirmedRestoreTargetLabel ?? reviewedManualRestoreTargetLabel ?? "restore target"
+        guard let currentTargetLabel else {
+            reviewedManualRestoreTargetLabel = nil
+            freshStartConfirmedRestoreTargetLabel = nil
+            restoreReviewExpiryLine = "Restore Review Expiry: cleared \(trackedTargetLabel) / target no longer restorable"
+            return
+        }
+
+        guard trackedTargetLabel == currentTargetLabel else {
+            reviewedManualRestoreTargetLabel = nil
+            freshStartConfirmedRestoreTargetLabel = nil
+            restoreReviewExpiryLine = "Restore Review Expiry: cleared \(trackedTargetLabel) / current target is \(currentTargetLabel)"
+            return
+        }
+
+        restoreReviewExpiryLine = "Restore Review Expiry: tracking \(currentTargetLabel) / target still current"
     }
 
     private func nextCheckpointLabel(completed: Int, total: Int) -> String? {

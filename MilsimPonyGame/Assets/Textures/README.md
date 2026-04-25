@@ -9,6 +9,20 @@ This directory stores both the sourced Canberra photographs in `Origin/` and the
 - Remaining texture risk for cycle `21` is no longer missing material slots; it is the quality gap between shared materials and future district-specific facade sources while live contact lanes are active.
 - The material-plumbing slice now adds authored `albedo + normal + roughness + AO` sets for Canberra civic facades and arterial asphalt, plus derived normal/roughness/AO companions for the shared Canberra concrete material.
 
+## Cycle 87 Black Mountain Closeout
+
+- `black_mountain_belconnen_sector.json` now explicitly assigns source-backed materials to Black Mountain dry-grass slopes, Telstra Tower concrete, and Bruce/UC facade masses.
+- `black_mountain_scope_perch_sector.json` mirrors the closeout at the playable perch with dry-grass terrain, AIS facade, and Telstra footing material overrides.
+- The cycle uses the existing Canberra texture library rather than adding unsourced new bitmap files: dry grass from the Lake Burley Griffin source, concrete from the Parliament House source, and facade breakup from the authored Canberra facade set.
+- Smoke coverage expects the route/map footer to report `Black Mountain Materials:` and the Black Mountain comparison stop to frame Telstra concrete, Black Mountain slopes, and Bruce/AIS facade breakup together.
+
+## Cycle 88 West Basin Closeout
+
+- `west_basin_yarralumla_sector.json` now explicitly assigns source-backed materials to West Basin promenade terrain, Yarralumla vegetation slopes, Commonwealth Avenue west, shoreline-adjacent facade masses, and arboretum vegetation framing.
+- `central_lake_basin_sector.json` now gives the West Basin water plate and western lake-edge promenade explicit water and concrete material overrides.
+- The closeout keeps the existing texture provenance: dry grass and water from the Lake Burley Griffin source, concrete from the Parliament House source, arterial asphalt from the authored Canberra road set, and facade breakup from the authored Canberra facade set.
+- Smoke coverage expects the route/map footer to report `West Basin Materials:` and the West Basin comparison stop to frame water motion, promenade hardscape, and vegetation response together.
+
 ## Source Photographs
 
 | Local file | Upstream page | Author | License | Notes |

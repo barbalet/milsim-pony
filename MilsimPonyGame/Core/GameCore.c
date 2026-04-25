@@ -37,6 +37,8 @@
 #define GAME_CORE_DEFAULT_OBSERVER_ALERTED_FOV_DEGREES 74.0f
 #define GAME_CORE_DEFAULT_OBSERVER_TURN_RATE_DEGREES_PER_SECOND 78.0f
 #define GAME_CORE_DEFAULT_OBSERVER_GROUP_RELAY_RANGE_METERS 28.0f
+#define GAME_CORE_DEFAULT_OBSERVER_SCAN_ARC_DEGREES 28.0f
+#define GAME_CORE_DEFAULT_OBSERVER_SCAN_CYCLE_SECONDS 5.2f
 #define GAME_CORE_OBSERVER_TARGET_HORIZONTAL_RADIUS 0.55f
 #define GAME_CORE_OBSERVER_TARGET_LOWER_OFFSET 1.30f
 #define GAME_CORE_OBSERVER_TARGET_UPPER_OFFSET 0.40f
@@ -142,6 +144,7 @@ typedef struct GameCoreState {
     float observerAlertTargetY[GAME_CORE_MAX_THREAT_OBSERVERS];
     float observerAlertTargetZ[GAME_CORE_MAX_THREAT_OBSERVERS];
     int observerAlertSourceIndex[GAME_CORE_MAX_THREAT_OBSERVERS];
+    float observerScanPhaseSeconds[GAME_CORE_MAX_THREAT_OBSERVERS];
     int threatObserverCount;
     float authoredSuspicionDecayPerSecond;
     float authoredFailThreshold;
@@ -292,6 +295,36 @@ static void GameCoreResetObserverAlertState(int index) {
     gameState.observerAlertSourceIndex[index] = -1;
 }
 
+static bool GameCoreObserverHasScanBehavior(const GameThreatObserver *observer) {
+    if (observer == NULL) {
+        return false;
+    }
+
+    return observer->groupIndex > 0 || observer->scanArcDegrees > 0.0f;
+}
+
+static float GameCoreObserverScanArcDegrees(const GameThreatObserver *observer) {
+    if (!GameCoreObserverHasScanBehavior(observer)) {
+        return 0.0f;
+    }
+
+    const float authoredArc = observer->scanArcDegrees > 0.0f
+        ? observer->scanArcDegrees
+        : GAME_CORE_DEFAULT_OBSERVER_SCAN_ARC_DEGREES;
+    return GameCoreClamp(authoredArc, 0.0f, 90.0f);
+}
+
+static float GameCoreObserverScanCycleSeconds(const GameThreatObserver *observer) {
+    if (!GameCoreObserverHasScanBehavior(observer)) {
+        return 0.0f;
+    }
+
+    const float authoredCycle = observer->scanCycleSeconds > 0.0f
+        ? observer->scanCycleSeconds
+        : GAME_CORE_DEFAULT_OBSERVER_SCAN_CYCLE_SECONDS;
+    return GameCoreClamp(authoredCycle, 1.2f, 20.0f);
+}
+
 static void GameCorePrimeObserverAlert(
     int observerIndex,
     int sourceIndex,
@@ -338,6 +371,8 @@ static void GameCoreUpdateObserverFacing(int observerIndex, float deltaTime) {
     float targetYawDegrees = authoredObserver->yawDegrees;
     float targetPitchDegrees = authoredObserver->pitchDegrees;
     const bool alerted = gameState.observerAlertSecondsRemaining[observerIndex] > 0.001f;
+    const float scanArcDegrees = GameCoreObserverScanArcDegrees(observer);
+    const float scanCycleSeconds = GameCoreObserverScanCycleSeconds(observer);
 
     if (alerted) {
         const float deltaX = gameState.observerAlertTargetX[observerIndex] - observer->positionX;
@@ -349,6 +384,21 @@ static void GameCoreUpdateObserverFacing(int observerIndex, float deltaTime) {
             targetYawDegrees = atan2f(deltaX, -deltaZ) * 180.0f / (float)M_PI;
             targetPitchDegrees = atan2f(deltaY, fmaxf(horizontalDistance, 0.001f)) * 180.0f / (float)M_PI;
         }
+    } else if (scanArcDegrees > 0.0f && scanCycleSeconds > 0.0f) {
+        if (deltaTime > 0.0f) {
+            gameState.observerScanPhaseSeconds[observerIndex] = fmodf(
+                gameState.observerScanPhaseSeconds[observerIndex] + deltaTime,
+                scanCycleSeconds
+            );
+            if (gameState.observerScanPhaseSeconds[observerIndex] < 0.0f) {
+                gameState.observerScanPhaseSeconds[observerIndex] += scanCycleSeconds;
+            }
+        }
+
+        const float normalizedPhase = gameState.observerScanPhaseSeconds[observerIndex] / scanCycleSeconds;
+        const float sweepOffset = sinf(normalizedPhase * 2.0f * (float)M_PI) * scanArcDegrees;
+        targetYawDegrees = authoredObserver->yawDegrees + sweepOffset;
+        targetPitchDegrees = authoredObserver->pitchDegrees;
     }
 
     const float turnRateDegreesPerSecond = observer->turnRateDegreesPerSecond > 0.0f
@@ -804,6 +854,11 @@ static void GameCoreResetDetectionState(bool clearFailCount) {
     for (int index = 0; index < gameState.threatObserverCount; index++) {
         gameState.threatObservers[index].yawDegrees = gameState.authoredThreatObservers[index].yawDegrees;
         gameState.threatObservers[index].pitchDegrees = gameState.authoredThreatObservers[index].pitchDegrees;
+        const float scanCycleSeconds = GameCoreObserverScanCycleSeconds(&gameState.threatObservers[index]);
+        gameState.observerScanPhaseSeconds[index] = fmodf(
+            (float)index * 1.7f,
+            scanCycleSeconds > 0.0f ? scanCycleSeconds : GAME_CORE_DEFAULT_OBSERVER_SCAN_CYCLE_SECONDS
+        );
         GameCoreResetObserverAlertState(index);
     }
 
@@ -1132,6 +1187,8 @@ static void GameCoreUpdateDetection(double deltaTime) {
             )
             : observer->fieldOfViewDegrees;
         const float coneThreshold = cosf(GameCoreDegreesToRadians(effectiveFieldOfViewDegrees * 0.5f));
+        const float scanArcDegrees = GameCoreObserverScanArcDegrees(observer);
+        const float scanCycleSeconds = GameCoreObserverScanCycleSeconds(observer);
 
         if (alerted && !gameState.observerNeutralized[index]) {
             gameState.alertedObserverCount += 1;
@@ -1146,11 +1203,15 @@ static void GameCoreUpdateDetection(double deltaTime) {
             .coneThreshold = coneThreshold,
             .suspicionPerSecond = observer->suspicionPerSecond,
             .alertSecondsRemaining = gameState.observerAlertSecondsRemaining[index],
+            .scanArcDegrees = scanArcDegrees,
+            .scanCycleSeconds = scanCycleSeconds,
+            .scanPhaseSeconds = gameState.observerScanPhaseSeconds[index],
             .neutralized = gameState.observerNeutralized[index],
             .alerted = alerted,
             .supportingGroup = alerted
                 && gameState.observerAlertSourceIndex[index] >= 0
                 && gameState.observerAlertSourceIndex[index] != index,
+            .scanHalted = alerted && scanArcDegrees > 0.0f,
         };
     }
 

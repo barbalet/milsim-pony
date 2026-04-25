@@ -178,8 +178,9 @@ final class GameRenderer: NSObject, MTKViewDelegate {
 
         super.init()
 
-        session.setFreshRunHandler { [weak self] in
-            self?.prepareFreshRun()
+        session.setFreshRunHandler { [weak self, weak session] in
+            let activateSelectedAlternate = session?.consumeAlternateRouteActivationRequest() ?? false
+            self?.prepareFreshRun(activateSelectedAlternate: activateSelectedAlternate)
         }
 
         scene.configureGameCore()
@@ -736,10 +737,15 @@ final class GameRenderer: NSObject, MTKViewDelegate {
         return materialTextures[SceneMaterialTextureKey(reference: reference, semantic: semantic)]
     }
 
-    private func prepareFreshRun() {
-        scene.prepareFreshRun()
+    private func prepareFreshRun(activateSelectedAlternate: Bool = false) {
+        scene.prepareFreshRun(activateSelectedAlternate: activateSelectedAlternate)
+        configureRouteFromScene()
         configureSpawnFromScene()
         publishSceneMetadata()
+    }
+
+    private func configureRouteFromScene() {
+        scene.configureGameCore()
     }
 
     private func configureSpawnFromScene() {

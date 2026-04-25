@@ -176,6 +176,13 @@
       "halfExtents": [54.0, 0.34, 22.0],
       "color": [0.24, 0.47, 0.70, 0.99],
       "yawDegrees": 8.0,
+      "material": {
+        "albedoTexture": "Textures/Final/canberra_lake_water_texture.png",
+        "baseColor": [0.88, 0.98, 1.10, 1.0],
+        "roughness": 0.14,
+        "ambientOcclusionStrength": 0.30,
+        "normalScale": 0.72
+      },
       "collisionEnabled": false
     },
     {
@@ -288,6 +295,15 @@
       "halfExtents": [18.0, 0.25, 4.0],
       "color": [0.49, 0.52, 0.55, 1.0],
       "yawDegrees": 0.0,
+      "material": {
+        "albedoTexture": "Textures/Final/canberra_concrete_texture.png",
+        "normalTexture": "Textures/Final/canberra_concrete_normal.png",
+        "roughnessTexture": "Textures/Final/canberra_concrete_roughness.png",
+        "ambientOcclusionTexture": "Textures/Final/canberra_concrete_ao.png",
+        "baseColor": [1.02, 1.01, 0.96, 1.0],
+        "roughness": 0.82,
+        "normalScale": 0.94
+      },
       "collisionEnabled": false,
       "contributesToGround": true
     },
