@@ -27,7 +27,7 @@ enum DemoFlowState: String {
     }
 }
 
-enum GameMenuPanel {
+enum GameMenuPanel: Equatable {
     case title
     case paused
     case failed
@@ -138,6 +138,277 @@ private struct StoredSessionSettings {
     let invertLookY: Bool
     let lookSensitivityScale: Double
     let difficultyPreset: RehearsalDifficultyPreset
+}
+
+private struct StoredReviewSessionState: Codable, Equatable {
+    let schemaVersion: Int
+    let sceneLabel: String
+    let routeSummary: String
+    let completedCheckpointCount: Int
+    let totalCheckpointCount: Int
+    let nextCheckpointLabel: String?
+    let currentSectorName: String
+    let difficultyPreset: String
+    let flowState: String
+    let mapPresented: Bool
+    let scopeActive: Bool
+    let routeComplete: Bool
+    let routeFailed: Bool
+    let reviewPackageLine: String
+    let savedAt: TimeInterval
+
+    init(
+        schemaVersion: Int,
+        sceneLabel: String,
+        routeSummary: String,
+        completedCheckpointCount: Int,
+        totalCheckpointCount: Int,
+        nextCheckpointLabel: String?,
+        currentSectorName: String,
+        difficultyPreset: String,
+        flowState: String,
+        mapPresented: Bool,
+        scopeActive: Bool,
+        routeComplete: Bool,
+        routeFailed: Bool,
+        reviewPackageLine: String,
+        savedAt: TimeInterval
+    ) {
+        self.schemaVersion = schemaVersion
+        self.sceneLabel = sceneLabel
+        self.routeSummary = routeSummary
+        self.completedCheckpointCount = completedCheckpointCount
+        self.totalCheckpointCount = totalCheckpointCount
+        self.nextCheckpointLabel = nextCheckpointLabel
+        self.currentSectorName = currentSectorName
+        self.difficultyPreset = difficultyPreset
+        self.flowState = flowState
+        self.mapPresented = mapPresented
+        self.scopeActive = scopeActive
+        self.routeComplete = routeComplete
+        self.routeFailed = routeFailed
+        self.reviewPackageLine = reviewPackageLine
+        self.savedAt = savedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        schemaVersion = try container.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 1
+        sceneLabel = try container.decodeIfPresent(String.self, forKey: .sceneLabel) ?? "Unknown scene"
+        routeSummary = try container.decodeIfPresent(String.self, forKey: .routeSummary) ?? "Route: unavailable"
+        completedCheckpointCount = try container.decodeIfPresent(Int.self, forKey: .completedCheckpointCount) ?? 0
+        totalCheckpointCount = try container.decodeIfPresent(Int.self, forKey: .totalCheckpointCount) ?? 0
+        nextCheckpointLabel = try container.decodeIfPresent(String.self, forKey: .nextCheckpointLabel)
+        currentSectorName = try container.decodeIfPresent(String.self, forKey: .currentSectorName) ?? "Unknown sector"
+        difficultyPreset = try container.decodeIfPresent(String.self, forKey: .difficultyPreset) ?? "Baseline"
+        flowState = try container.decodeIfPresent(String.self, forKey: .flowState) ?? "briefing"
+        mapPresented = try container.decodeIfPresent(Bool.self, forKey: .mapPresented) ?? false
+        scopeActive = try container.decodeIfPresent(Bool.self, forKey: .scopeActive) ?? false
+        routeComplete = try container.decodeIfPresent(Bool.self, forKey: .routeComplete) ?? false
+        routeFailed = try container.decodeIfPresent(Bool.self, forKey: .routeFailed) ?? false
+        reviewPackageLine = try container.decodeIfPresent(String.self, forKey: .reviewPackageLine) ?? "review pack unavailable"
+        savedAt = try container.decodeIfPresent(TimeInterval.self, forKey: .savedAt) ?? 0
+    }
+
+    var shellLine: String {
+        let routeState = routeComplete ? "complete" : (routeFailed ? "compromised" : flowState)
+        return "Last Session: \(completedCheckpointCount)/\(totalCheckpointCount) checkpoints / \(difficultyPreset) / \(currentSectorName) / \(routeState)"
+    }
+
+    var captureLine: String {
+        let nextLabel = nextCheckpointLabel ?? "route complete"
+        let mapState = mapPresented ? "map open" : "map hidden"
+        let scopeState = scopeActive ? "scope raised" : "scope ready"
+        return "Review Resume: next \(nextLabel) / \(reviewPackageLine) / \(mapState) / \(scopeState)"
+    }
+
+    var guardrailLine: String {
+        if totalCheckpointCount <= 0 {
+            return "Review Guardrail: stored route has no checkpoint count / fresh run required"
+        }
+        if completedCheckpointCount < 0 || completedCheckpointCount > totalCheckpointCount {
+            return "Review Guardrail: stored checkpoint progress is out of range / fresh run required"
+        }
+        if !routeComplete && completedCheckpointCount < totalCheckpointCount && nextCheckpointLabel == nil {
+            return "Review Guardrail: next checkpoint missing from stored review card / fresh run required"
+        }
+
+        return "Review Guardrail: stored review card valid / launch starts fresh until checkpoint restore exists"
+    }
+
+    var restorePreviewLine: String {
+        if totalCheckpointCount <= 0
+            || completedCheckpointCount < 0
+            || completedCheckpointCount > totalCheckpointCount {
+            return "Restore Preview: blocked by invalid stored checkpoint progress"
+        }
+        if routeComplete || completedCheckpointCount >= totalCheckpointCount {
+            return "Restore Preview: route already complete / fresh briefing remains default"
+        }
+        guard let nextCheckpointLabel else {
+            return "Restore Preview: blocked until next checkpoint context is captured"
+        }
+
+        return "Restore Preview: future resume target \(nextCheckpointLabel) / launch still starts fresh"
+    }
+
+    func restoreReadinessLine(currentSceneLabel: String, currentRouteSummary: String) -> String {
+        if schemaVersion != 1 {
+            return "Restore Readiness: blocked by stored schema v\(schemaVersion)"
+        }
+        if sceneLabel != currentSceneLabel {
+            return "Restore Readiness: blocked by scene mismatch / stored \(sceneLabel)"
+        }
+        if routeSummary != currentRouteSummary {
+            return "Restore Readiness: blocked by route summary mismatch"
+        }
+        if totalCheckpointCount <= 0
+            || completedCheckpointCount < 0
+            || completedCheckpointCount > totalCheckpointCount {
+            return "Restore Readiness: blocked by invalid checkpoint progress"
+        }
+        if routeComplete || completedCheckpointCount >= totalCheckpointCount {
+            return "Restore Readiness: complete run archived / fresh briefing remains default"
+        }
+        guard nextCheckpointLabel != nil else {
+            return "Restore Readiness: blocked until next checkpoint target is captured"
+        }
+
+        return "Restore Readiness: eligible for future manual restore / launch still starts fresh"
+    }
+
+    func manualRestoreArmingLine(currentSceneLabel: String, currentRouteSummary: String) -> String {
+        if schemaVersion != 1 {
+            return "Manual Restore Arm: disabled / stored schema v\(schemaVersion) is unsupported"
+        }
+        if sceneLabel != currentSceneLabel {
+            return "Manual Restore Arm: disabled / stored scene differs from current scene"
+        }
+        if routeSummary != currentRouteSummary {
+            return "Manual Restore Arm: disabled / stored route differs from current route"
+        }
+        if totalCheckpointCount <= 0
+            || completedCheckpointCount < 0
+            || completedCheckpointCount > totalCheckpointCount {
+            return "Manual Restore Arm: disabled / checkpoint progress failed validation"
+        }
+        if routeComplete || completedCheckpointCount >= totalCheckpointCount {
+            return "Manual Restore Arm: disabled / stored run already complete"
+        }
+        guard let nextCheckpointLabel else {
+            return "Manual Restore Arm: disabled / checkpoint target missing"
+        }
+
+        return "Manual Restore Arm: armed for future prompt at \(nextCheckpointLabel) / no auto-restore"
+    }
+
+    func manualRestorePromptLine(currentSceneLabel: String, currentRouteSummary: String) -> String {
+        if schemaVersion != 1
+            || sceneLabel != currentSceneLabel
+            || routeSummary != currentRouteSummary {
+            return "Manual Restore Prompt: hidden until stored run matches this scene and route"
+        }
+        if totalCheckpointCount <= 0
+            || completedCheckpointCount < 0
+            || completedCheckpointCount > totalCheckpointCount {
+            return "Manual Restore Prompt: hidden until checkpoint progress validates"
+        }
+        if routeComplete || completedCheckpointCount >= totalCheckpointCount {
+            return "Manual Restore Prompt: hidden for completed stored run"
+        }
+        guard let nextCheckpointLabel else {
+            return "Manual Restore Prompt: hidden until a checkpoint target is captured"
+        }
+
+        return "Manual Restore Prompt: future choice Restore \(nextCheckpointLabel) or Start Fresh / start fresh locked"
+    }
+
+    func restoreExecutionGateLine(currentSceneLabel: String, currentRouteSummary: String) -> String {
+        if schemaVersion != 1
+            || sceneLabel != currentSceneLabel
+            || routeSummary != currentRouteSummary {
+            return "Restore Execution Gate: closed / stored run identity not current"
+        }
+        if totalCheckpointCount <= 0
+            || completedCheckpointCount < 0
+            || completedCheckpointCount > totalCheckpointCount {
+            return "Restore Execution Gate: closed / checkpoint progress invalid"
+        }
+        if routeComplete || completedCheckpointCount >= totalCheckpointCount {
+            return "Restore Execution Gate: closed / stored run already complete"
+        }
+        guard nextCheckpointLabel != nil else {
+            return "Restore Execution Gate: closed / checkpoint target missing"
+        }
+
+        return "Restore Execution Gate: closed / restore action not bound in this build"
+    }
+
+    func restoreAuditLine(currentSceneLabel: String, currentRouteSummary: String) -> String {
+        let targetLabel = nextCheckpointLabel ?? "none"
+        let ageSeconds = max(Int(Date().timeIntervalSince1970 - savedAt), 0)
+        let identityState = sceneLabel == currentSceneLabel && routeSummary == currentRouteSummary
+            ? "identity current"
+            : "identity mismatch"
+
+        return "Restore Audit: v\(schemaVersion) / \(completedCheckpointCount)-\(totalCheckpointCount) / target \(targetLabel) / \(identityState) / saved \(ageSeconds)s ago"
+    }
+
+    func restoreFreshnessLine(maxAgeSeconds: Int) -> String {
+        guard savedAt > 0 else {
+            return "Restore Freshness: stale / missing saved timestamp"
+        }
+
+        let ageSeconds = max(Int(Date().timeIntervalSince1970 - savedAt), 0)
+        if ageSeconds > maxAgeSeconds {
+            return "Restore Freshness: stale / saved \(ageSeconds)s ago exceeds \(maxAgeSeconds)s review window"
+        }
+
+        return "Restore Freshness: current / saved \(ageSeconds)s ago within \(maxAgeSeconds)s review window"
+    }
+
+    func restoreRetentionLine(maxAgeSeconds: Int) -> String {
+        guard savedAt > 0 else {
+            return "Restore Retention: future discard candidate / missing saved timestamp"
+        }
+
+        let ageSeconds = max(Int(Date().timeIntervalSince1970 - savedAt), 0)
+        if ageSeconds > maxAgeSeconds {
+            return "Restore Retention: future discard candidate / stale persisted review card"
+        }
+
+        return "Restore Retention: keep for future prompt review / no discard in this build"
+    }
+
+    func restoreCleanupPreviewLine(maxAgeSeconds: Int) -> String {
+        guard savedAt > 0 else {
+            return "Restore Cleanup Preview: would clear stale card later / no deletion in this build"
+        }
+
+        let ageSeconds = max(Int(Date().timeIntervalSince1970 - savedAt), 0)
+        if ageSeconds > maxAgeSeconds {
+            return "Restore Cleanup Preview: would clear stale card later / no deletion in this build"
+        }
+
+        return "Restore Cleanup Preview: no cleanup needed / review card retained"
+    }
+
+    static func == (lhs: StoredReviewSessionState, rhs: StoredReviewSessionState) -> Bool {
+        lhs.schemaVersion == rhs.schemaVersion
+            && lhs.sceneLabel == rhs.sceneLabel
+            && lhs.routeSummary == rhs.routeSummary
+            && lhs.completedCheckpointCount == rhs.completedCheckpointCount
+            && lhs.totalCheckpointCount == rhs.totalCheckpointCount
+            && lhs.nextCheckpointLabel == rhs.nextCheckpointLabel
+            && lhs.currentSectorName == rhs.currentSectorName
+            && lhs.difficultyPreset == rhs.difficultyPreset
+            && lhs.flowState == rhs.flowState
+            && lhs.mapPresented == rhs.mapPresented
+            && lhs.scopeActive == rhs.scopeActive
+            && lhs.routeComplete == rhs.routeComplete
+            && lhs.routeFailed == rhs.routeFailed
+            && lhs.reviewPackageLine == rhs.reviewPackageLine
+    }
 }
 
 private final class ShotFeedbackAudioEngine {
@@ -533,6 +804,7 @@ final class GameSession: ObservableObject {
     private var freshRunHandler: (() -> Void)?
     private var pendingOverlayLines: [String]?
     private var isOverlayPublishScheduled = false
+    private var storedReviewSessionState: StoredReviewSessionState?
 
     init(configuration: LaunchConfiguration) {
         let storedSettings = Self.loadStoredSettings()
@@ -541,6 +813,7 @@ final class GameSession: ObservableObject {
         self.invertLookY = storedSettings.invertLookY
         self.lookSensitivityScale = storedSettings.lookSensitivityScale
         self.difficultyPreset = storedSettings.difficultyPreset
+        self.storedReviewSessionState = Self.loadStoredReviewSessionState()
 
         configuration.bootMode.withCString { bootMode in
             GameCoreBootstrap(bootMode)
@@ -583,7 +856,7 @@ final class GameSession: ObservableObject {
     }
 
     var shouldAdvanceSimulation: Bool {
-        sceneReady && menuPanel == nil
+        allowsLiveGameplayInput
     }
 
     var hudCardOpacity: Double {
@@ -612,6 +885,18 @@ final class GameSession: ObservableObject {
 
     var canShowMap: Bool {
         mapConfiguration != nil
+    }
+
+    private var allowsSceneTuningInput: Bool {
+        allowsLiveGameplayInput
+    }
+
+    private var allowsLiveGameplayInput: Bool {
+        guard sceneReady else {
+            return false
+        }
+
+        return demoFlowState == .playing && menuPanel == nil
     }
 
     var difficultySummaryText: String {
@@ -1438,12 +1723,18 @@ final class GameSession: ObservableObject {
                 print("[Input] \(command.label) pressed")
                 rebuildOverlay()
                 return
+            case _ where command.isContinuous && menuPanel == .title:
+                startDemo()
             default:
                 break
             }
         }
 
-        guard menuPanel == nil else {
+        guard allowsLiveGameplayInput else {
+            if !isPressed, command.isContinuous, pressedCommands.remove(command) != nil {
+                synchronizeMovementIntent()
+                rebuildOverlay()
+            }
             return
         }
 
@@ -1481,7 +1772,7 @@ final class GameSession: ObservableObject {
     }
 
     func handleMouseDelta(x: CGFloat, y: CGFloat) {
-        guard menuPanel == nil else {
+        guard allowsSceneTuningInput else {
             return
         }
 
@@ -1502,7 +1793,7 @@ final class GameSession: ObservableObject {
     }
 
     func refreshContinuousInputForSimulation() {
-        guard menuPanel == nil else {
+        guard allowsSceneTuningInput else {
             return
         }
 
@@ -1539,6 +1830,7 @@ final class GameSession: ObservableObject {
         applyThreatAudioFeedback(for: snapshot)
         viewportSize = drawableSize
         refreshOverheadMapSnapshot()
+        persistReviewSessionState(from: snapshot)
         rebuildOverlay()
     }
 
@@ -1596,6 +1888,7 @@ final class GameSession: ObservableObject {
         }
 
         refreshOverheadMapSnapshot()
+        persistReviewSessionState(from: snapshot)
         rebuildOverlay()
     }
 
@@ -1905,6 +2198,42 @@ final class GameSession: ObservableObject {
                 || detail.hasPrefix("Reference:")
         }
         lines.append(contentsOf: planningLines.prefix(3))
+        if let storedReviewSessionLine {
+            lines.append(storedReviewSessionLine)
+        }
+        if let storedReviewResumeLine {
+            lines.append(storedReviewResumeLine)
+        }
+        if let storedReviewGuardrailLine {
+            lines.append(storedReviewGuardrailLine)
+        }
+        if let storedReviewRestorePreviewLine {
+            lines.append(storedReviewRestorePreviewLine)
+        }
+        if let storedReviewRestoreReadinessLine {
+            lines.append(storedReviewRestoreReadinessLine)
+        }
+        if let storedReviewManualRestoreArmingLine {
+            lines.append(storedReviewManualRestoreArmingLine)
+        }
+        if let storedReviewManualRestorePromptLine {
+            lines.append(storedReviewManualRestorePromptLine)
+        }
+        if let storedReviewRestoreExecutionGateLine {
+            lines.append(storedReviewRestoreExecutionGateLine)
+        }
+        if let storedReviewRestoreAuditLine {
+            lines.append(storedReviewRestoreAuditLine)
+        }
+        if let storedReviewRestoreFreshnessLine {
+            lines.append(storedReviewRestoreFreshnessLine)
+        }
+        if let storedReviewRestoreRetentionLine {
+            lines.append(storedReviewRestoreRetentionLine)
+        }
+        if let storedReviewRestoreCleanupPreviewLine {
+            lines.append(storedReviewRestoreCleanupPreviewLine)
+        }
         let reviewLines = sceneDetails.filter { detail in
             detail.hasPrefix("Review Pack:")
                 || detail.hasPrefix("Reference Pack:")
@@ -1928,8 +2257,56 @@ final class GameSession: ObservableObject {
             if let validationLine = routeDetails.first(where: { $0.hasPrefix("Route Validation:") }) {
                 lines.append(validationLine)
             }
+            if let selectionLine = routeDetails.first(where: { $0.hasPrefix("Route Selection:") }) {
+                lines.append(selectionLine)
+            }
+            if let activationLine = routeDetails.first(where: { $0.hasPrefix("Route Activation:") }) {
+                lines.append(activationLine)
+            }
+            if let rollbackLine = routeDetails.first(where: { $0.hasPrefix("Route Rollback:") }) {
+                lines.append(rollbackLine)
+            }
+            if let commitLine = routeDetails.first(where: { $0.hasPrefix("Route Commit:") }) {
+                lines.append(commitLine)
+            }
+            if let dryRunLine = routeDetails.first(where: { $0.hasPrefix("Route Dry Run:") }) {
+                lines.append(dryRunLine)
+            }
+            if let promotionLine = routeDetails.first(where: { $0.hasPrefix("Route Promotion:") }) {
+                lines.append(promotionLine)
+            }
+            if let auditLine = routeDetails.first(where: { $0.hasPrefix("Route Audit:") }) {
+                lines.append(auditLine)
+            }
+            if let boundaryLine = routeDetails.first(where: { $0.hasPrefix("Route Boundary:") }) {
+                lines.append(boundaryLine)
+            }
+            if let armingLine = routeDetails.first(where: { $0.hasPrefix("Route Arming:") }) {
+                lines.append(armingLine)
+            }
+            if let confirmationLine = routeDetails.first(where: { $0.hasPrefix("Route Confirmation:") }) {
+                lines.append(confirmationLine)
+            }
+            if let releaseLine = routeDetails.first(where: { $0.hasPrefix("Route Release:") }) {
+                lines.append(releaseLine)
+            }
+            if let preflightLine = routeDetails.first(where: { $0.hasPrefix("Route Preflight:") }) {
+                lines.append(preflightLine)
+            }
             if let handoffLine = routeDetails.first(where: { $0.hasPrefix("Route Handoff:") }) {
                 lines.append(handoffLine)
+            }
+            if let collisionAuthoringLine = routeDetails.first(where: { $0.hasPrefix("Collision Authoring:") }) {
+                lines.append(collisionAuthoringLine)
+            }
+            if let environmentalMotionLine = routeDetails.first(where: { $0.hasPrefix("Environmental Motion:") }) {
+                lines.append(environmentalMotionLine)
+            }
+            if let surfaceFidelityLine = routeDetails.first(where: { $0.hasPrefix("Surface Fidelity:") }) {
+                lines.append(surfaceFidelityLine)
+            }
+            if let sessionPersistenceLine = routeDetails.first(where: { $0.hasPrefix("Session Persistence:") }) {
+                lines.append(sessionPersistenceLine)
             }
             if let selectionLine = routeDetails.first(where: { $0.hasPrefix("Selection:") }) {
                 lines.append(selectionLine)
@@ -1961,11 +2338,13 @@ final class GameSession: ObservableObject {
         let coverLine = routeDetails.first(where: { $0.hasPrefix("Cover:") })
         let compareLine = routeDetails.first(where: { $0.hasPrefix("Compare:") })
         let captureLine = routeDetails.first(where: { $0.hasPrefix("Capture:") })
+        let persistenceLine = routeDetails.first(where: { $0.hasPrefix("Session Persistence:") })
         return [
             briefingSummary,
             routeSummary,
             contactLine ?? compareLine ?? routeDetails.first(where: { $0.hasPrefix("Next:") }) ?? "Next: continue through the current rehearsal markers.",
             coverLine ?? captureLine ?? sceneDetails.first(where: { $0.hasPrefix("Recovery Rule:") || $0.hasPrefix("Capture Framing:") }) ?? "Capture: keep the next district marker and atlas cues in frame.",
+            persistenceLine ?? "Session Persistence: pending / resume keeps the current live shell only.",
             evasionDetails.first ?? "Threats: preview pressure and world updates are frozen while paused.",
             String(format: "Scope: %.1fx optic %@.", scopeMagnification, isScopeActive ? "was active before the pause shell" : "can be raised again when live"),
             "Resume keeps the current rehearsal live. Restart rolls a fresh rehearsal start.",
@@ -2003,6 +2382,7 @@ final class GameSession: ObservableObject {
             ),
             sceneDetails.first(where: { $0.hasPrefix("Review Pack:") }) ?? "Review Pack: final review pack data unavailable.",
             sceneDetails.first(where: { $0.hasPrefix("Combat Rehearsal:") }) ?? "Combat Rehearsal: final rehearsal data unavailable.",
+            routeDetails.first(where: { $0.hasPrefix("Session Persistence:") }) ?? "Session Persistence: pending / completion review state not yet persisted.",
             "Outcome: the current Canberra line now reads as one contact rehearsal with live observer pressure and explicit recovery cues across the full route.",
             "Release: \(configuration.releaseDisplayName) / \(configuration.contentSourceSummary)",
             String(format: "Optic: %.1fx scoped review remained available across the full route.", scopeMagnification),
@@ -2305,7 +2685,19 @@ final class GameSession: ObservableObject {
             .map(\.label)
             .sorted()
             .joined(separator: ", ")
-        let headerLines = [
+        let storedSessionLine = storedReviewSessionLine ?? "Last Session: no persisted review state yet"
+        let storedResumeLine = storedReviewResumeLine ?? "Review Resume: no persisted capture context yet"
+        let storedGuardrailLine = storedReviewGuardrailLine ?? "Review Guardrail: no persisted review card to validate yet"
+        let storedPreviewLine = storedReviewRestorePreviewLine ?? "Restore Preview: no persisted checkpoint target yet"
+        let storedReadinessLine = storedReviewRestoreReadinessLine ?? "Restore Readiness: no persisted review card to inspect yet"
+        let storedArmingLine = storedReviewManualRestoreArmingLine ?? "Manual Restore Arm: no persisted review card to inspect yet"
+        let storedPromptLine = storedReviewManualRestorePromptLine ?? "Manual Restore Prompt: hidden until a review card is persisted"
+        let storedExecutionGateLine = storedReviewRestoreExecutionGateLine ?? "Restore Execution Gate: closed / no persisted review card"
+        let storedAuditLine = storedReviewRestoreAuditLine ?? "Restore Audit: no persisted review card"
+        let storedFreshnessLine = storedReviewRestoreFreshnessLine ?? "Restore Freshness: no persisted review card"
+        let storedRetentionLine = storedReviewRestoreRetentionLine ?? "Restore Retention: no persisted review card"
+        let storedCleanupPreviewLine = storedReviewRestoreCleanupPreviewLine ?? "Restore Cleanup Preview: no persisted review card"
+        let headerLines: [String] = [
             "Mode: \(configuration.bootMode)",
             "Demo: \(demoFlowState.label)\(isSettingsPresented ? " / settings" : "")",
             "Release: \(configuration.releaseDisplayName)",
@@ -2319,6 +2711,18 @@ final class GameSession: ObservableObject {
             "Locator: \(isMapPresented ? "Canberra map open" : "Canberra map hidden") / \(currentMapSectorName)",
             "Renderer: \(rendererName)",
             "Scene Summary: \(sceneSummary)",
+            storedSessionLine,
+            storedResumeLine,
+            storedGuardrailLine,
+            storedPreviewLine,
+            storedReadinessLine,
+            storedArmingLine,
+            storedPromptLine,
+            storedExecutionGateLine,
+            storedAuditLine,
+            storedFreshnessLine,
+            storedRetentionLine,
+            storedCleanupPreviewLine,
             String(
                 format: "Scope: %@ / %.1fx / %.1f deg / x%.1f draw",
                 isScopeActive ? "active" : "ready",
@@ -2406,8 +2810,16 @@ final class GameSession: ObservableObject {
         }
     }
 
+    private var canRecoverGameplayInputFocus: Bool {
+        menuPanel != .settings
+    }
+
+    var allowsGameplayInputFocusCapture: Bool {
+        canRecoverGameplayInputFocus
+    }
+
     private func requestInputFocusIfNeeded() {
-        guard menuPanel == nil else {
+        guard canRecoverGameplayInputFocus else {
             return
         }
 
@@ -2415,20 +2827,20 @@ final class GameSession: ObservableObject {
     }
 
     func scheduleGameplayInputFocusRecovery() {
-        guard menuPanel == nil else {
+        guard canRecoverGameplayInputFocus else {
             return
         }
 
         requestInputFocusIfNeeded()
         DispatchQueue.main.async { [weak self] in
-            guard let self, self.menuPanel == nil else {
+            guard let self, self.canRecoverGameplayInputFocus else {
                 return
             }
 
             self.requestInputFocusIfNeeded()
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { [weak self] in
-            guard let self, self.menuPanel == nil else {
+            guard let self, self.canRecoverGameplayInputFocus else {
                 return
             }
 
@@ -2442,6 +2854,124 @@ final class GameSession: ObservableObject {
         defaults.set(invertLookY, forKey: Self.invertLookYDefaultsKey)
         defaults.set(lookSensitivityScale, forKey: Self.lookSensitivityScaleDefaultsKey)
         defaults.set(difficultyPreset.rawValue, forKey: Self.difficultyPresetDefaultsKey)
+    }
+
+    private var storedReviewSessionLine: String? {
+        storedReviewSessionState?.shellLine
+    }
+
+    private var storedReviewResumeLine: String? {
+        storedReviewSessionState?.captureLine
+    }
+
+    private var storedReviewGuardrailLine: String? {
+        storedReviewSessionState?.guardrailLine
+    }
+
+    private var storedReviewRestorePreviewLine: String? {
+        storedReviewSessionState?.restorePreviewLine
+    }
+
+    private var storedReviewRestoreReadinessLine: String? {
+        storedReviewSessionState?.restoreReadinessLine(
+            currentSceneLabel: sceneLabel,
+            currentRouteSummary: routeSummary
+        )
+    }
+
+    private var storedReviewManualRestoreArmingLine: String? {
+        storedReviewSessionState?.manualRestoreArmingLine(
+            currentSceneLabel: sceneLabel,
+            currentRouteSummary: routeSummary
+        )
+    }
+
+    private var storedReviewManualRestorePromptLine: String? {
+        storedReviewSessionState?.manualRestorePromptLine(
+            currentSceneLabel: sceneLabel,
+            currentRouteSummary: routeSummary
+        )
+    }
+
+    private var storedReviewRestoreExecutionGateLine: String? {
+        storedReviewSessionState?.restoreExecutionGateLine(
+            currentSceneLabel: sceneLabel,
+            currentRouteSummary: routeSummary
+        )
+    }
+
+    private var storedReviewRestoreAuditLine: String? {
+        storedReviewSessionState?.restoreAuditLine(
+            currentSceneLabel: sceneLabel,
+            currentRouteSummary: routeSummary
+        )
+    }
+
+    private var storedReviewRestoreFreshnessLine: String? {
+        storedReviewSessionState?.restoreFreshnessLine(maxAgeSeconds: Self.reviewSessionStateFreshnessWindowSeconds)
+    }
+
+    private var storedReviewRestoreRetentionLine: String? {
+        storedReviewSessionState?.restoreRetentionLine(maxAgeSeconds: Self.reviewSessionStateFreshnessWindowSeconds)
+    }
+
+    private var storedReviewRestoreCleanupPreviewLine: String? {
+        storedReviewSessionState?.restoreCleanupPreviewLine(maxAgeSeconds: Self.reviewSessionStateFreshnessWindowSeconds)
+    }
+
+    private func persistReviewSessionState(from snapshot: GameFrameSnapshot) {
+        guard sceneReady else {
+            return
+        }
+
+        let totalCheckpointCount = max(Int(snapshot.totalCheckpointCount), 0)
+        let completedCheckpointCount = max(min(Int(snapshot.completedCheckpointCount), totalCheckpointCount), 0)
+        let nextCheckpointLabel = nextCheckpointLabel(
+            completed: completedCheckpointCount,
+            total: totalCheckpointCount
+        )
+        let reviewPackageLine = routeDetails.first(where: { $0.hasPrefix("Review Pack:") })
+            ?? sceneDetails.first(where: { $0.hasPrefix("Review Pack:") })
+            ?? "review pack unavailable"
+        let state = StoredReviewSessionState(
+            schemaVersion: 1,
+            sceneLabel: sceneLabel,
+            routeSummary: routeSummary,
+            completedCheckpointCount: completedCheckpointCount,
+            totalCheckpointCount: totalCheckpointCount,
+            nextCheckpointLabel: nextCheckpointLabel,
+            currentSectorName: currentMapSectorName,
+            difficultyPreset: difficultyPreset.displayName,
+            flowState: demoFlowState.label,
+            mapPresented: isMapPresented,
+            scopeActive: isScopeActive,
+            routeComplete: snapshot.routeComplete,
+            routeFailed: snapshot.routeFailed,
+            reviewPackageLine: reviewPackageLine,
+            savedAt: Date().timeIntervalSince1970
+        )
+
+        guard state != storedReviewSessionState else {
+            return
+        }
+
+        storedReviewSessionState = state
+        if let data = try? JSONEncoder().encode(state) {
+            UserDefaults.standard.set(data, forKey: Self.reviewSessionStateDefaultsKey)
+        }
+    }
+
+    private func nextCheckpointLabel(completed: Int, total: Int) -> String? {
+        guard let mapConfiguration else {
+            return nil
+        }
+
+        let index = max(min(completed, min(total, mapConfiguration.checkpoints.count)), 0)
+        guard index < mapConfiguration.checkpoints.count else {
+            return nil
+        }
+
+        return mapConfiguration.checkpoints[index].label
     }
 
     private func shortenedPath(_ path: String) -> String {
@@ -2507,8 +3037,20 @@ final class GameSession: ObservableObject {
         )
     }
 
+    private static func loadStoredReviewSessionState() -> StoredReviewSessionState? {
+        guard let data = UserDefaults.standard.data(forKey: reviewSessionStateDefaultsKey),
+              let state = try? JSONDecoder().decode(StoredReviewSessionState.self, from: data),
+              state.schemaVersion == 1 else {
+            return nil
+        }
+
+        return state
+    }
+
     private static let hudOpacityDefaultsKey = "milsimPony.hudOpacity"
     private static let invertLookYDefaultsKey = "milsimPony.invertLookY"
     private static let lookSensitivityScaleDefaultsKey = "milsimPony.lookSensitivityScale"
     private static let difficultyPresetDefaultsKey = "milsimPony.difficultyPreset"
+    private static let reviewSessionStateDefaultsKey = "milsimPony.reviewSessionState.v1"
+    private static let reviewSessionStateFreshnessWindowSeconds = 86_400
 }

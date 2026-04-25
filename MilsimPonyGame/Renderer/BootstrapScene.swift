@@ -82,6 +82,9 @@ struct ScenePostProcessSettings {
     let highlightTint: SIMD4<Float>
     let shadowBalance: Float
     let vignetteStrength: Float
+    let ssaoStrength: Float
+    let ssaoRadius: Float
+    let ssaoBias: Float
 }
 
 struct SceneBallisticsSettings {
@@ -397,8 +400,45 @@ struct SceneMapConfiguration {
     let routeLoaderStatus: String
     let routeValidationStatus: String
     let routeValidationRule: String
+    let routeSelectionStatus: String
+    let routeSelectionRule: String
+    let routeActivationStatus: String
+    let routeActivationRule: String
+    let routeRollbackStatus: String
+    let routeRollbackRule: String
+    let routeCommitStatus: String
+    let routeCommitRule: String
+    let routeDryRunStatus: String
+    let routeDryRunRule: String
+    let routePromotionStatus: String
+    let routePromotionRule: String
+    let routeAuditStatus: String
+    let routeAuditRule: String
+    let routeBoundaryStatus: String
+    let routeBoundaryRule: String
+    let routeArmingStatus: String
+    let routeArmingRule: String
+    let routeConfirmationStatus: String
+    let routeConfirmationRule: String
+    let routeReleaseStatus: String
+    let routeReleaseRule: String
+    let routePreflightStatus: String
+    let routePreflightRule: String
     let routeHandoffStatus: String
     let routeHandoffRule: String
+    let collisionAuthoringStatus: String
+    let collisionAuthoringRule: String
+    let collisionAuthoringAudit: String
+    let collisionAuthoringBlockerScope: String
+    let environmentalMotionStatus: String
+    let environmentalMotionRule: String
+    let environmentalMotionWindSummary: String
+    let surfaceFidelityStatus: String
+    let surfaceFidelityRule: String
+    let surfaceFidelitySummary: String
+    let sessionPersistenceStatus: String
+    let sessionPersistenceRule: String
+    let sessionPersistenceSummary: String
     let reviewPackTitle: String
     let reviewPackSummary: String
     let referenceGallery: String
@@ -504,6 +544,7 @@ final class BootstrapScene {
     private let routeInfo: SceneRouteInfo
     private let evasionInfo: SceneEvasionInfo
     private let traversalTuning: SceneTraversalTuning
+    private let environmentalMotion: EnvironmentalMotionConfiguration
     private let debugInfoTemplate: SceneDebugInfo
     private let mapConfigurationTemplate: SceneMapConfiguration
     private let groundSampler: WorldGroundSurfaceSampler
@@ -535,6 +576,7 @@ final class BootstrapScene {
             routeInfo = buildResult.routeInfo
             evasionInfo = buildResult.evasionInfo
             traversalTuning = buildResult.traversalTuning
+            environmentalMotion = buildResult.environmentalMotion
             groundSampler = buildResult.groundModel.sampler
             spawnOptions = buildResult.spawnOptions
         } catch {
@@ -560,6 +602,7 @@ final class BootstrapScene {
             routeInfo = fallbackResult.routeInfo
             evasionInfo = fallbackResult.evasionInfo
             traversalTuning = fallbackResult.traversalTuning
+            environmentalMotion = fallbackResult.environmentalMotion
             groundSampler = fallbackResult.groundModel.sampler
             spawnOptions = fallbackResult.spawnOptions
             print("[Scene] Falling back to procedural scene: \(error)")
@@ -724,6 +767,12 @@ final class BootstrapScene {
             visibilityDistance: profile.visibilityDistance,
             ambientWetness: profile.ambientWetness,
             shorelineSpace: profile.shorelineSpace,
+            windDirection: environmentalMotion.windDirectionVector,
+            windStrength: clamp(environmentalMotion.windStrength ?? 0.55, min: 0.0, max: 2.0),
+            gustStrength: clamp(environmentalMotion.gustStrength ?? 0.25, min: 0.0, max: 2.0),
+            vegetationResponse: clamp(environmentalMotion.vegetationResponse ?? 1.0, min: 0.0, max: 2.0),
+            shorelineRippleStrength: clamp(environmentalMotion.shorelineRippleStrength ?? 0.18, min: 0.0, max: 1.5),
+            waterSurfaceResponse: clamp(environmentalMotion.waterSurfaceResponse ?? 0.72, min: 0.0, max: 2.0),
             terrainPatch: terrainPatch,
             groundMaterial: profile.groundMaterial,
             groundCoverMaterial: profile.groundCoverMaterial,
@@ -787,7 +836,23 @@ final class BootstrapScene {
                     "Mission Script: \(mapConfiguration.missionScriptTitle) / \(mapConfiguration.missionPhases.count) checkpoint hooks",
                     activeRouteLine(),
                     routeValidationLine(),
+                    routeSelectionLine(),
+                    routeActivationLine(),
+                    routeRollbackLine(),
+                    routeCommitLine(),
+                    routeDryRunLine(),
+                    routePromotionLine(),
+                    routeAuditLine(),
+                    routeBoundaryLine(),
+                    routeArmingLine(),
+                    routeConfirmationLine(),
+                    routeReleaseLine(),
+                    routePreflightLine(),
                     routeHandoffLine(),
+                    collisionAuthoringLine(),
+                    environmentalMotionLine(),
+                    surfaceFidelityLine(),
+                    sessionPersistenceLine(),
                     alternateRouteCompletionLine(),
                     "Contacts: \(snapshot.neutralizedObserverCount) neutralized / \(max(snapshot.totalObserverCount - snapshot.neutralizedObserverCount, 0)) live",
                     String(
@@ -810,7 +875,23 @@ final class BootstrapScene {
             "Mission Script: \(routeInfo.missionTitle) / \(routeInfo.missionPhases.count) checkpoint hooks",
             activeRouteLine(),
             routeValidationLine(),
+            routeSelectionLine(),
+            routeActivationLine(),
+            routeRollbackLine(),
+            routeCommitLine(),
+            routeDryRunLine(),
+            routePromotionLine(),
+            routeAuditLine(),
+            routeBoundaryLine(),
+            routeArmingLine(),
+            routeConfirmationLine(),
+            routeReleaseLine(),
+            routePreflightLine(),
             routeHandoffLine(),
+            collisionAuthoringLine(),
+            environmentalMotionLine(),
+            surfaceFidelityLine(),
+            sessionPersistenceLine(),
             "Alternate Routes: \(routeInfo.alternateRoutes.count) candidates / active route remains \(routeInfo.name)",
             String(
                 format: "Footprint: %@ -> %@ / %d sectors / %.0fm planned",
@@ -1041,8 +1122,96 @@ final class BootstrapScene {
         "Route Validation: \(routeInfo.routeSelection.validationStatus) / \(routeInfo.routeSelection.validationRule)"
     }
 
+    private func routeSelectionLine() -> String {
+        let status = routeInfo.routeSelection.selectionStatus ?? "alternate route selection pending"
+        let rule = routeInfo.routeSelection.selectionRule ?? "requires briefing-locked route choice before checkpoint binding"
+        return "Route Selection: \(status) / \(rule)"
+    }
+
+    private func routeActivationLine() -> String {
+        let status = routeInfo.routeSelection.activationStatus ?? "alternate route activation guarded"
+        let rule = routeInfo.routeSelection.activationRule ?? "activation waits for a fresh run boundary"
+        return "Route Activation: \(status) / \(rule)"
+    }
+
+    private func routeRollbackLine() -> String {
+        let status = routeInfo.routeSelection.rollbackStatus ?? "alternate route rollback guarded"
+        let rule = routeInfo.routeSelection.rollbackRule ?? "primary route remains the fallback if alternate binding fails"
+        return "Route Rollback: \(status) / \(rule)"
+    }
+
+    private func routeCommitLine() -> String {
+        let status = routeInfo.routeSelection.commitStatus ?? "alternate route commit pending"
+        let rule = routeInfo.routeSelection.commitRule ?? "commit waits for staged route binding at a fresh run boundary"
+        return "Route Commit: \(status) / \(rule)"
+    }
+
+    private func routeDryRunLine() -> String {
+        let status = routeInfo.routeSelection.dryRunStatus ?? "alternate route dry run pending"
+        let rule = routeInfo.routeSelection.dryRunRule ?? "dry run must compare checkpoint order without mutating the live route"
+        return "Route Dry Run: \(status) / \(rule)"
+    }
+
+    private func routePromotionLine() -> String {
+        let status = routeInfo.routeSelection.promotionStatus ?? "alternate route promotion pending"
+        let rule = routeInfo.routeSelection.promotionRule ?? "promotion waits for a clean dry-run review before live binding"
+        return "Route Promotion: \(status) / \(rule)"
+    }
+
+    private func routeAuditLine() -> String {
+        let status = routeInfo.routeSelection.auditStatus ?? "alternate route audit pending"
+        let rule = routeInfo.routeSelection.auditRule ?? "audit must prove active binding remains unchanged before promotion"
+        return "Route Audit: \(status) / \(rule)"
+    }
+
+    private func routeBoundaryLine() -> String {
+        let status = routeInfo.routeSelection.boundaryStatus ?? "alternate route boundary check pending"
+        let rule = routeInfo.routeSelection.boundaryRule ?? "handoff remains locked to briefing or restart boundaries"
+        return "Route Boundary: \(status) / \(rule)"
+    }
+
+    private func routeArmingLine() -> String {
+        let status = routeInfo.routeSelection.armingStatus ?? "alternate route handoff arming pending"
+        let rule = routeInfo.routeSelection.armingRule ?? "arming requires boundary approval while live binding stays unchanged"
+        return "Route Arming: \(status) / \(rule)"
+    }
+
+    private func routeConfirmationLine() -> String {
+        let status = routeInfo.routeSelection.confirmationStatus ?? "alternate route handoff confirmation pending"
+        let rule = routeInfo.routeSelection.confirmationRule ?? "confirmation records readiness without replacing the active route"
+        return "Route Confirmation: \(status) / \(rule)"
+    }
+
+    private func routeReleaseLine() -> String {
+        let status = routeInfo.routeSelection.releaseStatus ?? "alternate route release gate pending"
+        let rule = routeInfo.routeSelection.releaseRule ?? "release gate waits for explicit live-switch implementation"
+        return "Route Release: \(status) / \(rule)"
+    }
+
+    private func routePreflightLine() -> String {
+        let status = routeInfo.routeSelection.preflightStatus ?? "alternate route live-switch preflight pending"
+        let rule = routeInfo.routeSelection.preflightRule ?? "preflight records switch readiness without changing the active binding"
+        return "Route Preflight: \(status) / \(rule)"
+    }
+
     private func routeHandoffLine() -> String {
         "Route Handoff: \(routeInfo.routeSelection.handoffStatus) / \(routeInfo.routeSelection.handoffRule)"
+    }
+
+    private func collisionAuthoringLine() -> String {
+        "Collision Authoring: \(mapConfiguration.collisionAuthoringStatus) / \(mapConfiguration.collisionAuthoringRule)"
+    }
+
+    private func environmentalMotionLine() -> String {
+        "Environmental Motion: \(mapConfiguration.environmentalMotionStatus) / \(mapConfiguration.environmentalMotionWindSummary)"
+    }
+
+    private func surfaceFidelityLine() -> String {
+        "Surface Fidelity: \(mapConfiguration.surfaceFidelityStatus) / \(mapConfiguration.surfaceFidelitySummary)"
+    }
+
+    private func sessionPersistenceLine() -> String {
+        "Session Persistence: \(mapConfiguration.sessionPersistenceStatus) / \(mapConfiguration.sessionPersistenceSummary)"
     }
 
     private func alternateRouteSelectionLine(for route: AlternateRouteConfiguration) -> String {
@@ -1221,8 +1390,45 @@ final class BootstrapScene {
             routeLoaderStatus: mapConfigurationTemplate.routeLoaderStatus,
             routeValidationStatus: mapConfigurationTemplate.routeValidationStatus,
             routeValidationRule: mapConfigurationTemplate.routeValidationRule,
+            routeSelectionStatus: mapConfigurationTemplate.routeSelectionStatus,
+            routeSelectionRule: mapConfigurationTemplate.routeSelectionRule,
+            routeActivationStatus: mapConfigurationTemplate.routeActivationStatus,
+            routeActivationRule: mapConfigurationTemplate.routeActivationRule,
+            routeRollbackStatus: mapConfigurationTemplate.routeRollbackStatus,
+            routeRollbackRule: mapConfigurationTemplate.routeRollbackRule,
+            routeCommitStatus: mapConfigurationTemplate.routeCommitStatus,
+            routeCommitRule: mapConfigurationTemplate.routeCommitRule,
+            routeDryRunStatus: mapConfigurationTemplate.routeDryRunStatus,
+            routeDryRunRule: mapConfigurationTemplate.routeDryRunRule,
+            routePromotionStatus: mapConfigurationTemplate.routePromotionStatus,
+            routePromotionRule: mapConfigurationTemplate.routePromotionRule,
+            routeAuditStatus: mapConfigurationTemplate.routeAuditStatus,
+            routeAuditRule: mapConfigurationTemplate.routeAuditRule,
+            routeBoundaryStatus: mapConfigurationTemplate.routeBoundaryStatus,
+            routeBoundaryRule: mapConfigurationTemplate.routeBoundaryRule,
+            routeArmingStatus: mapConfigurationTemplate.routeArmingStatus,
+            routeArmingRule: mapConfigurationTemplate.routeArmingRule,
+            routeConfirmationStatus: mapConfigurationTemplate.routeConfirmationStatus,
+            routeConfirmationRule: mapConfigurationTemplate.routeConfirmationRule,
+            routeReleaseStatus: mapConfigurationTemplate.routeReleaseStatus,
+            routeReleaseRule: mapConfigurationTemplate.routeReleaseRule,
+            routePreflightStatus: mapConfigurationTemplate.routePreflightStatus,
+            routePreflightRule: mapConfigurationTemplate.routePreflightRule,
             routeHandoffStatus: mapConfigurationTemplate.routeHandoffStatus,
             routeHandoffRule: mapConfigurationTemplate.routeHandoffRule,
+            collisionAuthoringStatus: mapConfigurationTemplate.collisionAuthoringStatus,
+            collisionAuthoringRule: mapConfigurationTemplate.collisionAuthoringRule,
+            collisionAuthoringAudit: mapConfigurationTemplate.collisionAuthoringAudit,
+            collisionAuthoringBlockerScope: mapConfigurationTemplate.collisionAuthoringBlockerScope,
+            environmentalMotionStatus: mapConfigurationTemplate.environmentalMotionStatus,
+            environmentalMotionRule: mapConfigurationTemplate.environmentalMotionRule,
+            environmentalMotionWindSummary: mapConfigurationTemplate.environmentalMotionWindSummary,
+            surfaceFidelityStatus: mapConfigurationTemplate.surfaceFidelityStatus,
+            surfaceFidelityRule: mapConfigurationTemplate.surfaceFidelityRule,
+            surfaceFidelitySummary: mapConfigurationTemplate.surfaceFidelitySummary,
+            sessionPersistenceStatus: mapConfigurationTemplate.sessionPersistenceStatus,
+            sessionPersistenceRule: mapConfigurationTemplate.sessionPersistenceRule,
+            sessionPersistenceSummary: mapConfigurationTemplate.sessionPersistenceSummary,
             reviewPackTitle: mapConfigurationTemplate.reviewPackTitle,
             reviewPackSummary: mapConfigurationTemplate.reviewPackSummary,
             referenceGallery: mapConfigurationTemplate.referenceGallery,
@@ -1614,6 +1820,7 @@ private struct SceneBuildResult {
     let routeInfo: SceneRouteInfo
     let evasionInfo: SceneEvasionInfo
     let traversalTuning: SceneTraversalTuning
+    let environmentalMotion: EnvironmentalMotionConfiguration
     let spawnOptions: [SpawnConfiguration]
 }
 
@@ -1734,6 +1941,13 @@ private final class ScenePackageBuilder {
         let shadowConfiguration = sceneConfiguration.shadow ?? ShadowConfiguration()
         let postProcessConfiguration = sceneConfiguration.postProcess ?? PostProcessConfiguration()
         let ballisticsConfiguration = sceneConfiguration.ballistics ?? BallisticsConfiguration()
+        let environmentalMotion = sceneConfiguration.environmentalMotion ?? EnvironmentalMotionConfiguration()
+        let materialBreakup = sceneConfiguration.materialBreakup ?? MaterialBreakupConfiguration()
+        let surfaceFidelity = sceneConfiguration.surfaceFidelity ?? SurfaceFidelityConfiguration()
+        let sessionPersistence = sceneConfiguration.sessionPersistence ?? SessionPersistenceConfiguration()
+        let materialBreakupRoadDecalDensity = simd_clamp(materialBreakup.roadDecalDensity ?? 0.55, 0.0, 2.0)
+        let materialBreakupRoadScuffStrength = simd_clamp(materialBreakup.roadScuffStrength ?? 0.42, 0.0, 1.0)
+        let materialBreakupLandmarkStrength = simd_clamp(materialBreakup.landmarkBreakupStrength ?? 0.20, 0.0, 1.0)
         let traversalTuning = SceneTraversalTuning(
             walkSpeed: max(playerConfiguration.walkSpeed ?? 4.2, 1.0),
             sprintSpeed: max(playerConfiguration.sprintSpeed ?? 6.8, max(playerConfiguration.walkSpeed ?? 4.2, 1.0) + 0.6),
@@ -1756,7 +1970,10 @@ private final class ScenePackageBuilder {
             shadowTint: postProcessConfiguration.shadowTintVector,
             highlightTint: postProcessConfiguration.highlightTintVector,
             shadowBalance: simd_clamp(postProcessConfiguration.shadowBalance ?? 0.44, 0.05, 0.95),
-            vignetteStrength: simd_clamp(postProcessConfiguration.vignetteStrength ?? 0.08, 0.0, 1.0)
+            vignetteStrength: simd_clamp(postProcessConfiguration.vignetteStrength ?? 0.08, 0.0, 1.0),
+            ssaoStrength: simd_clamp(postProcessConfiguration.ssaoStrength ?? 0.18, 0.0, 1.0),
+            ssaoRadius: simd_clamp(postProcessConfiguration.ssaoRadius ?? 1.6, 0.5, 6.0),
+            ssaoBias: simd_clamp(postProcessConfiguration.ssaoBias ?? 0.0008, 0.0, 0.02)
         )
         let ballisticsSettings = SceneBallisticsSettings(
             muzzleVelocityMetersPerSecond: max(ballisticsConfiguration.muzzleVelocityMetersPerSecond ?? 820.0, 40.0),
@@ -1783,6 +2000,8 @@ private final class ScenePackageBuilder {
         var terrainCount = 0
         var roadCount = 0
         var grayboxCount = 0
+        var decalCount = 0
+        var landmarkBreakupCount = 0
         var routeMarkerCount = 0
         var guidanceMarkerCount = 0
         var observerMarkerCount = 0
@@ -1922,13 +2141,33 @@ private final class ScenePackageBuilder {
                         flatColorWorldDrawableCount += 1
                     }
                 }
+
+                if materialBreakupRoadDecalDensity > 0 {
+                    for decalDrawable in roadDecalDrawables(
+                        from: roadStrip,
+                        sectorID: sector.id,
+                        residency: residency,
+                        density: materialBreakupRoadDecalDensity,
+                        strength: materialBreakupRoadScuffStrength
+                    ) {
+                        sceneDrawables.append(decalDrawable)
+                        decalCount += 1
+                        flatColorWorldDrawableCount += 1
+                    }
+                }
             }
 
             for block in sector.grayboxBlocks {
+                let normalizedBlockName = "\(sector.id) \(block.name)".lowercased()
+                if materialBreakupLandmarkStrength > 0 && usesLandmarkBreakupMaterial(for: normalizedBlockName) {
+                    landmarkBreakupCount += 1
+                }
+
                 if let drawable = grayboxDrawable(
                     from: block,
                     sectorID: sector.id,
-                    residency: residency
+                    residency: residency,
+                    landmarkBreakupStrength: materialBreakupLandmarkStrength
                 ) {
                     sceneDrawables.append(drawable)
                     grayboxCount += 1
@@ -1970,10 +2209,54 @@ private final class ScenePackageBuilder {
             loaderStatus: "alternate route loader pending",
             validationStatus: "alternate route validation pending",
             validationRule: "requires staged route metrics",
+            selectionStatus: "alternate route selection pending",
+            selectionRule: "requires briefing-locked route choice before checkpoint binding",
+            activationStatus: "alternate route activation guarded",
+            activationRule: "activation waits for a fresh run boundary",
+            rollbackStatus: "alternate route rollback guarded",
+            rollbackRule: "primary route remains the fallback if alternate binding fails",
+            commitStatus: "alternate route commit pending",
+            commitRule: "commit waits for staged route binding at a fresh run boundary",
+            dryRunStatus: "alternate route dry run pending",
+            dryRunRule: "dry run must compare checkpoint order without mutating the live route",
+            promotionStatus: "alternate route promotion pending",
+            promotionRule: "promotion waits for a clean dry-run review before live binding",
+            auditStatus: "alternate route audit pending",
+            auditRule: "audit must prove active binding remains unchanged before promotion",
+            boundaryStatus: "alternate route boundary check pending",
+            boundaryRule: "handoff remains locked to briefing or restart boundaries",
+            armingStatus: "alternate route handoff arming pending",
+            armingRule: "arming requires boundary approval while live binding stays unchanged",
+            confirmationStatus: "alternate route handoff confirmation pending",
+            confirmationRule: "confirmation records readiness without replacing the active route",
+            releaseStatus: "alternate route release gate pending",
+            releaseRule: "release gate waits for explicit live-switch implementation",
+            preflightStatus: "alternate route live-switch preflight pending",
+            preflightRule: "preflight records switch readiness without changing the active binding",
             handoffStatus: "route handoff pending",
             handoffRule: "requires eligible staged route and restart-safe checkpoint ownership"
         )
+        let collisionAuthoring = sceneConfiguration.collisionAuthoring ?? CollisionAuthoringConfiguration(
+            status: "collision authoring review pending",
+            rule: "requires sector blocker inventory before route handoff editing",
+            audit: "no collision authoring audit loaded",
+            blockerScope: "sector blockers only"
+        )
         let routePlannedDistanceMeters = plannedRouteDistance(for: sceneConfiguration.route.checkpoints)
+        let surfaceFidelitySummary = surfaceFidelitySummary(
+            environmentalMotion: environmentalMotion,
+            postProcessSettings: postProcessSettings,
+            materialBreakup: materialBreakup,
+            roadDecalCount: decalCount,
+            landmarkBreakupCount: landmarkBreakupCount
+        )
+        let sessionPersistenceSummary = sessionPersistenceSummary(
+            spawnCount: sceneConfiguration.randomSpawns?.count ?? 1,
+            checkpointCount: sceneConfiguration.route.checkpoints.count,
+            alternateRouteCount: alternateRoutes.count,
+            reviewStopCount: reviewPack.comparisonStops.count,
+            missionPhaseCount: missionScript.phases.count
+        )
         let routeSectorNames = routeSectorNames(
             for: sceneConfiguration.route.checkpoints,
             loadedSectors: loadedSectors
@@ -1986,6 +2269,15 @@ private final class ScenePackageBuilder {
             "Sectors: \(loadedSectors.map(\.displayName).joined(separator: ", "))",
             "Residency: \(residencyCounts.always) always / \(residencyCounts.farField) far-field / \(residencyCounts.local) local",
             "World: \(terrainCount) terrain / \(roadCount) roads / \(collisionCount) blockers",
+            String(
+                format: "Material Breakup: %@ / %.2f road density / %.2f scuff / %.2f landmark / %d decals / %d landmark materials",
+                materialBreakup.status ?? "material breakup pending",
+                materialBreakupRoadDecalDensity,
+                materialBreakupRoadScuffStrength,
+                materialBreakupLandmarkStrength,
+                decalCount,
+                landmarkBreakupCount
+            ),
             "Ground: \(groundModel.localSurfaces.count) local / \(groundModel.continuitySurfaces.count) continuity surfaces / \(continuityGroundDrawableCount) global drawable",
             "Texture Coverage: \(texturedWorldDrawableCount) textured world drawables / \(flatColorWorldDrawableCount) flat-color world drawables",
             String(
@@ -2021,11 +2313,13 @@ private final class ScenePackageBuilder {
             "Exposure Guide: \(combatRehearsal.exposureGuide)",
             "Recovery Rule: \(combatRehearsal.recoveryRule)",
             String(
-                format: "Post: %+0.2f exp / %.2f white / %.2f contrast / %.2f saturation",
+                format: "Post: %+0.2f exp / %.2f white / %.2f contrast / %.2f saturation / SSAO %.2f r%.1f",
                 postProcessSettings.exposureBias,
                 postProcessSettings.whitePoint,
                 postProcessSettings.contrast,
-                postProcessSettings.saturation
+                postProcessSettings.saturation,
+                postProcessSettings.ssaoStrength,
+                postProcessSettings.ssaoRadius
             ),
             String(
                 format: "Ballistics: %.0f m/s / %.2f m/s2 / %.2fs window / %.0f Hz",
@@ -2036,6 +2330,22 @@ private final class ScenePackageBuilder {
             ),
             "Telemetry: \((sceneConfiguration.randomSpawns?.count ?? 1)) starts / \(sceneConfiguration.route.checkpoints.count) route markers / \(guidanceConfiguration.signposts.count) signposts",
             "Route Loader: active \(routeSelection.activeRouteLabel) / staged \(routeSelection.selectedAlternateRouteLabel ?? "no alternate staged") / \(routeSelection.bindingStatus) / \(routeSelection.loaderStatus)",
+            "Route Selection: \(routeSelection.selectionStatus ?? "alternate route selection pending") / \(routeSelection.selectionRule ?? "requires briefing-locked route choice before checkpoint binding")",
+            "Route Activation: \(routeSelection.activationStatus ?? "alternate route activation guarded") / \(routeSelection.activationRule ?? "activation waits for a fresh run boundary")",
+            "Route Rollback: \(routeSelection.rollbackStatus ?? "alternate route rollback guarded") / \(routeSelection.rollbackRule ?? "primary route remains the fallback if alternate binding fails")",
+            "Route Commit: \(routeSelection.commitStatus ?? "alternate route commit pending") / \(routeSelection.commitRule ?? "commit waits for staged route binding at a fresh run boundary")",
+            "Route Dry Run: \(routeSelection.dryRunStatus ?? "alternate route dry run pending") / \(routeSelection.dryRunRule ?? "dry run must compare checkpoint order without mutating the live route")",
+            "Route Promotion: \(routeSelection.promotionStatus ?? "alternate route promotion pending") / \(routeSelection.promotionRule ?? "promotion waits for a clean dry-run review before live binding")",
+            "Route Audit: \(routeSelection.auditStatus ?? "alternate route audit pending") / \(routeSelection.auditRule ?? "audit must prove active binding remains unchanged before promotion")",
+            "Route Boundary: \(routeSelection.boundaryStatus ?? "alternate route boundary check pending") / \(routeSelection.boundaryRule ?? "handoff remains locked to briefing or restart boundaries")",
+            "Route Arming: \(routeSelection.armingStatus ?? "alternate route handoff arming pending") / \(routeSelection.armingRule ?? "arming requires boundary approval while live binding stays unchanged")",
+            "Route Confirmation: \(routeSelection.confirmationStatus ?? "alternate route handoff confirmation pending") / \(routeSelection.confirmationRule ?? "confirmation records readiness without replacing the active route")",
+            "Route Release: \(routeSelection.releaseStatus ?? "alternate route release gate pending") / \(routeSelection.releaseRule ?? "release gate waits for explicit live-switch implementation")",
+            "Route Preflight: \(routeSelection.preflightStatus ?? "alternate route live-switch preflight pending") / \(routeSelection.preflightRule ?? "preflight records switch readiness without changing the active binding")",
+            "Collision Authoring: \(collisionAuthoring.status) / \(collisionAuthoring.rule) / \(collisionAuthoring.audit)",
+            "Environmental Motion: \(environmentalMotion.status ?? "environmental motion pending") / \(environmentalMotionWindSummary(environmentalMotion))",
+            "Surface Fidelity: \(surfaceFidelity.status ?? "surface fidelity review pending") / \(surfaceFidelitySummary)",
+            "Session Persistence: \(sessionPersistence.status ?? "session persistence planning pending") / \(sessionPersistenceSummary)",
             "Threats: \(detectionConfiguration.observers.count) observers / \(guidanceConfiguration.coverPoints.count) cover / \(guidanceConfiguration.signposts.count) signs",
             String(
                 format: "Traversal: %.1f walk / %.1f sprint / %.3f look",
@@ -2048,7 +2358,7 @@ private final class ScenePackageBuilder {
 
         detailLines.append(contentsOf: sceneConfiguration.planningNotes ?? [])
 
-        let summary = "\(assetCount) assets, \(terrainCount) terrain, \(roadCount) roads, \(grayboxCount) structures, \(routeMarkerCount) route markers, \(guidanceMarkerCount + observerMarkerCount) evasion markers"
+        let summary = "\(assetCount) assets, \(terrainCount) terrain, \(roadCount) roads, \(grayboxCount) structures, \(decalCount) decals, \(routeMarkerCount) route markers, \(guidanceMarkerCount + observerMarkerCount) evasion markers"
 
         return SceneBuildResult(
             drawables: sceneDrawables,
@@ -2086,6 +2396,13 @@ private final class ScenePackageBuilder {
                 routePlannedDistanceMeters: routePlannedDistanceMeters,
                 routeSectorNames: routeSectorNames,
                 routeSelection: routeSelection,
+                collisionAuthoring: collisionAuthoring,
+                collisionCount: collisionCount,
+                environmentalMotion: environmentalMotion,
+                surfaceFidelity: surfaceFidelity,
+                surfaceFidelitySummary: surfaceFidelitySummary,
+                sessionPersistence: sessionPersistence,
+                sessionPersistenceSummary: sessionPersistenceSummary,
                 reviewPack: reviewPack,
                 combatRehearsal: combatRehearsal,
                 missionScript: missionScript,
@@ -2124,6 +2441,7 @@ private final class ScenePackageBuilder {
                 signposts: guidanceConfiguration.signposts
             ),
             traversalTuning: traversalTuning,
+            environmentalMotion: environmentalMotion,
             spawnOptions: sceneConfiguration.randomSpawns?.isEmpty == false
                 ? (sceneConfiguration.randomSpawns ?? [sceneConfiguration.spawn])
                 : [sceneConfiguration.spawn]
@@ -2141,6 +2459,13 @@ private final class ScenePackageBuilder {
         routePlannedDistanceMeters: Float,
         routeSectorNames: [String],
         routeSelection: RouteSelectionConfiguration,
+        collisionAuthoring: CollisionAuthoringConfiguration,
+        collisionCount: Int,
+        environmentalMotion: EnvironmentalMotionConfiguration,
+        surfaceFidelity: SurfaceFidelityConfiguration,
+        surfaceFidelitySummary: String,
+        sessionPersistence: SessionPersistenceConfiguration,
+        sessionPersistenceSummary: String,
         reviewPack: ReviewPackConfiguration,
         combatRehearsal: CombatRehearsalConfiguration,
         missionScript: MissionScriptConfiguration,
@@ -2351,8 +2676,49 @@ private final class ScenePackageBuilder {
             routeLoaderStatus: routeSelection.loaderStatus,
             routeValidationStatus: routeSelection.validationStatus,
             routeValidationRule: routeSelection.validationRule,
+            routeSelectionStatus: routeSelection.selectionStatus ?? "alternate route selection pending",
+            routeSelectionRule: routeSelection.selectionRule ?? "requires briefing-locked route choice before checkpoint binding",
+            routeActivationStatus: routeSelection.activationStatus ?? "alternate route activation guarded",
+            routeActivationRule: routeSelection.activationRule ?? "activation waits for a fresh run boundary",
+            routeRollbackStatus: routeSelection.rollbackStatus ?? "alternate route rollback guarded",
+            routeRollbackRule: routeSelection.rollbackRule ?? "primary route remains the fallback if alternate binding fails",
+            routeCommitStatus: routeSelection.commitStatus ?? "alternate route commit pending",
+            routeCommitRule: routeSelection.commitRule ?? "commit waits for staged route binding at a fresh run boundary",
+            routeDryRunStatus: routeSelection.dryRunStatus ?? "alternate route dry run pending",
+            routeDryRunRule: routeSelection.dryRunRule ?? "dry run must compare checkpoint order without mutating the live route",
+            routePromotionStatus: routeSelection.promotionStatus ?? "alternate route promotion pending",
+            routePromotionRule: routeSelection.promotionRule ?? "promotion waits for a clean dry-run review before live binding",
+            routeAuditStatus: routeSelection.auditStatus ?? "alternate route audit pending",
+            routeAuditRule: routeSelection.auditRule ?? "audit must prove active binding remains unchanged before promotion",
+            routeBoundaryStatus: routeSelection.boundaryStatus ?? "alternate route boundary check pending",
+            routeBoundaryRule: routeSelection.boundaryRule ?? "handoff remains locked to briefing or restart boundaries",
+            routeArmingStatus: routeSelection.armingStatus ?? "alternate route handoff arming pending",
+            routeArmingRule: routeSelection.armingRule ?? "arming requires boundary approval while live binding stays unchanged",
+            routeConfirmationStatus: routeSelection.confirmationStatus ?? "alternate route handoff confirmation pending",
+            routeConfirmationRule: routeSelection.confirmationRule ?? "confirmation records readiness without replacing the active route",
+            routeReleaseStatus: routeSelection.releaseStatus ?? "alternate route release gate pending",
+            routeReleaseRule: routeSelection.releaseRule ?? "release gate waits for explicit live-switch implementation",
+            routePreflightStatus: routeSelection.preflightStatus ?? "alternate route live-switch preflight pending",
+            routePreflightRule: routeSelection.preflightRule ?? "preflight records switch readiness without changing the active binding",
             routeHandoffStatus: routeSelection.handoffStatus,
             routeHandoffRule: routeSelection.handoffRule,
+            collisionAuthoringStatus: collisionAuthoring.status,
+            collisionAuthoringRule: routeCollisionAuthoringRule(
+                collisionAuthoring,
+                collisionCount: collisionCount,
+                sectorCount: loadedSectors.count
+            ),
+            collisionAuthoringAudit: collisionAuthoring.audit,
+            collisionAuthoringBlockerScope: collisionAuthoring.blockerScope,
+            environmentalMotionStatus: environmentalMotion.status ?? "environmental motion pending",
+            environmentalMotionRule: environmentalMotion.rule ?? "scene uses default terrain breeze",
+            environmentalMotionWindSummary: environmentalMotionWindSummary(environmentalMotion),
+            surfaceFidelityStatus: surfaceFidelity.status ?? "surface fidelity review pending",
+            surfaceFidelityRule: surfaceFidelity.rule ?? "review environmental motion, water, SSAO, decals, and material breakup together",
+            surfaceFidelitySummary: surfaceFidelitySummary,
+            sessionPersistenceStatus: sessionPersistence.status ?? "session persistence planning pending",
+            sessionPersistenceRule: sessionPersistence.rule ?? "capture route, checkpoint, difficulty, map, and review state before save/resume activation",
+            sessionPersistenceSummary: sessionPersistenceSummary,
             reviewPackTitle: reviewPack.title,
             reviewPackSummary: reviewPack.summary,
             referenceGallery: reviewPack.referenceGallery,
@@ -2377,6 +2743,66 @@ private final class ScenePackageBuilder {
         zip(checkpoints, checkpoints.dropFirst()).reduce(0) { partialResult, segment in
             partialResult + simd_distance(segment.0.positionVector, segment.1.positionVector)
         }
+    }
+
+    private func routeCollisionAuthoringRule(
+        _ configuration: CollisionAuthoringConfiguration,
+        collisionCount: Int,
+        sectorCount: Int
+    ) -> String {
+        "\(configuration.rule) / \(collisionCount) blockers across \(sectorCount) sectors / \(configuration.blockerScope)"
+    }
+
+    private func environmentalMotionWindSummary(_ configuration: EnvironmentalMotionConfiguration) -> String {
+        let direction = configuration.windDirectionVector
+        return String(
+            format: "%@ / wind %.2f gust %.2f / dir %.2f %.2f / vegetation %.2f / shoreline ripple %.2f / water %.2f",
+            configuration.rule ?? "scene uses default terrain breeze",
+            simd_clamp(configuration.windStrength ?? 0.55, 0.0, 2.0),
+            simd_clamp(configuration.gustStrength ?? 0.25, 0.0, 2.0),
+            direction.x,
+            direction.y,
+            simd_clamp(configuration.vegetationResponse ?? 1.0, 0.0, 2.0),
+            simd_clamp(configuration.shorelineRippleStrength ?? 0.18, 0.0, 1.5),
+            simd_clamp(configuration.waterSurfaceResponse ?? 0.72, 0.0, 2.0)
+        )
+    }
+
+    private func surfaceFidelitySummary(
+        environmentalMotion: EnvironmentalMotionConfiguration,
+        postProcessSettings: ScenePostProcessSettings,
+        materialBreakup: MaterialBreakupConfiguration,
+        roadDecalCount: Int,
+        landmarkBreakupCount: Int
+    ) -> String {
+        String(
+            format: "wind %.2f / water %.2f / SSAO %.2f r%.1f / decals %d / landmarks %d / road %.2f landmark %.2f",
+            simd_clamp(environmentalMotion.windStrength ?? 0.55, 0.0, 2.0),
+            simd_clamp(environmentalMotion.waterSurfaceResponse ?? 0.72, 0.0, 2.0),
+            postProcessSettings.ssaoStrength,
+            postProcessSettings.ssaoRadius,
+            roadDecalCount,
+            landmarkBreakupCount,
+            simd_clamp(materialBreakup.roadScuffStrength ?? 0.42, 0.0, 1.0),
+            simd_clamp(materialBreakup.landmarkBreakupStrength ?? 0.20, 0.0, 1.0)
+        )
+    }
+
+    private func sessionPersistenceSummary(
+        spawnCount: Int,
+        checkpointCount: Int,
+        alternateRouteCount: Int,
+        reviewStopCount: Int,
+        missionPhaseCount: Int
+    ) -> String {
+        String(
+            format: "%d starts / %d checkpoints / %d alternate / %d review stops / %d hooks",
+            spawnCount,
+            checkpointCount,
+            alternateRouteCount,
+            reviewStopCount,
+            missionPhaseCount
+        )
     }
 
     private func routeSectorNames(
@@ -2529,7 +2955,8 @@ private final class ScenePackageBuilder {
     private func grayboxDrawable(
         from configuration: GrayboxBlockConfiguration,
         sectorID: String,
-        residency: SectorResidency
+        residency: SectorResidency,
+        landmarkBreakupStrength: Float
     ) -> SceneDrawable? {
         let vertices = GeometryBuilder.makeBox(
             halfExtents: configuration.halfExtentsVector,
@@ -2540,6 +2967,8 @@ private final class ScenePackageBuilder {
             return nil
         }
 
+        let normalizedName = configuration.name.lowercased()
+        let isWaterSurface = usesWaterMaterial(for: normalizedName)
         let rotation = simd_float4x4.rotation(y: (configuration.yawDegrees ?? 0) * (.pi / 180.0))
         return SceneDrawable(
             name: "\(sectorID):\(configuration.name)",
@@ -2554,18 +2983,24 @@ private final class ScenePackageBuilder {
                 multiplier: visibilityMultiplier(3.8, for: residency)
             ),
             minimumViewDot: visibilityMinimumViewDot(-0.55, for: residency),
-            textureKey: .concrete,
+            textureKey: isWaterSurface ? .water : .concrete,
             material: grayboxMaterial(
                 for: configuration,
-                sectorID: sectorID
+                sectorID: sectorID,
+                landmarkBreakupStrength: landmarkBreakupStrength
             ),
             retainedInJungleRenderer: true,
-            castsShadow: configuration.castsShadow ?? true,
+            castsShadow: isWaterSurface ? false : (configuration.castsShadow ?? true),
             receivesShadow: configuration.receivesShadow ?? true
         )
     }
 
     private func grayboxShadowDrawable(from configuration: GrayboxBlockConfiguration, sectorID: String) -> SceneDrawable? {
+        let normalizedName = configuration.name.lowercased()
+        guard !usesWaterMaterial(for: normalizedName) else {
+            return nil
+        }
+
         let shadowVertices = GeometryBuilder.makeShadowQuad(
             halfExtents: SIMD2<Float>(
                 max(configuration.halfExtentsVector.x * 1.08, 0.6),
@@ -2677,6 +3112,69 @@ private final class ScenePackageBuilder {
             ),
             retainedInJungleRenderer: false
         )
+    }
+
+    private func roadDecalDrawables(
+        from configuration: RoadStripConfiguration,
+        sectorID: String,
+        residency: SectorResidency,
+        density: Float,
+        strength: Float
+    ) -> [SceneDrawable] {
+        let count = max(
+            1,
+            min(
+                Int(ceil((configuration.sizeVector.y / 46.0) * density)),
+                8
+            )
+        )
+        let baseColor = configuration.roadColorVector
+        let decalColor = SIMD4<Float>(
+            max(baseColor.x * (0.50 + strength * 0.16), 0.015),
+            max(baseColor.y * (0.50 + strength * 0.16), 0.015),
+            max(baseColor.z * (0.50 + strength * 0.16), 0.015),
+            1.0
+        )
+        let vertices = GeometryBuilder.makeRoadSurfaceDecals(
+            size: configuration.sizeVector,
+            shoulderWidth: configuration.shoulderWidth ?? 1.2,
+            crownHeight: configuration.crownHeight ?? 0.04,
+            count: count,
+            strength: strength,
+            color: decalColor
+        )
+
+        guard !vertices.isEmpty, let buffer = makeBuffer(from: vertices) else {
+            return []
+        }
+
+        let rotation = simd_float4x4.rotation(y: (configuration.yawDegrees ?? 0) * (.pi / 180.0))
+        let radius = simd_length(SIMD3<Float>(configuration.sizeVector.x * 0.5, 0.5, configuration.sizeVector.y * 0.5))
+        return [
+            SceneDrawable(
+                name: "\(sectorID):\(configuration.name):RoadBreakup",
+                vertexBuffer: buffer,
+                vertexCount: vertices.count,
+                modelMatrix: simd_float4x4.translation(configuration.positionVector + SIMD3<Float>(0, 0.018, 0)) * rotation,
+                worldCenter: configuration.positionVector,
+                boundingRadius: radius,
+                maxDrawDistance: adaptiveDrawDistance(
+                    defaultValue: visibilityDefault(140, for: residency),
+                    boundingRadius: radius,
+                    multiplier: visibilityMultiplier(2.4, for: residency)
+                ),
+                minimumViewDot: -1,
+                textureKey: nil,
+                material: legacyMaterial(
+                    textureKey: nil,
+                    overrides: nil,
+                    roughnessFactor: 0.92
+                ),
+                retainedInJungleRenderer: false,
+                castsShadow: false,
+                receivesShadow: true
+            )
+        ]
     }
 
     private func continuityGroundDrawable(
@@ -3091,16 +3589,21 @@ private final class ScenePackageBuilder {
             .applying(configuration: overrides)
     }
 
-    private func facadeMaterial(overrides: MaterialConfiguration?) -> SceneMaterial {
+    private func facadeMaterial(
+        overrides: MaterialConfiguration?,
+        baseColorFactor: SIMD4<Float> = SIMD4<Float>(1, 1, 1, 1),
+        roughnessFactor: Float = 0.74,
+        normalScale: Float = 1.0
+    ) -> SceneMaterial {
         SceneMaterial(
             albedoTexture: .assetRelativePath("Textures/Final/canberra_civic_facade_albedo.png"),
             normalTexture: .assetRelativePath("Textures/Final/canberra_civic_facade_normal.png"),
             roughnessTexture: .assetRelativePath("Textures/Final/canberra_civic_facade_roughness.png"),
             ambientOcclusionTexture: .assetRelativePath("Textures/Final/canberra_civic_facade_ao.png"),
-            baseColorFactor: SIMD4<Float>(1, 1, 1, 1),
-            roughnessFactor: 0.74,
+            baseColorFactor: baseColorFactor,
+            roughnessFactor: roughnessFactor,
             ambientOcclusionStrength: 1.0,
-            normalScale: 1.0
+            normalScale: normalScale
         ).applying(configuration: overrides)
     }
 
@@ -3114,6 +3617,19 @@ private final class ScenePackageBuilder {
             roughnessFactor: 0.84,
             ambientOcclusionStrength: 1.0,
             normalScale: 1.0
+        ).applying(configuration: overrides)
+    }
+
+    private func waterMaterial(overrides: MaterialConfiguration?) -> SceneMaterial {
+        SceneMaterial(
+            albedoTexture: .sceneKey(.water),
+            normalTexture: nil,
+            roughnessTexture: nil,
+            ambientOcclusionTexture: nil,
+            baseColorFactor: SIMD4<Float>(0.88, 0.98, 1.08, 1.0),
+            roughnessFactor: 0.16,
+            ambientOcclusionStrength: 0.35,
+            normalScale: 0.65
         ).applying(configuration: overrides)
     }
 
@@ -3132,20 +3648,51 @@ private final class ScenePackageBuilder {
 
     private func grayboxMaterial(
         for configuration: GrayboxBlockConfiguration,
-        sectorID: String
+        sectorID: String,
+        landmarkBreakupStrength: Float
     ) -> SceneMaterial {
         let normalizedName = "\(sectorID) \(configuration.name)".lowercased()
+        if usesWaterMaterial(for: configuration.name.lowercased()) {
+            return waterMaterial(overrides: configuration.material)
+        }
+
         if usesHardscapeMaterial(for: normalizedName, configuration: configuration) {
             return concreteMaterial(overrides: configuration.material)
         }
 
         if usesFacadeMaterial(for: normalizedName) {
-            return facadeMaterial(overrides: configuration.material)
+            return landmarkFacadeMaterial(
+                for: normalizedName,
+                overrides: configuration.material,
+                strength: landmarkBreakupStrength
+            )
         }
 
         return configuration.halfExtentsVector.y <= 1.4
             ? concreteMaterial(overrides: configuration.material)
-            : facadeMaterial(overrides: configuration.material)
+            : landmarkFacadeMaterial(
+                for: normalizedName,
+                overrides: configuration.material,
+                strength: landmarkBreakupStrength
+            )
+    }
+
+    private func landmarkFacadeMaterial(
+        for normalizedName: String,
+        overrides: MaterialConfiguration?,
+        strength: Float
+    ) -> SceneMaterial {
+        guard usesLandmarkBreakupMaterial(for: normalizedName), strength > 0 else {
+            return facadeMaterial(overrides: overrides)
+        }
+
+        let profile = landmarkBreakupProfile(for: normalizedName, strength: strength)
+        return facadeMaterial(
+            overrides: overrides,
+            baseColorFactor: profile.tint,
+            roughnessFactor: profile.roughness,
+            normalScale: profile.normalScale
+        )
     }
 
     private func roadMaterial(
@@ -3187,6 +3734,10 @@ private final class ScenePackageBuilder {
         return configuration.halfExtentsVector.y <= 0.9
     }
 
+    private func usesWaterMaterial(for normalizedName: String) -> Bool {
+        normalizedName.contains("lake") || normalizedName.contains("water")
+    }
+
     private func usesFacadeMaterial(for normalizedName: String) -> Bool {
         let tokens = [
             "mass", "office", "hotel", "administrative", "gallery", "campus",
@@ -3195,6 +3746,54 @@ private final class ScenePackageBuilder {
             "group", "cluster", "centre", "center", "podium", "band"
         ]
         return tokens.contains(where: normalizedName.contains)
+    }
+
+    private func usesLandmarkBreakupMaterial(for normalizedName: String) -> Bool {
+        let tokens = [
+            "parliament", "capitalhill", "civic", "library", "gallery",
+            "museum", "telstra", "blackmountain", "belconnen", "woden",
+            "arena", "mall", "campus", "tower", "embassy", "cluster",
+            "towncentre", "towncenter"
+        ]
+        return tokens.contains(where: normalizedName.contains) && !usesWaterMaterial(for: normalizedName)
+    }
+
+    private func landmarkBreakupProfile(
+        for normalizedName: String,
+        strength: Float
+    ) -> (tint: SIMD4<Float>, roughness: Float, normalScale: Float) {
+        let clampedStrength = simd_clamp(strength, 0.0, 1.0)
+        let tint: SIMD4<Float>
+        let roughnessBase: Float
+
+        if normalizedName.contains("parliament") || normalizedName.contains("capitalhill") {
+            tint = SIMD4<Float>(1.02, 1.03, 0.96, 1.0)
+            roughnessBase = 0.82
+        } else if normalizedName.contains("telstra") || normalizedName.contains("blackmountain") || normalizedName.contains("tower") {
+            tint = SIMD4<Float>(0.88, 0.94, 1.04, 1.0)
+            roughnessBase = 0.68
+        } else if normalizedName.contains("belconnen") || normalizedName.contains("woden") || normalizedName.contains("mall") {
+            tint = SIMD4<Float>(0.98, 0.94, 0.90, 1.0)
+            roughnessBase = 0.78
+        } else if normalizedName.contains("gallery") || normalizedName.contains("museum") || normalizedName.contains("library") {
+            tint = SIMD4<Float>(1.04, 1.01, 0.94, 1.0)
+            roughnessBase = 0.76
+        } else {
+            tint = SIMD4<Float>(0.96, 0.99, 1.03, 1.0)
+            roughnessBase = 0.74
+        }
+
+        let blendedTint = SIMD4<Float>(
+            1.0 + ((tint.x - 1.0) * clampedStrength),
+            1.0 + ((tint.y - 1.0) * clampedStrength),
+            1.0 + ((tint.z - 1.0) * clampedStrength),
+            1.0
+        )
+        return (
+            tint: blendedTint,
+            roughness: simd_clamp(0.74 + ((roughnessBase - 0.74) * clampedStrength), 0.45, 0.95),
+            normalScale: simd_clamp(1.0 + (clampedStrength * 0.35), 0.0, 1.6)
+        )
     }
 
     private func usesPedestrianPavingMaterial(for normalizedName: String) -> Bool {
@@ -3344,7 +3943,10 @@ private enum FallbackSceneFactory {
                     shadowTint: SIMD4<Float>(0.95, 0.99, 1.04, 1.0),
                     highlightTint: SIMD4<Float>(1.04, 1.01, 0.95, 1.0),
                     shadowBalance: 0.44,
-                    vignetteStrength: 0.08
+                    vignetteStrength: 0.08,
+                    ssaoStrength: 0.0,
+                    ssaoRadius: 1.6,
+                    ssaoBias: 0.0008
                 )
             ),
             scopeConfiguration: ScopeConfiguration(),
@@ -3388,8 +3990,45 @@ private enum FallbackSceneFactory {
                 routeLoaderStatus: "alternate route loader unavailable",
                 routeValidationStatus: "route validation unavailable",
                 routeValidationRule: "fallback scene has no staged route",
+                routeSelectionStatus: "route selection unavailable",
+                routeSelectionRule: "fallback scene has no staged route",
+                routeActivationStatus: "route activation unavailable",
+                routeActivationRule: "fallback scene has no staged route",
+                routeRollbackStatus: "route rollback unavailable",
+                routeRollbackRule: "fallback scene has no staged route",
+                routeCommitStatus: "route commit unavailable",
+                routeCommitRule: "fallback scene has no staged route",
+                routeDryRunStatus: "route dry run unavailable",
+                routeDryRunRule: "fallback scene has no staged route",
+                routePromotionStatus: "route promotion unavailable",
+                routePromotionRule: "fallback scene has no staged route",
+                routeAuditStatus: "route audit unavailable",
+                routeAuditRule: "fallback scene has no staged route",
+                routeBoundaryStatus: "route boundary unavailable",
+                routeBoundaryRule: "fallback scene has no staged route",
+                routeArmingStatus: "route arming unavailable",
+                routeArmingRule: "fallback scene has no staged route",
+                routeConfirmationStatus: "route confirmation unavailable",
+                routeConfirmationRule: "fallback scene has no staged route",
+                routeReleaseStatus: "route release unavailable",
+                routeReleaseRule: "fallback scene has no staged route",
+                routePreflightStatus: "route preflight unavailable",
+                routePreflightRule: "fallback scene has no staged route",
                 routeHandoffStatus: "route handoff unavailable",
                 routeHandoffRule: "fallback scene has no staged route",
+                collisionAuthoringStatus: "collision authoring unavailable",
+                collisionAuthoringRule: "fallback scene has no collision blockers",
+                collisionAuthoringAudit: "fallback audit unavailable",
+                collisionAuthoringBlockerScope: "fallback blockers unavailable",
+                environmentalMotionStatus: "environmental motion unavailable",
+                environmentalMotionRule: "fallback scene has no authored terrain motion",
+                environmentalMotionWindSummary: "fallback scene has no authored terrain motion / wind 0.00 gust 0.00",
+                surfaceFidelityStatus: "surface fidelity unavailable",
+                surfaceFidelityRule: "fallback scene has no environmental fidelity stack",
+                surfaceFidelitySummary: "fallback scene has no surface fidelity stack",
+                sessionPersistenceStatus: "session persistence unavailable",
+                sessionPersistenceRule: "fallback scene has no resumable route state",
+                sessionPersistenceSummary: "fallback scene has no session persistence plan",
                 reviewPackTitle: "Fallback Review Pack",
                 reviewPackSummary: "Review pack data unavailable",
                 referenceGallery: "Unavailable",
@@ -3444,6 +4083,30 @@ private enum FallbackSceneFactory {
                     loaderStatus: "alternate route loader unavailable",
                     validationStatus: "route validation unavailable",
                     validationRule: "fallback scene has no staged route",
+                    selectionStatus: "route selection unavailable",
+                    selectionRule: "fallback scene has no staged route",
+                    activationStatus: "route activation unavailable",
+                    activationRule: "fallback scene has no staged route",
+                    rollbackStatus: "route rollback unavailable",
+                    rollbackRule: "fallback scene has no staged route",
+                    commitStatus: "route commit unavailable",
+                    commitRule: "fallback scene has no staged route",
+                    dryRunStatus: "route dry run unavailable",
+                    dryRunRule: "fallback scene has no staged route",
+                    promotionStatus: "route promotion unavailable",
+                    promotionRule: "fallback scene has no staged route",
+                    auditStatus: "route audit unavailable",
+                    auditRule: "fallback scene has no staged route",
+                    boundaryStatus: "route boundary unavailable",
+                    boundaryRule: "fallback scene has no staged route",
+                    armingStatus: "route arming unavailable",
+                    armingRule: "fallback scene has no staged route",
+                    confirmationStatus: "route confirmation unavailable",
+                    confirmationRule: "fallback scene has no staged route",
+                    releaseStatus: "route release unavailable",
+                    releaseRule: "fallback scene has no staged route",
+                    preflightStatus: "route preflight unavailable",
+                    preflightRule: "fallback scene has no staged route",
                     handoffStatus: "route handoff unavailable",
                     handoffRule: "fallback scene has no staged route"
                 ),
@@ -3459,6 +4122,15 @@ private enum FallbackSceneFactory {
                 walkSpeed: 4.2,
                 sprintSpeed: 6.8,
                 lookSensitivity: 0.08
+            ),
+            environmentalMotion: EnvironmentalMotionConfiguration(
+                status: "environmental motion unavailable",
+                rule: "fallback scene has no authored terrain motion",
+                windDirection: [0.86, 0.50],
+                windStrength: 0.0,
+                gustStrength: 0.0,
+                vegetationResponse: 0.0,
+                shorelineRippleStrength: 0.0
             ),
             spawnOptions: [
                 SpawnConfiguration(
@@ -3704,6 +4376,65 @@ private enum GeometryBuilder {
                 uv2: SIMD2<Float>(u1, lengthRepeat),
                 uv3: SIMD2<Float>(u0, lengthRepeat),
                 color: color
+            )
+        }
+
+        return vertices
+    }
+
+    static func makeRoadSurfaceDecals(
+        size: SIMD2<Float>,
+        shoulderWidth: Float,
+        crownHeight: Float,
+        count: Int,
+        strength: Float,
+        color: SIMD4<Float>
+    ) -> [SceneVertex] {
+        let halfWidth = max(size.x * 0.5, 0.5)
+        let halfDepth = max(size.y * 0.5, 0.5)
+        let clampedShoulderWidth = min(max(shoulderWidth, 0.1), halfWidth * 0.45)
+        let laneInset = clampedShoulderWidth + 0.28
+        let laneHalfWidth = max(halfWidth - laneInset, halfWidth * 0.28)
+        let decalCount = max(count, 0)
+        guard decalCount > 0, laneHalfWidth > 0.2 else {
+            return []
+        }
+
+        var vertices: [SceneVertex] = []
+        vertices.reserveCapacity(decalCount * 6)
+
+        for index in 0..<decalCount {
+            let fraction = (Float(index) + 0.5) / Float(decalCount)
+            let alternatingSide: Float = index.isMultiple(of: 2) ? -1.0 : 1.0
+            let lateral = alternatingSide * laneHalfWidth * (0.34 + 0.17 * Float(index % 3))
+            let length = min(max(size.y * (0.045 + strength * 0.035), 2.4), 8.5)
+            let width = min(max(size.x * (0.055 + strength * 0.045), 0.45), max(laneHalfWidth * 0.52, 0.55))
+            let centerZ = (-halfDepth + length) + (fraction * max((halfDepth * 2.0) - (length * 2.0), 0.1))
+            let skew = alternatingSide * width * 0.28
+            let x0 = lateral - width * 0.5
+            let x1 = lateral + width * 0.5
+            let z0 = centerZ - length * 0.5
+            let z1 = centerZ + length * 0.5
+            let y0 = roadCrownHeight(x: x0, halfWidth: halfWidth, crownHeight: crownHeight) + 0.026
+            let y1 = roadCrownHeight(x: x1, halfWidth: halfWidth, crownHeight: crownHeight) + 0.026
+            let decalTint = SIMD4<Float>(
+                color.x * (0.88 + Float(index % 3) * 0.04),
+                color.y * (0.88 + Float(index % 3) * 0.04),
+                color.z * (0.88 + Float(index % 3) * 0.04),
+                color.w
+            )
+
+            appendQuad(
+                to: &vertices,
+                p0: SIMD3<Float>(x0, y0, z0),
+                p1: SIMD3<Float>(x1, y1, z0 + skew),
+                p2: SIMD3<Float>(x1, y1, z1 + skew),
+                p3: SIMD3<Float>(x0, y0, z1),
+                uv0: SIMD2<Float>(0, 0),
+                uv1: SIMD2<Float>(1, 0),
+                uv2: SIMD2<Float>(1, 1),
+                uv3: SIMD2<Float>(0, 1),
+                color: decalTint
             )
         }
 

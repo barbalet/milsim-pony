@@ -54,6 +54,12 @@ struct JungleTerrainFrame {
     let visibilityDistance: Float
     let ambientWetness: Float
     let shorelineSpace: Float
+    let windDirection: SIMD2<Float>
+    let windStrength: Float
+    let gustStrength: Float
+    let vegetationResponse: Float
+    let shorelineRippleStrength: Float
+    let waterSurfaceResponse: Float
     let terrainPatch: JungleTerrainPatch
     let groundMaterial: JungleMaterialChannel
     let groundCoverMaterial: JungleMaterialChannel
@@ -82,6 +88,7 @@ struct SceneUniforms {
     var lightingParameters: SIMD4<Float>
     var atmosphereParameters: SIMD4<Float>
     var shadowParameters: SIMD4<Float>
+    var motionParameters: SIMD4<Float>
 }
 
 struct SceneMaterialUniforms {
@@ -94,6 +101,7 @@ struct ScenePostProcessUniforms {
     var shadowTint: SIMD4<Float>
     var highlightTint: SIMD4<Float>
     var gradeParameters: SIMD4<Float>
+    var aoParameters: SIMD4<Float>
 }
 
 struct SkyUniforms {

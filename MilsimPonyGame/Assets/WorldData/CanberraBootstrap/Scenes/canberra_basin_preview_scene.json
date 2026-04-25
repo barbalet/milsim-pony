@@ -1,10 +1,10 @@
 {
-  "cycleLabel": "Cycle 38 Alternate Route Handoff Plan",
-  "sceneName": "Canberra Alternate Route Handoff Plan Validation",
+  "cycleLabel": "Cycle 70 Restore Cleanup Preview",
+  "sceneName": "Canberra Restore Cleanup Preview Validation",
   "planningNotes": [
-    "Plan: cycle 38 adds the alternate-route handoff plan while the live Woden-to-Belconnen route remains the only bound playable route.",
-    "Breakdown: preserve the cycle 32 overhead-map preview path, cycle 33 selection readiness, cycle 34 checkpoint ownership, cycle 35 active-route staging, cycle 36 route metrics, and cycle 37 binding gate while surfacing the restart-safe handoff rule.",
-    "Reference: carry the cycle 28 group-observer baseline, cycle 29 observer-audio feedback, cycle 30 mission hooks, cycle 31 route authoring data, cycle 32 map preview, cycle 33 selection rules, cycle 34 ownership split, cycle 35 loader staging, cycle 36 metrics, and cycle 37 gate validation forward as the foundation for live route binding."
+    "Plan: cycle 70 adds a restore-cleanup preview report while the live Woden-to-Belconnen route remains the only bound playable route.",
+    "Breakdown: preserve the cycle 69 restore-retention policy while previewing whether a future cleanup action would clear stale review cards, without deleting anything.",
+    "Reference: carry the cycle 28 group-observer baseline, cycle 29 observer-audio feedback, cycle 30 mission hooks, cycles 31 through 50 alternate-route staging, cycle 51 collision-authoring readiness, cycles 52 through 57 environmental fidelity work, cycle 58 persistence-readiness reporting, cycle 59 last-review persistence, cycle 60 resume-card context, cycle 61 guardrails, cycle 62 restore-target preview, cycle 63 readiness report, cycle 64 manual arming, cycle 65 prompt contract, cycle 66 execution gate, cycle 67 audit trail, cycle 68 freshness policy, and cycle 69 retention policy forward as the foundation for capture packaging."
   ],
   "spawn": {
     "label": "Woden Town Centre Staging",
@@ -138,6 +138,9 @@
     "saturation": 1.05,
     "shadowBalance": 0.43,
     "vignetteStrength": 0.10,
+    "ssaoStrength": 0.24,
+    "ssaoRadius": 2.0,
+    "ssaoBias": 0.0007,
     "shadowTint": [0.95, 0.99, 1.04],
     "highlightTint": [1.05, 1.01, 0.94]
   },
@@ -157,9 +160,34 @@
     "holdBreathDurationSeconds": 3.6,
     "holdBreathRecoverySeconds": 5.4
   },
+  "environmentalMotion": {
+    "status": "water surface motion active; route binding unchanged",
+    "rule": "drive vegetation, shoreline, and lake-surface motion from scene-authored wind controls",
+    "windDirection": [0.78, -0.62],
+    "windStrength": 0.72,
+    "gustStrength": 0.34,
+    "vegetationResponse": 1.12,
+    "shorelineRippleStrength": 0.26,
+    "waterSurfaceResponse": 0.86
+  },
+  "materialBreakup": {
+    "status": "landmark material breakup active; route binding unchanged",
+    "rule": "generate low-profile mesh scuffs and named landmark facade variation without changing collision or route markers",
+    "roadDecalDensity": 0.72,
+    "roadScuffStrength": 0.48,
+    "landmarkBreakupStrength": 0.42
+  },
+  "surfaceFidelity": {
+    "status": "surface fidelity closeout active; route binding unchanged",
+    "rule": "review vegetation, wind, water, SSAO, road decals, and landmark breakup as one readable Canberra surface stack"
+  },
+  "sessionPersistence": {
+    "status": "restore cleanup preview report active; runtime restore still pending",
+    "rule": "preview future stale-card cleanup while keeping persisted review state untouched in this build"
+  },
   "route": {
     "name": "Canberra Combat-Lane Rehearsal",
-    "summary": "Follow one authored line from Woden to Belconnen while scoped rifle drift, grouped observer relays, alert memory, observer audio, mission-script hooks, active-route loader staging, alternate-route metrics, binding-gate validation, handoff planning, checkpoint ownership, and contact-lane cues validate that the atlas can carry route expansion without losing Canberra readability.",
+    "summary": "Follow one authored line from Woden to Belconnen while scoped rifle drift, grouped observer relays, alert memory, observer audio, mission-script hooks, active-route loader staging, alternate-route metrics, binding-gate validation, selection locking, activation guarding, rollback guarding, commit gating, dry-run comparison, handoff planning, checkpoint ownership, and contact-lane cues validate that the atlas can carry route expansion without losing Canberra readability.",
     "checkpoints": [
       {
         "id": "woden_town_centre_staging",
@@ -308,7 +336,7 @@
   },
   "reviewPack": {
     "title": "Canberra Review Pack Baseline",
-    "summary": "Reference-backed Woden-to-Belconnen atlas baseline carried forward into the alternate-route handoff-plan pass.",
+    "summary": "Reference-backed Woden-to-Belconnen atlas baseline carried forward into the alternate-route dry-run pass.",
     "referenceGallery": "CanberraReferenceGallery",
     "textureLibrary": "Canberra Texture Library",
     "captureFormat": "Open the map on district handoffs, raise the 4x scope on skyline stops, and use the pause shell for route-proof captures.",
@@ -384,8 +412,8 @@
     ]
   },
   "combatRehearsal": {
-    "title": "Canberra Cycle 38 Alternate Route Handoff Plan",
-    "summary": "Live Woden-to-Belconnen contact pass with paired observer relays, expanded alert audio, mission-script checkpoint hooks, active-route loader staging, staged alternate-route metrics, binding-gate validation, restart-safe handoff planning, alternate-route preview pathing, explicit selection readiness, checkpoint ownership metadata, clearer observer-state HUD feedback, cover cues, recovery notes, persistent field-difficulty tuning, and authored rifle stability layered over the full atlas route.",
+    "title": "Canberra Cycle 70 Restore Cleanup Preview",
+    "summary": "Live Woden-to-Belconnen contact pass with paired observer relays, expanded alert audio, mission-script checkpoint hooks, active-route loader staging, staged alternate-route metrics, binding-gate validation, briefing-only selection locking, guarded alternate-route activation, primary-route rollback guarding, staged-route commit gating, non-mutating alternate-route dry-run comparison, promotion-readiness review, promotion-audit reporting, restart-boundary rehearsal, handoff-arming preview, handoff-confirmation reporting, release-gate reporting, live-switch preflight reporting, collision-authoring readiness reporting, scene-authored wind, shoreline, lake-surface motion, screen-space surface-depth, road material-breakup, landmark facade variation, surface-fidelity closeout reporting, session-persistence readiness reporting, last-review state persistence, review-resume capture context, review-persistence guardrails, restore-target previewing, restore-readiness reporting, manual-restore arming, manual-restore prompt contract reporting, restore-execution gate reporting, restore-audit trail reporting, restore-freshness policy reporting, restore-retention policy reporting, and restore-cleanup preview reporting layered over the full atlas route.",
     "exposureGuide": "Open ground is intentional; move between named cover screens before raising the optic on skyline-heavy checkpoints.",
     "recoveryRule": "If suspicion spikes, break line of sight, re-anchor on the nearest cover screen, and retry the current lane from the latest checkpoint rather than freelancing a shortcut.",
     "contactStops": [
@@ -565,11 +593,41 @@
     "selectedAlternateRouteID": "east_basin_to_belconnen_probe",
     "selectedAlternateRouteLabel": "East Basin To Belconnen Probe",
     "bindingStatus": "primary route bound",
-    "loaderStatus": "alternate route handoff plan staged",
+    "loaderStatus": "alternate route live-switch preflight staged",
     "validationStatus": "staged alternate route eligible; live switch disabled",
     "validationRule": "requires 3+ markers, 100m+ planned distance, and 2+ sectors",
+    "selectionStatus": "briefing selection locked; live switch disabled",
+    "selectionRule": "route choice may change only from briefing before a run starts",
+    "activationStatus": "activation guard armed; primary route still live",
+    "activationRule": "selected alternate route may activate only on a fresh run boundary after loader binding",
+    "rollbackStatus": "rollback guard armed; primary route remains recoverable",
+    "rollbackRule": "failed alternate binding returns to the primary route before checkpoint order changes",
+    "commitStatus": "commit gate staged; checkpoint sequence unchanged",
+    "commitRule": "commit selected alternate route only after validation, activation, and rollback guards pass",
+    "dryRunStatus": "dry run staged; active route not mutated",
+    "dryRunRule": "compare selected alternate checkpoint order against the active route before commit",
+    "promotionStatus": "promotion readiness staged; active route still locked",
+    "promotionRule": "promote selected alternate only after dry-run review passes and commit remains staged",
+    "auditStatus": "promotion audit passed for review; live binding unchanged",
+    "auditRule": "audit must confirm active route id, checkpoint count, and restart boundary before promotion",
+    "boundaryStatus": "restart boundary rehearsal staged; live route unchanged",
+    "boundaryRule": "handoff may arm only from briefing or checkpoint restart before first alternate checkpoint",
+    "armingStatus": "handoff arming staged; live route still primary",
+    "armingRule": "arming records selected alternate eligibility without rebinding active checkpoints",
+    "confirmationStatus": "handoff confirmation staged; primary route remains bound",
+    "confirmationRule": "confirm selected alternate handoff only as review metadata until live switch is implemented",
+    "releaseStatus": "release gate staged; live switch still disabled",
+    "releaseRule": "release alternate route only after future live-switch code exists and primary rollback is proven",
+    "preflightStatus": "live-switch preflight staged; active binding unchanged",
+    "preflightRule": "preflight may validate selected alternate readiness but must not mutate checkpoint order",
     "handoffStatus": "restart-safe handoff planned; checkpoint order unchanged",
     "handoffRule": "bind alternate route only from briefing or restart boundary"
+  },
+  "collisionAuthoring": {
+    "status": "collision authoring inventory staged; active route unchanged",
+    "rule": "review sector blockers before editing alternate-route checkpoint ownership",
+    "audit": "runtime blocker count is surfaced beside route preflight metadata",
+    "blockerScope": "graybox blocker volumes and authored sector collision volumes"
   },
   "alternateRoutes": [
     {
@@ -589,9 +647,9 @@
       ],
       "routeType": "preview-candidate",
       "authoringStatus": "map-preview ready; activation waits for dedicated route selection and checkpoint ownership",
-      "selectionMode": "briefing-locked preview",
-      "selectionStatus": "selection-ready metadata",
-      "activationRule": "selectable after live route loader can bind alternate checkpoint ownership",
+      "selectionMode": "briefing-locked candidate",
+      "selectionStatus": "dry run ready; not live-bound",
+      "activationRule": "selectable after briefing route choice can bind alternate checkpoint ownership",
       "checkpointOwnershipStatus": "ownership split ready",
       "sharedCheckpointIDs": [
         "east_basin_lookout",

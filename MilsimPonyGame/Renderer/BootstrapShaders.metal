@@ -20,6 +20,7 @@ struct SceneUniforms {
     float4 lightingParameters;
     float4 atmosphereParameters;
     float4 shadowParameters;
+    float4 motionParameters;
 };
 
 struct SceneMaterialUniforms {
@@ -32,6 +33,7 @@ struct ScenePostProcessUniforms {
     float4 shadowTint;
     float4 highlightTint;
     float4 gradeParameters;
+    float4 aoParameters;
 };
 
 struct SkyUniforms {
@@ -77,6 +79,15 @@ vertex BootstrapVertexOut bootstrapVertexMain(
 ) {
     SceneVertex inVertex = vertices[vertexID];
     float4 worldPosition = uniforms.modelMatrix * float4(inVertex.position, 1.0);
+    float waterRippleStrength = max(uniforms.motionParameters.z, 0.0);
+    if (waterRippleStrength > 0.0001) {
+        float2 windDirection = normalize(uniforms.motionParameters.xy + float2(0.0001, 0.0));
+        float time = uniforms.motionParameters.w;
+        float directionalWave = sin(dot(worldPosition.xz, windDirection) * 0.115 + time * 0.95);
+        float crossWave = sin((worldPosition.x - worldPosition.z) * 0.052 + time * 1.27);
+        worldPosition.y += ((directionalWave * 0.055) + (crossWave * 0.030)) * waterRippleStrength;
+    }
+
     BootstrapVertexOut out;
     out.position = uniforms.viewProjectionMatrix * worldPosition;
     out.color = inVertex.color;
@@ -98,6 +109,15 @@ vertex float4 bootstrapShadowVertexMain(
 ) {
     SceneVertex inVertex = vertices[vertexID];
     float4 worldPosition = uniforms.modelMatrix * float4(inVertex.position, 1.0);
+    float waterRippleStrength = max(uniforms.motionParameters.z, 0.0);
+    if (waterRippleStrength > 0.0001) {
+        float2 windDirection = normalize(uniforms.motionParameters.xy + float2(0.0001, 0.0));
+        float time = uniforms.motionParameters.w;
+        float directionalWave = sin(dot(worldPosition.xz, windDirection) * 0.115 + time * 0.95);
+        float crossWave = sin((worldPosition.x - worldPosition.z) * 0.052 + time * 1.27);
+        worldPosition.y += ((directionalWave * 0.055) + (crossWave * 0.030)) * waterRippleStrength;
+    }
+
     return uniforms.shadowViewProjectionMatrix * worldPosition;
 }
 
@@ -164,10 +184,24 @@ fragment float4 bootstrapFragmentMain(
     sampler surfaceSampler [[sampler(0)]],
     sampler shadowSampler [[sampler(1)]]
 ) {
-    float4 sampledAlbedo = albedoTexture.sample(surfaceSampler, in.uv);
-    float4 sampledNormal = normalTexture.sample(surfaceSampler, in.uv);
-    float sampledRoughness = roughnessTexture.sample(surfaceSampler, in.uv).r;
-    float sampledAmbientOcclusion = ambientOcclusionTexture.sample(surfaceSampler, in.uv).r;
+    float waterRippleStrength = max(uniforms.motionParameters.z, 0.0);
+    float2 surfaceUV = in.uv;
+    float waterPhase = 0.0;
+    if (waterRippleStrength > 0.0001) {
+        float2 windDirection = normalize(uniforms.motionParameters.xy + float2(0.0001, 0.0));
+        float time = uniforms.motionParameters.w;
+        waterPhase = dot(in.worldPosition.xz, windDirection) * 0.095 + time * 0.62;
+        surfaceUV += windDirection * (time * 0.011 * waterRippleStrength);
+        surfaceUV += float2(
+            sin(waterPhase + in.worldPosition.z * 0.041),
+            cos(waterPhase + in.worldPosition.x * 0.037)
+        ) * (0.006 * waterRippleStrength);
+    }
+
+    float4 sampledAlbedo = albedoTexture.sample(surfaceSampler, surfaceUV);
+    float4 sampledNormal = normalTexture.sample(surfaceSampler, surfaceUV);
+    float sampledRoughness = roughnessTexture.sample(surfaceSampler, surfaceUV).r;
+    float sampledAmbientOcclusion = ambientOcclusionTexture.sample(surfaceSampler, surfaceUV).r;
 
     float3 lightDirection = normalize(-uniforms.lightDirection.xyz);
     float3 viewDirection = normalize(uniforms.cameraPosition.xyz - in.worldPosition);
@@ -178,10 +212,21 @@ fragment float4 bootstrapFragmentMain(
     tangentSpaceNormal.xy *= material.channelFactors.z;
     float3x3 tangentFrame = float3x3(tangent, bitangent, geometricNormal);
     float3 shadedNormal = normalize(tangentFrame * tangentSpaceNormal);
+    if (waterRippleStrength > 0.0001) {
+        float rippleX = sin(waterPhase + in.worldPosition.x * 0.087);
+        float rippleZ = cos(waterPhase + in.worldPosition.z * 0.074);
+        float3 rippleNormal = normalize(float3(rippleX * 0.16, 1.0, rippleZ * 0.16));
+        shadedNormal = normalize(mix(shadedNormal, rippleNormal, clamp(waterRippleStrength * 0.45, 0.0, 0.75)));
+    }
+
     float3 halfVector = normalize(lightDirection + viewDirection);
     float3 baseColor = in.color.rgb * material.baseColorFactor.rgb * sampledAlbedo.rgb;
+    if (waterRippleStrength > 0.0001) {
+        baseColor = mix(baseColor, float3(0.20, 0.45, 0.63), clamp(waterRippleStrength * 0.16, 0.0, 0.28));
+    }
+
     float diffuse = clamp(dot(shadedNormal, lightDirection), 0.0, 1.0);
-    float roughness = clamp(sampledRoughness * material.channelFactors.x, 0.04, 1.0);
+    float roughness = clamp((sampledRoughness * material.channelFactors.x) - (waterRippleStrength * 0.04), 0.03, 1.0);
     float ambientOcclusion = mix(1.0, sampledAmbientOcclusion, material.channelFactors.y);
     float ambientIntensity = uniforms.lightingParameters.x;
     float diffuseIntensity = uniforms.lightingParameters.y;
@@ -189,7 +234,7 @@ fragment float4 bootstrapFragmentMain(
     float fogFar = uniforms.lightingParameters.w;
     float hazeStrength = max(uniforms.atmosphereParameters.x, 0.0);
     float specularPower = mix(128.0, 10.0, roughness);
-    float specularStrength = mix(0.16, 0.02, roughness);
+    float specularStrength = mix(0.16, 0.02, roughness) + (waterRippleStrength * 0.035);
     float specular = pow(clamp(dot(shadedNormal, halfVector), 0.0, 1.0), specularPower) * specularStrength * diffuse;
     float3 ambient = baseColor * ambientIntensity * ambientOcclusion;
     float shadowVisibility = sampleShadowVisibility(
@@ -248,10 +293,37 @@ fragment float4 postProcessFragmentMain(
     SkyVertexOut in [[stage_in]],
     constant ScenePostProcessUniforms &uniforms [[buffer(0)]],
     texture2d<float> sceneTexture [[texture(0)]],
+    depth2d<float> sceneDepthTexture [[texture(1)]],
     sampler postSampler [[sampler(0)]]
 ) {
-    float2 uv = saturate(in.uv);
+    float2 uv = float2(saturate(in.uv.x), saturate(1.0 - in.uv.y));
     float3 hdrColor = max(sceneTexture.sample(postSampler, uv).rgb, 0.0);
+    float depth = sceneDepthTexture.sample(postSampler, uv);
+    float ssaoStrength = clamp(uniforms.aoParameters.x, 0.0, 1.0);
+    float ssaoRadius = max(uniforms.aoParameters.y, 0.5);
+    float ssaoBias = max(uniforms.aoParameters.z, 0.0);
+    float2 texelSize = 1.0 / float2(sceneDepthTexture.get_width(), sceneDepthTexture.get_height());
+    float contactDepth = 0.0;
+    if (ssaoStrength > 0.0001 && depth < 0.9999) {
+        constexpr float2 offsets[8] = {
+            float2(1.0, 0.0),
+            float2(-1.0, 0.0),
+            float2(0.0, 1.0),
+            float2(0.0, -1.0),
+            float2(0.7071, 0.7071),
+            float2(-0.7071, 0.7071),
+            float2(0.7071, -0.7071),
+            float2(-0.7071, -0.7071)
+        };
+
+        for (uint index = 0; index < 8; ++index) {
+            float neighborDepth = sceneDepthTexture.sample(postSampler, saturate(uv + offsets[index] * texelSize * ssaoRadius));
+            float closerNeighbor = max(depth - neighborDepth - ssaoBias, 0.0);
+            contactDepth += saturate(closerNeighbor * 280.0);
+        }
+        contactDepth *= 0.125;
+    }
+
     float exposure = exp2(uniforms.exposureParameters.x);
     float whitePoint = max(uniforms.exposureParameters.y, 0.001);
     float contrast = max(uniforms.exposureParameters.z, 0.0);
@@ -260,6 +332,7 @@ fragment float4 postProcessFragmentMain(
     float vignetteStrength = clamp(uniforms.gradeParameters.y, 0.0, 1.0);
 
     float3 graded = hdrColor * exposure;
+    graded *= 1.0 - (contactDepth * ssaoStrength * 0.42);
     graded /= whitePoint;
     graded = filmicToneMap(graded);
 

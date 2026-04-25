@@ -66,11 +66,12 @@ private struct AuxiliaryWindowBridge: View {
                 openWindow(id: AuxiliaryWindowID.controls.rawValue)
                 syncMenuWindow()
                 syncMapWindow()
+                recoverGameplayInputFocus()
             }
             .onChange(of: session.isMapPresented) { _, _ in
                 syncMapWindow()
             }
-            .onChange(of: session.menuPanel != nil) { _, _ in
+            .onChange(of: session.menuPanel) { _, _ in
                 syncMenuWindow()
             }
     }
@@ -78,22 +79,26 @@ private struct AuxiliaryWindowBridge: View {
     private func syncMenuWindow() {
         if session.menuPanel != nil {
             openWindow(id: AuxiliaryWindowID.menu.rawValue)
+            recoverGameplayInputFocus()
         } else {
             dismissWindow(id: AuxiliaryWindowID.menu.rawValue)
-            session.enqueueStateChange { state in
-                state.scheduleGameplayInputFocusRecovery()
-            }
+            recoverGameplayInputFocus()
         }
     }
 
     private func syncMapWindow() {
         if session.isMapPresented {
             openWindow(id: AuxiliaryWindowID.map.rawValue)
+            recoverGameplayInputFocus()
         } else {
             dismissWindow(id: AuxiliaryWindowID.map.rawValue)
-            session.enqueueStateChange { state in
-                state.scheduleGameplayInputFocusRecovery()
-            }
+            recoverGameplayInputFocus()
+        }
+    }
+
+    private func recoverGameplayInputFocus() {
+        session.enqueueStateChange { state in
+            state.scheduleGameplayInputFocusRecovery()
         }
     }
 }
@@ -1590,9 +1595,89 @@ private struct OverheadMapCanvas: View {
                 .foregroundStyle(.white.opacity(0.64))
                 .fixedSize(horizontal: false, vertical: true)
 
+            Text(routeSelectionLine)
+                .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.635))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(routeActivationLine)
+                .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.632))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(routeRollbackLine)
+                .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.631))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(routeCommitLine)
+                .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.630))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(routeDryRunLine)
+                .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.629))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(routePromotionLine)
+                .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.628))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(routeAuditLine)
+                .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.627))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(routeBoundaryLine)
+                .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.626))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(routeArmingLine)
+                .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.625))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(routeConfirmationLine)
+                .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.624))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(routeReleaseLine)
+                .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.623))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(routePreflightLine)
+                .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.622))
+                .fixedSize(horizontal: false, vertical: true)
+
             Text(routeHandoffLine)
                 .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
                 .foregroundStyle(.white.opacity(0.63))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(collisionAuthoringLine)
+                .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.622))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(environmentalMotionLine)
+                .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.622))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(surfaceFidelityLine)
+                .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.622))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(sessionPersistenceLine)
+                .font(.system(size: min(10 * canvasScale, 15), weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.622))
                 .fixedSize(horizontal: false, vertical: true)
 
             Text("Review Pack: \(snapshot.configuration.reviewPackTitle) • refs \(snapshot.configuration.referenceGallery) • \(snapshot.configuration.openRisks.count) risks")
@@ -1672,8 +1757,72 @@ private struct OverheadMapCanvas: View {
         "Route Validation: \(snapshot.configuration.routeValidationStatus) • \(snapshot.configuration.routeValidationRule)"
     }
 
+    private var routeSelectionLine: String {
+        "Route Selection: \(snapshot.configuration.routeSelectionStatus) • \(snapshot.configuration.routeSelectionRule)"
+    }
+
+    private var routeActivationLine: String {
+        "Route Activation: \(snapshot.configuration.routeActivationStatus) • \(snapshot.configuration.routeActivationRule)"
+    }
+
+    private var routeRollbackLine: String {
+        "Route Rollback: \(snapshot.configuration.routeRollbackStatus) • \(snapshot.configuration.routeRollbackRule)"
+    }
+
+    private var routeCommitLine: String {
+        "Route Commit: \(snapshot.configuration.routeCommitStatus) • \(snapshot.configuration.routeCommitRule)"
+    }
+
+    private var routeDryRunLine: String {
+        "Route Dry Run: \(snapshot.configuration.routeDryRunStatus) • \(snapshot.configuration.routeDryRunRule)"
+    }
+
+    private var routePromotionLine: String {
+        "Route Promotion: \(snapshot.configuration.routePromotionStatus) • \(snapshot.configuration.routePromotionRule)"
+    }
+
+    private var routeAuditLine: String {
+        "Route Audit: \(snapshot.configuration.routeAuditStatus) • \(snapshot.configuration.routeAuditRule)"
+    }
+
+    private var routeBoundaryLine: String {
+        "Route Boundary: \(snapshot.configuration.routeBoundaryStatus) • \(snapshot.configuration.routeBoundaryRule)"
+    }
+
+    private var routeArmingLine: String {
+        "Route Arming: \(snapshot.configuration.routeArmingStatus) • \(snapshot.configuration.routeArmingRule)"
+    }
+
+    private var routeConfirmationLine: String {
+        "Route Confirmation: \(snapshot.configuration.routeConfirmationStatus) • \(snapshot.configuration.routeConfirmationRule)"
+    }
+
+    private var routeReleaseLine: String {
+        "Route Release: \(snapshot.configuration.routeReleaseStatus) • \(snapshot.configuration.routeReleaseRule)"
+    }
+
+    private var routePreflightLine: String {
+        "Route Preflight: \(snapshot.configuration.routePreflightStatus) • \(snapshot.configuration.routePreflightRule)"
+    }
+
     private var routeHandoffLine: String {
         "Route Handoff: \(snapshot.configuration.routeHandoffStatus) • \(snapshot.configuration.routeHandoffRule)"
+    }
+
+    private var collisionAuthoringLine: String {
+        "Collision Authoring: \(snapshot.configuration.collisionAuthoringStatus) • \(snapshot.configuration.collisionAuthoringRule)"
+    }
+
+    private var environmentalMotionLine: String {
+        "Environmental Motion: \(snapshot.configuration.environmentalMotionStatus) • \(snapshot.configuration.environmentalMotionWindSummary)"
+    }
+
+    private var surfaceFidelityLine: String {
+        "Surface Fidelity: \(snapshot.configuration.surfaceFidelityStatus) • \(snapshot.configuration.surfaceFidelitySummary)"
+    }
+
+    private var sessionPersistenceLine: String {
+        "Session Persistence: \(snapshot.configuration.sessionPersistenceStatus) • \(snapshot.configuration.sessionPersistenceSummary)"
     }
 
     private var comparisonLine: String {

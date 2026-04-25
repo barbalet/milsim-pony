@@ -32,11 +32,16 @@ struct SceneConfiguration: Decodable {
     let shadow: ShadowConfiguration?
     let postProcess: PostProcessConfiguration?
     let ballistics: BallisticsConfiguration?
+    let environmentalMotion: EnvironmentalMotionConfiguration?
+    let materialBreakup: MaterialBreakupConfiguration?
+    let surfaceFidelity: SurfaceFidelityConfiguration?
+    let sessionPersistence: SessionPersistenceConfiguration?
     let route: RouteConfiguration
     let reviewPack: ReviewPackConfiguration?
     let combatRehearsal: CombatRehearsalConfiguration?
     let missionScript: MissionScriptConfiguration?
     let routeSelection: RouteSelectionConfiguration?
+    let collisionAuthoring: CollisionAuthoringConfiguration?
     let alternateRoutes: [AlternateRouteConfiguration]?
     let detection: DetectionConfiguration?
     let guidance: GuidanceConfiguration?
@@ -151,6 +156,9 @@ struct PostProcessConfiguration: Decodable {
     let saturation: Float?
     let shadowBalance: Float?
     let vignetteStrength: Float?
+    let ssaoStrength: Float?
+    let ssaoRadius: Float?
+    let ssaoBias: Float?
     let shadowTint: [Float]?
     let highlightTint: [Float]?
 
@@ -161,6 +169,9 @@ struct PostProcessConfiguration: Decodable {
         saturation: Float? = 1.02,
         shadowBalance: Float? = 0.44,
         vignetteStrength: Float? = 0.08,
+        ssaoStrength: Float? = 0.18,
+        ssaoRadius: Float? = 1.6,
+        ssaoBias: Float? = 0.0008,
         shadowTint: [Float]? = nil,
         highlightTint: [Float]? = nil
     ) {
@@ -170,6 +181,9 @@ struct PostProcessConfiguration: Decodable {
         self.saturation = saturation
         self.shadowBalance = shadowBalance
         self.vignetteStrength = vignetteStrength
+        self.ssaoStrength = ssaoStrength
+        self.ssaoRadius = ssaoRadius
+        self.ssaoBias = ssaoBias
         self.shadowTint = shadowTint
         self.highlightTint = highlightTint
     }
@@ -387,6 +401,95 @@ struct SunConfiguration: Decodable {
     }
 }
 
+struct EnvironmentalMotionConfiguration: Decodable {
+    let status: String?
+    let rule: String?
+    let windDirection: [Float]?
+    let windStrength: Float?
+    let gustStrength: Float?
+    let vegetationResponse: Float?
+    let shorelineRippleStrength: Float?
+    let waterSurfaceResponse: Float?
+
+    init(
+        status: String? = "environmental motion pending",
+        rule: String? = "scene uses default terrain breeze",
+        windDirection: [Float]? = nil,
+        windStrength: Float? = 0.55,
+        gustStrength: Float? = 0.25,
+        vegetationResponse: Float? = 1.0,
+        shorelineRippleStrength: Float? = 0.18,
+        waterSurfaceResponse: Float? = 0.72
+    ) {
+        self.status = status
+        self.rule = rule
+        self.windDirection = windDirection
+        self.windStrength = windStrength
+        self.gustStrength = gustStrength
+        self.vegetationResponse = vegetationResponse
+        self.shorelineRippleStrength = shorelineRippleStrength
+        self.waterSurfaceResponse = waterSurfaceResponse
+    }
+
+    var windDirectionVector: SIMD2<Float> {
+        guard let windDirection, windDirection.count >= 2 else {
+            return SIMD2<Float>(0.86, 0.50)
+        }
+
+        let vector = SIMD2<Float>(windDirection[0], windDirection[1])
+        let length = simd_length(vector)
+        return length > 0.0001 ? vector / length : SIMD2<Float>(0.86, 0.50)
+    }
+}
+
+struct MaterialBreakupConfiguration: Decodable {
+    let status: String?
+    let rule: String?
+    let roadDecalDensity: Float?
+    let roadScuffStrength: Float?
+    let landmarkBreakupStrength: Float?
+
+    init(
+        status: String? = "material breakup pending",
+        rule: String? = "use default road scuff decals",
+        roadDecalDensity: Float? = 0.55,
+        roadScuffStrength: Float? = 0.42,
+        landmarkBreakupStrength: Float? = 0.20
+    ) {
+        self.status = status
+        self.rule = rule
+        self.roadDecalDensity = roadDecalDensity
+        self.roadScuffStrength = roadScuffStrength
+        self.landmarkBreakupStrength = landmarkBreakupStrength
+    }
+}
+
+struct SurfaceFidelityConfiguration: Decodable {
+    let status: String?
+    let rule: String?
+
+    init(
+        status: String? = "surface fidelity review pending",
+        rule: String? = "review environmental motion, water, SSAO, decals, and material breakup together"
+    ) {
+        self.status = status
+        self.rule = rule
+    }
+}
+
+struct SessionPersistenceConfiguration: Decodable {
+    let status: String?
+    let rule: String?
+
+    init(
+        status: String? = "session persistence planning pending",
+        rule: String? = "capture route, checkpoint, difficulty, map, and review state before save/resume activation"
+    ) {
+        self.status = status
+        self.rule = rule
+    }
+}
+
 struct RouteConfiguration: Decodable {
     let name: String
     let summary: String
@@ -496,8 +599,39 @@ struct RouteSelectionConfiguration: Decodable {
     let loaderStatus: String
     let validationStatus: String
     let validationRule: String
+    let selectionStatus: String?
+    let selectionRule: String?
+    let activationStatus: String?
+    let activationRule: String?
+    let rollbackStatus: String?
+    let rollbackRule: String?
+    let commitStatus: String?
+    let commitRule: String?
+    let dryRunStatus: String?
+    let dryRunRule: String?
+    let promotionStatus: String?
+    let promotionRule: String?
+    let auditStatus: String?
+    let auditRule: String?
+    let boundaryStatus: String?
+    let boundaryRule: String?
+    let armingStatus: String?
+    let armingRule: String?
+    let confirmationStatus: String?
+    let confirmationRule: String?
+    let releaseStatus: String?
+    let releaseRule: String?
+    let preflightStatus: String?
+    let preflightRule: String?
     let handoffStatus: String
     let handoffRule: String
+}
+
+struct CollisionAuthoringConfiguration: Decodable {
+    let status: String
+    let rule: String
+    let audit: String
+    let blockerScope: String
 }
 
 struct AlternateRouteConfiguration: Decodable {

@@ -416,6 +416,7 @@ final class GameRenderer: NSObject, MTKViewDelegate {
 
         drawPostProcessedScene(
             from: sceneColorTexture,
+            depthTexture: sceneDepthTexture,
             encoder: postProcessEncoder
         )
         postProcessEncoder.endEncoding()
@@ -548,6 +549,11 @@ final class GameRenderer: NSObject, MTKViewDelegate {
         encoder.setFragmentSamplerState(shadowCompareSamplerState, index: 1)
 
         for drawable in drawables {
+            let waterSurfaceResponse = drawable.textureKey == .water ? max(terrainFrame.waterSurfaceResponse, 0) : 0
+            let waterRippleStrength = min(
+                max(terrainFrame.shorelineRippleStrength * waterSurfaceResponse, 0),
+                3.0
+            )
             var uniforms = SceneUniforms(
                 viewProjectionMatrix: viewProjectionMatrix,
                 shadowViewProjectionMatrix: shadowFrame.viewProjectionMatrix,
@@ -578,6 +584,12 @@ final class GameRenderer: NSObject, MTKViewDelegate {
                     shadowFrame.normalBias,
                     shadowFrame.texelSize,
                     0
+                ),
+                motionParameters: SIMD4<Float>(
+                    terrainFrame.windDirection.x,
+                    terrainFrame.windDirection.y,
+                    waterRippleStrength,
+                    Float(terrainFrame.simulatedTimeSeconds)
                 )
             )
             var materialUniforms = SceneMaterialUniforms(
@@ -632,7 +644,8 @@ final class GameRenderer: NSObject, MTKViewDelegate {
                 fogColor: SIMD4<Float>(0, 0, 0, 0),
                 lightingParameters: SIMD4<Float>(0, 0, 0, 0),
                 atmosphereParameters: SIMD4<Float>(0, 0, 0, 0),
-                shadowParameters: SIMD4<Float>(0, 0, 0, 0)
+                shadowParameters: SIMD4<Float>(0, 0, 0, 0),
+                motionParameters: SIMD4<Float>(0, 0, 0, 0)
             )
 
             encoder.setVertexBuffer(drawable.vertexBuffer, offset: 0, index: 0)
@@ -647,6 +660,7 @@ final class GameRenderer: NSObject, MTKViewDelegate {
 
     private func drawPostProcessedScene(
         from sceneTexture: MTLTexture,
+        depthTexture: MTLTexture,
         encoder: MTLRenderCommandEncoder
     ) {
         var uniforms = ScenePostProcessUniforms(
@@ -663,6 +677,12 @@ final class GameRenderer: NSObject, MTKViewDelegate {
                 scene.environment.postProcess.vignetteStrength,
                 0,
                 0
+            ),
+            aoParameters: SIMD4<Float>(
+                scene.environment.postProcess.ssaoStrength,
+                scene.environment.postProcess.ssaoRadius,
+                scene.environment.postProcess.ssaoBias,
+                0
             )
         )
 
@@ -670,6 +690,7 @@ final class GameRenderer: NSObject, MTKViewDelegate {
         encoder.setRenderPipelineState(postProcessPipelineState)
         encoder.setFragmentBytes(&uniforms, length: MemoryLayout<ScenePostProcessUniforms>.stride, index: 0)
         encoder.setFragmentTexture(sceneTexture, index: 0)
+        encoder.setFragmentTexture(depthTexture, index: 1)
         encoder.setFragmentSamplerState(postProcessSamplerState, index: 0)
         encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
     }
@@ -1048,7 +1069,7 @@ final class GameRenderer: NSObject, MTKViewDelegate {
             mipmapped: false
         )
         descriptor.storageMode = .private
-        descriptor.usage = .renderTarget
+        descriptor.usage = [.renderTarget, .shaderRead]
         let texture = device.makeTexture(descriptor: descriptor)
         texture?.label = "SceneHDRDepth"
         return texture
@@ -1089,7 +1110,7 @@ final class GameRenderer: NSObject, MTKViewDelegate {
         )
         descriptor.depthAttachment.texture = depthTexture
         descriptor.depthAttachment.loadAction = .clear
-        descriptor.depthAttachment.storeAction = .dontCare
+        descriptor.depthAttachment.storeAction = .store
         descriptor.depthAttachment.clearDepth = 1.0
         return descriptor
     }
@@ -1192,6 +1213,7 @@ private final class JungleTerrainRenderer {
         var skyColorAndVisibility: SIMD4<Float>
         var atmosphereControls: SIMD4<Float>
         var shadowParameters: SIMD4<Float>
+        var motionParameters: SIMD4<Float>
     }
 
     private enum TerrainLayerKind {
@@ -1271,6 +1293,7 @@ private final class JungleTerrainRenderer {
         float4 skyColorAndVisibility;
         float4 atmosphereControls;
         float4 shadowParameters;
+        float4 motionParameters;
     };
 
     struct TerrainRasterizerData {
@@ -1286,9 +1309,15 @@ private final class JungleTerrainRenderer {
     ) {
         TerrainRasterizerData out;
         float time = uniforms.cameraPositionAndTime.w;
-        float wind = sin((in.position.x * 0.05f) + (in.position.z * 0.04f) + time * 0.9f);
+        float2 windDirection = normalize(uniforms.motionParameters.xy);
+        float windStrength = max(uniforms.motionParameters.z, 0.0f);
+        float gustStrength = max(uniforms.motionParameters.w, 0.0f);
+        float windPhase = dot(in.position.xz, windDirection * 0.055f) + time * (0.78f + gustStrength * 0.34f);
+        float crossPhase = dot(in.position.xz, float2(-windDirection.y, windDirection.x) * 0.031f) + time * 1.37f;
+        float wind = (sin(windPhase) * 0.72f) + (sin(crossPhase) * gustStrength * 0.28f);
         float3 animatedPosition = in.position;
-        animatedPosition.y += wind * in.motion * 0.06f;
+        animatedPosition.xz += windDirection * wind * in.motion * windStrength * 0.045f;
+        animatedPosition.y += wind * in.motion * windStrength * 0.055f;
         out.position = uniforms.viewProjectionMatrix * float4(animatedPosition, 1.0f);
         out.color = in.color;
         out.worldPosition = animatedPosition;
@@ -1301,9 +1330,15 @@ private final class JungleTerrainRenderer {
         constant TerrainUniforms &uniforms [[buffer(1)]]
     ) {
         float time = uniforms.cameraPositionAndTime.w;
-        float wind = sin((in.position.x * 0.05f) + (in.position.z * 0.04f) + time * 0.9f);
+        float2 windDirection = normalize(uniforms.motionParameters.xy);
+        float windStrength = max(uniforms.motionParameters.z, 0.0f);
+        float gustStrength = max(uniforms.motionParameters.w, 0.0f);
+        float windPhase = dot(in.position.xz, windDirection * 0.055f) + time * (0.78f + gustStrength * 0.34f);
+        float crossPhase = dot(in.position.xz, float2(-windDirection.y, windDirection.x) * 0.031f) + time * 1.37f;
+        float wind = (sin(windPhase) * 0.72f) + (sin(crossPhase) * gustStrength * 0.28f);
         float3 animatedPosition = in.position;
-        animatedPosition.y += wind * in.motion * 0.06f;
+        animatedPosition.xz += windDirection * wind * in.motion * windStrength * 0.045f;
+        animatedPosition.y += wind * in.motion * windStrength * 0.055f;
         return uniforms.shadowViewProjectionMatrix * float4(animatedPosition, 1.0f);
     }
 
@@ -1899,10 +1934,13 @@ private final class JungleTerrainRenderer {
     ) -> Float {
         switch layer.kind {
         case .ground:
+            let rippleLift = sample.wetness * frame.shorelineSpace * frame.shorelineRippleStrength
             return max(
                 0.0,
-                sample.groundCover * frame.groundCoverMaterial.motion * 0.16 +
-                    sample.waist * frame.waistMaterial.motion * 0.05
+                (sample.groundCover * frame.groundCoverMaterial.motion * 0.16 +
+                    sample.waist * frame.waistMaterial.motion * 0.05 +
+                    rippleLift * 0.18) *
+                    frame.vegetationResponse
             )
         case .understory:
             return max(
@@ -1910,7 +1948,8 @@ private final class JungleTerrainRenderer {
                 density * (
                     sample.groundCover * frame.groundCoverMaterial.motion * 1.08 +
                         sample.waist * frame.waistMaterial.motion * 0.34
-                )
+                ) *
+                    frame.vegetationResponse
             )
         case .midstory:
             return max(
@@ -1918,7 +1957,8 @@ private final class JungleTerrainRenderer {
                 density * (
                     sample.waist * frame.waistMaterial.motion * 0.92 +
                         sample.head * frame.headMaterial.motion * 0.42
-                )
+                ) *
+                    frame.vegetationResponse
             )
         case .canopy:
             return max(
@@ -1926,7 +1966,8 @@ private final class JungleTerrainRenderer {
                 density * (
                     sample.head * frame.headMaterial.motion * 0.52 +
                         sample.canopy * frame.canopyMaterial.motion * 0.96
-                )
+                ) *
+                    frame.vegetationResponse
             )
         }
     }
@@ -2290,6 +2331,12 @@ private final class JungleTerrainRenderer {
                 shadowFrame.normalBias,
                 shadowFrame.texelSize,
                 0
+            ),
+            motionParameters: SIMD4<Float>(
+                frame.windDirection.x,
+                frame.windDirection.y,
+                frame.windStrength,
+                frame.gustStrength
             )
         )
 
