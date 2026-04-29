@@ -2472,6 +2472,23 @@ void GameCoreRestartRoute(void) {
     printf("[GameCore] Route restart to %.2f %.2f %.2f\n", gameState.respawnX, gameState.respawnY, gameState.respawnZ);
 }
 
+void GameCoreForceRouteFailure(void) {
+    if (!gameState.bootstrapped) {
+        GameCoreBootstrap("implicit");
+        return;
+    }
+
+    if (!gameState.routeComplete && !gameState.routeFailed) {
+        gameState.routeFailed = true;
+        gameState.failCount += 1;
+    }
+
+    gameState.moveSpeed = 0;
+    gameState.distanceToNextCheckpointMeters = 0;
+    GameCoreResetProfilingCounters();
+    printf("[GameCore] Route failure forced by mission script\n");
+}
+
 void GameCoreClearFailure(void) {
     if (!gameState.bootstrapped) {
         GameCoreBootstrap("implicit");

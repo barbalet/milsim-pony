@@ -1,10 +1,10 @@
 {
-  "cycleLabel": "Cycle 116 Save Resume Closeout",
-  "sceneName": "Canberra Save Resume Closeout",
+  "cycleLabel": "Cycle 122 Conditional Mission Scripting",
+  "sceneName": "Canberra Conditional Mission Closeout",
   "planningNotes": [
-    "Plan: cycle 116 closes the REVIEW.md save/resume priority with an explicit saved-run resume UX, route-bound checkpoint restore, and persisted checkpoint-performance evidence.",
-    "Breakdown: preserve the cycle 85 through 115 route, map, material-breakup, collision-authoring, restore-execution, session-audio, scope-calibration, concealment, CSM-profile, reflection-probe, packaging-validation, tester-delivery, lighting-architecture, automated-capture, LOD-switching, time-of-day, Forward+ start, scoped-safe AA, physical-atmosphere, shadow indirect rendering, SDF UI, SSR/IBL, render graph, authored audio mix, firing feedback, group-NPC patrol state, district texture closeout, multi-route binding, scope optics, and collision workflow while promoting the review card into a resume-safe saved session.",
-    "Reference: carry the cycle 28 group-observer baseline, cycle 29 observer-audio feedback, cycle 30 mission hooks, cycles 31 through 50 alternate-route staging, cycle 51 collision-authoring readiness, cycles 52 through 57 environmental fidelity work, cycles 58 through 78 restore safety work, cycles 79 through 115 weapon, route, material, profiling, packaging, tester, lighting, capture, LOD, time-of-day, Forward+, AA, atmosphere, indirect-rendering, SDF UI, SSR, render-graph, audio-mix, firing-feedback, group-NPC, texture, multi-route, scope-optics, and collision-authoring decisions, then add cycle 116 save/resume as the eighth next-priority recovery cycle."
+    "Plan: cycles 118 through 122 close vegetation interaction, difficulty regression, water closeout telemetry, LOS authoring overlay, and conditional mission scripting after the cycle 117 formal profiling baseline.",
+    "Breakdown: preserve the cycle 85 through 117 route, map, material-breakup, collision-authoring, restore-execution, session-audio, scope-calibration, concealment, CSM-profile, reflection-probe, packaging-validation, tester-delivery, lighting-architecture, automated-capture, LOD-switching, time-of-day, Forward+ start, scoped-safe AA, physical-atmosphere, shadow indirect rendering, SDF UI, SSR/IBL, render graph, authored audio mix, firing feedback, group-NPC patrol state, district texture closeout, multi-route binding, scope optics, collision workflow, save/resume, and formal profiling decisions while adding live friction, runtime mission checks, and richer author telemetry.",
+    "Reference: carry the cycle 28 group-observer baseline through cycle 117 profiling evidence, then add cycles 118 through 122 as the next five recovery cycles before all-route minimap, packaging, SSAO, CSM, foliage animation, and final recovery audit work."
   ],
   "spawn": {
     "label": "Woden Town Centre Staging",
@@ -341,16 +341,16 @@
     "probeColor": [0.22, 0.38, 0.52, 1.0]
   },
   "packagingAutomation": {
-    "status": "cycle 116 packaging validation retained",
+    "status": "cycle 122 packaging validation retained",
     "rule": "release packages must pass manifest validation, version policy, archive naming, and package-content smoke checks before tester sharing",
     "versionPolicy": "cycle build number 116 / marketing version 1.16.0",
-    "archivePattern": "MilsimPonyGame-v1.16.0-b116-cycle116-<utc>",
+    "archivePattern": "MilsimPonyGame-v1.22.0-b122-cycle122-<utc>",
     "manifestChecks": [
       "world manifest JSON lints",
       "coordinate system file resolves",
       "scene file resolves and lints",
       "all sector files resolve and lint",
-      "cycle 116 release docs exist"
+      "cycle 122 release docs exist"
     ],
     "smokeCommand": "Tools/package_release.sh --validate-only"
   },
@@ -772,8 +772,8 @@
     ]
   },
   "missionScript": {
-    "title": "Cycle 30 Checkpoint Mission Hooks",
-    "summary": "Data-driven phase hooks annotate key Woden-to-Belconnen checkpoints with objective, trigger, success, and failure cues ahead of later mission scripting.",
+    "title": "Cycle 122 Conditional Mission Script",
+    "summary": "Data-driven phase hooks now include conditional alert failure, timed windows, and alternate objectives for the Woden-to-Belconnen rehearsal.",
     "phases": [
       {
         "checkpointID": "woden_town_centre_staging",
@@ -782,7 +782,9 @@
         "trigger": "Start shell confirm or first checkpoint touch.",
         "successCue": "Route handoff is live and the next contact lane is Woden Scope Perch.",
         "failureCue": "If the route state is unclear, return to briefing and restart from the authored start.",
-        "mapCode": "MS-DEPLOY"
+        "mapCode": "MS-DEPLOY",
+        "timeLimitSeconds": 90,
+        "alternateObjective": "Open the map and confirm the active route before moving."
       },
       {
         "checkpointID": "woden_scope_perch",
@@ -791,7 +793,11 @@
         "trigger": "Enter the perch radius with observer pressure active.",
         "successCue": "Woden contact read is established; proceed toward State Circle after cover recovery.",
         "failureCue": "If shared alert pressure rises, break sight behind Woden Scope Wall before retrying.",
-        "mapCode": "MS-WODEN"
+        "mapCode": "MS-WODEN",
+        "failOnObserverAlert": true,
+        "failOnSuspicionRatio": 0.88,
+        "timeLimitSeconds": 180,
+        "alternateObjective": "If the perch is exposed, observe from the Woden vegetation screen."
       },
       {
         "checkpointID": "state_circle_transfer",
@@ -800,7 +806,10 @@
         "trigger": "Reach State Circle while suspicion is below the failure threshold.",
         "successCue": "Parliament approach is clear enough to hand off toward Kings Avenue.",
         "failureCue": "Recover to State Circle Median and re-enter the transfer after line of sight drops.",
-        "mapCode": "MS-STATE"
+        "mapCode": "MS-STATE",
+        "failOnSuspicionRatio": 0.92,
+        "timeLimitSeconds": 240,
+        "alternateObjective": "Use the inner verge route if the direct crossing is watched."
       },
       {
         "checkpointID": "east_basin_lookout",
@@ -809,7 +818,11 @@
         "trigger": "Enter the East Basin lookout radius and hold a scope-ready stance.",
         "successCue": "East Basin exposure and audio feedback are readable without collapsing route flow.",
         "failureCue": "Reset to East Basin Survey Wall and wait for observer memory to cool.",
-        "mapCode": "MS-EAST"
+        "mapCode": "MS-EAST",
+        "failOnObserverAlert": true,
+        "failOnSuspicionRatio": 0.86,
+        "timeLimitSeconds": 210,
+        "alternateObjective": "Hold the shoreline wall until the observer scan moves off-axis."
       },
       {
         "checkpointID": "civic_interchange_review",
@@ -818,7 +831,10 @@
         "trigger": "Reach Civic after completing the Constitution Axis handoff.",
         "successCue": "Civic relay state is visible in HUD and map; continue to West Basin.",
         "failureCue": "Use the Civic Arcade Screen and retry once suspicion is cooling.",
-        "mapCode": "MS-CIVIC"
+        "mapCode": "MS-CIVIC",
+        "failOnSuspicionRatio": 0.9,
+        "timeLimitSeconds": 260,
+        "alternateObjective": "Let the paired observer relay cool before crossing the interchange."
       },
       {
         "checkpointID": "black_mountain_scope_perch",
@@ -827,7 +843,11 @@
         "trigger": "Reach the scope perch and raise the optic on the north-west lane.",
         "successCue": "Black Mountain overwatch remains readable with mission and observer feedback active.",
         "failureCue": "Drop to Tower Footing Screen and reacquire the route from cover.",
-        "mapCode": "MS-BLACK"
+        "mapCode": "MS-BLACK",
+        "failOnObserverAlert": true,
+        "failOnSuspicionRatio": 0.84,
+        "timeLimitSeconds": 240,
+        "alternateObjective": "Use the Black Mountain vegetation edge for a lower exposure overwatch."
       },
       {
         "checkpointID": "belconnen_town_centre_review",
@@ -836,7 +856,10 @@
         "trigger": "Enter Belconnen Town Centre Review after the Belconnen Way overlook.",
         "successCue": "Belconnen town-centre pressure is staged and the final Ginninderra hook is armed.",
         "failureCue": "Recover to Belconnen Median Screen before re-entering the town-centre lane.",
-        "mapCode": "MS-BELCO"
+        "mapCode": "MS-BELCO",
+        "failOnSuspicionRatio": 0.9,
+        "timeLimitSeconds": 260,
+        "alternateObjective": "Shift to the Belconnen hard-cover median if the town-centre pair relays."
       },
       {
         "checkpointID": "ginninderra_drive_review",
@@ -845,7 +868,11 @@
         "trigger": "Touch the final Ginninderra Drive Review marker.",
         "successCue": "Mission hook route complete; ready for alternate-route selection.",
         "failureCue": "Break contact at Ginninderra Access Screen and retry the final lane.",
-        "mapCode": "MS-EXIT"
+        "mapCode": "MS-EXIT",
+        "failOnObserverAlert": true,
+        "failOnSuspicionRatio": 0.82,
+        "timeLimitSeconds": 220,
+        "alternateObjective": "Extract through the screened access edge if the final watcher is active."
       }
     ]
   },

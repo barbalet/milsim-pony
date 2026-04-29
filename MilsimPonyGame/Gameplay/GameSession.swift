@@ -1161,6 +1161,12 @@ final class GameSession: ObservableObject {
     private var lastWorldAudioState = "ambient waiting"
     private var lastScopeAudioState = "scope ready"
     private var sessionAudioState = "session audio waiting"
+    private var currentVegetationFrictionScale: Float = 1.0
+    private var currentVegetationMaskingCount = 0
+    private var currentMissionRuntimeLine = "Mission Runtime: waiting for live phase"
+    private var missionPhaseEntryElapsedSeconds: Double = 0
+    private var missionPhaseEntryCheckpointCount = 0
+    private var missionScriptFailureArmed = false
     private var sceneAudioMixSettings = SceneAudioMixSettings(
         status: "audio mix waiting",
         rule: "scene audio mix has not been loaded",
@@ -1967,6 +1973,30 @@ final class GameSession: ObservableObject {
 
     private var currentMapSectorName: String {
         cachedOverheadMapSnapshot?.currentSectorName ?? "waiting for Canberra layout"
+    }
+
+    private func vegetationInteraction(for sectorName: String) -> (active: Bool, frictionScale: Float, label: String) {
+        let sectorHasVegetation = sectorName.localizedCaseInsensitiveContains("Yarralumla")
+            || sectorName.localizedCaseInsensitiveContains("West Basin")
+            || sectorName.localizedCaseInsensitiveContains("Black Mountain")
+            || sectorName.localizedCaseInsensitiveContains("Woden Valley")
+        let sceneVegetationActive = mapConfiguration?.environmentalMotionStatus.localizedCaseInsensitiveContains("vegetation") == true
+            || mapConfiguration?.surfaceFidelityStatus.localizedCaseInsensitiveContains("vegetation") == true
+
+        guard sectorHasVegetation || sceneVegetationActive else {
+            return (false, 1.0, "clear hardscape")
+        }
+
+        if sectorName.localizedCaseInsensitiveContains("Black Mountain") {
+            return (true, 0.76, "dense scrub")
+        }
+        if sectorName.localizedCaseInsensitiveContains("Yarralumla") || sectorName.localizedCaseInsensitiveContains("West Basin") {
+            return (true, 0.82, "shoreline vegetation")
+        }
+        if sectorName.localizedCaseInsensitiveContains("Woden Valley") {
+            return (true, 0.88, "verge grass")
+        }
+        return (true, 0.92, "light screening")
     }
 
     private func refreshOverheadMapSnapshot() {
@@ -2811,6 +2841,7 @@ final class GameSession: ObservableObject {
         routeWasFailed = snapshot.routeFailed
         latestSnapshot = snapshot
         refreshObserverDebugStatesFromCore()
+        evaluateMissionScriptRuntime(for: snapshot)
         maintainRealtimeSessionHealth(for: snapshot)
         applyThreatAudioFeedback(for: snapshot)
         applyWorldMovementAudioFeedback(for: snapshot)
@@ -2854,6 +2885,7 @@ final class GameSession: ObservableObject {
         latestBallisticPrediction = ballisticPrediction
         latestProfilingSnapshot = profiling
         refreshObserverDebugStatesFromCore()
+        evaluateMissionScriptRuntime(for: snapshot)
         maintainRealtimeSessionHealth(for: snapshot)
         applyThreatAudioFeedback(for: snapshot)
         applyWorldMovementAudioFeedback(for: snapshot)
@@ -3049,6 +3081,10 @@ final class GameSession: ObservableObject {
 
     private func resetMissionRuntime() {
         GameCoreResetDebugState()
+        missionPhaseEntryElapsedSeconds = 0
+        missionPhaseEntryCheckpointCount = 0
+        missionScriptFailureArmed = false
+        currentMissionRuntimeLine = "Mission Runtime: reset for fresh run"
         clearGameplayInputState()
         refreshSnapshotFromCore()
         resetThreatFeedbackState()
@@ -3078,6 +3114,55 @@ final class GameSession: ObservableObject {
         routeWasComplete = snapshot.routeComplete
         routeWasFailed = snapshot.routeFailed
         refreshOverheadMapSnapshot()
+    }
+
+    private func evaluateMissionScriptRuntime(for snapshot: GameFrameSnapshot) {
+        guard demoFlowState == .playing, let mapConfiguration else {
+            currentMissionRuntimeLine = "Mission Runtime: waiting for live phase"
+            return
+        }
+
+        let checkpointCount = Int(snapshot.completedCheckpointCount)
+        if checkpointCount != missionPhaseEntryCheckpointCount {
+            missionPhaseEntryCheckpointCount = checkpointCount
+            missionPhaseEntryElapsedSeconds = snapshot.elapsedSeconds
+            missionScriptFailureArmed = false
+        }
+
+        guard checkpointCount < mapConfiguration.checkpoints.count else {
+            currentMissionRuntimeLine = "Mission Runtime: route complete / all scripted phases satisfied"
+            return
+        }
+
+        let checkpoint = mapConfiguration.checkpoints[checkpointCount]
+        guard let phase = mapConfiguration.missionPhases.first(where: { $0.checkpointID == checkpoint.id }) else {
+            currentMissionRuntimeLine = "Mission Runtime: no scripted phase for \(checkpoint.label)"
+            return
+        }
+
+        let phaseElapsed = max(snapshot.elapsedSeconds - missionPhaseEntryElapsedSeconds, 0)
+        let failRatio = snapshot.suspicionLevel / max(effectiveDetectionFailThreshold, 0.01)
+        let alertTriggered = (phase.failOnObserverAlert ?? false) && snapshot.alertedObserverCount > 0
+        let suspicionTriggered = failRatio >= (phase.failOnSuspicionRatio ?? 1.1)
+        let timedOut = phase.timeLimitSeconds.map { phaseElapsed > Double($0) } ?? false
+        let alternate = phase.alternateObjective ?? "no alternate objective"
+
+        if !missionScriptFailureArmed && (alertTriggered || suspicionTriggered || timedOut) {
+            missionScriptFailureArmed = true
+            GameCoreForceRouteFailure()
+            statusLine = "Mission script failed: \(phase.failureCue)"
+        }
+
+        let timerText = phase.timeLimitSeconds.map {
+            String(format: "%.0fs/%.0fs", phaseElapsed, Double($0))
+        } ?? "untimed"
+        let conditionText = String(
+            format: "alert %@ / suspicion %.0f%% / timer %@",
+            phase.failOnObserverAlert == true ? "fail" : "warn",
+            failRatio * 100,
+            timerText
+        )
+        currentMissionRuntimeLine = "Mission Runtime: \(phase.mapCode ?? phase.phase) / \(conditionText) / alt \(alternate)"
     }
 
     private func applyDifficultyPresetToCore(announceChange: Bool) {
@@ -3163,8 +3248,14 @@ final class GameSession: ObservableObject {
     }
 
     private func synchronizeMovementIntent() {
-        let strafe = axisValue(negative: .strafeLeft, positive: .strafeRight)
-        let forward = axisValue(negative: .backward, positive: .forward)
+        var strafe = axisValue(negative: .strafeLeft, positive: .strafeRight)
+        var forward = axisValue(negative: .backward, positive: .forward)
+        let vegetation = vegetationInteraction(for: currentMapSectorName)
+        currentVegetationFrictionScale = vegetation.frictionScale
+        if vegetation.active {
+            strafe *= vegetation.frictionScale
+            forward *= vegetation.frictionScale
+        }
 
         GameCoreSetMoveIntent(strafe, forward)
         GameCoreSetSprint(pressedCommands.contains(.sprint))
@@ -3751,21 +3842,17 @@ final class GameSession: ObservableObject {
         }
 
         let sectorName = currentMapSectorName
-        let sectorHasVegetation = sectorName.localizedCaseInsensitiveContains("Yarralumla")
-            || sectorName.localizedCaseInsensitiveContains("West Basin")
-            || sectorName.localizedCaseInsensitiveContains("Black Mountain")
-            || sectorName.localizedCaseInsensitiveContains("Woden Valley")
-        let sceneVegetationActive = mapConfiguration?.environmentalMotionStatus.localizedCaseInsensitiveContains("vegetation") == true
-            || mapConfiguration?.surfaceFidelityStatus.localizedCaseInsensitiveContains("vegetation") == true
+        let vegetation = vegetationInteraction(for: sectorName)
         let maskedCount = latestObserverDebugStates.filter {
             !$0.neutralized && $0.inRange && $0.inViewCone && !$0.hasLineOfSight
         }.count
+        currentVegetationMaskingCount = maskedCount
         let concealmentState: String
-        if sectorHasVegetation && snapshot.seeingObserverCount > 0 {
+        if vegetation.active && snapshot.seeingObserverCount > 0 {
             concealmentState = "screen broken"
-        } else if sectorHasVegetation || maskedCount > 0 {
+        } else if vegetation.active || maskedCount > 0 {
             concealmentState = "screening"
-        } else if sceneVegetationActive {
+        } else if mapConfiguration?.environmentalMotionStatus.localizedCaseInsensitiveContains("vegetation") == true {
             concealmentState = "available at vegetated stops"
         } else {
             concealmentState = "not active"
@@ -3784,9 +3871,11 @@ final class GameSession: ObservableObject {
             : "\(maskedCount) masked"
 
         return String(
-            format: "Vegetation Concealment: %@ / traversal %@ / %@ / sector %@",
+            format: "Vegetation Concealment: %@ / traversal %@ / friction %.2f %@ / %@ / sector %@",
             concealmentState,
             traversalState,
+            currentVegetationFrictionScale,
+            vegetation.label,
             exposureState,
             sectorName
         )
@@ -3966,6 +4055,49 @@ final class GameSession: ObservableObject {
             difficultyPreset.observerSuspicionScale,
             difficultyPreset.suspicionDecayScale,
             difficultyPreset.weaponCycleScale
+        )
+    }
+
+    private func difficultyRegressionLine() -> String {
+        let routeCount = (mapConfiguration?.alternateRoutes.count ?? 0) + 1
+        let groupedObserverCount = mapConfiguration?.threatObservers.filter {
+            ($0.groupID?.isEmpty == false)
+        }.count ?? 0
+        return String(
+            format: "Difficulty Regression: %@ / %d presets / %d routes / %d grouped observers / save-resume %@",
+            difficultyPreset.displayName,
+            RehearsalDifficultyPreset.allCases.count,
+            routeCount,
+            groupedObserverCount,
+            storedReviewSessionState == nil ? "ready" : "tracked"
+        )
+    }
+
+    private func waterCloseoutLine() -> String {
+        guard let mapConfiguration else {
+            return "Water Closeout: waiting for scene water profile"
+        }
+
+        return "Water Closeout: \(mapConfiguration.waterReflectionStatus) / \(mapConfiguration.waterReflectionSummary) / \(mapConfiguration.environmentalMotionWindSummary)"
+    }
+
+    private func losRouteAuthorOverlayLine() -> String {
+        guard let focusState = prominentObserverDebugStates(limit: 1).first else {
+            return "LOS Overlay: waiting for focus observer vector"
+        }
+
+        let player = latestSnapshot.map {
+            String(format: "player %.1f %.1f", $0.cameraX, $0.cameraZ)
+        } ?? "player pending"
+        return String(
+            format: "LOS Overlay: %@ %.1f %.1f -> %@ / %@ / %.0fm / mask %d",
+            focusState.label,
+            focusState.positionX,
+            focusState.positionZ,
+            player,
+            focusState.scanStateLabel,
+            focusState.distanceMeters,
+            currentVegetationMaskingCount
         )
     }
 
@@ -4333,9 +4465,13 @@ final class GameSession: ObservableObject {
                 worldMovementAudioLine(),
                 audioMixLine(),
                 vegetationConcealmentLine(),
+                waterCloseoutLine(),
+                difficultyRegressionLine(),
+                currentMissionRuntimeLine,
                 alternateRouteActivationLine,
                 patrolPairFoundationLine(),
                 losDebugOverlayLine(),
+                losRouteAuthorOverlayLine(),
                 scanStateOverlayLine(),
                 scanHaltResumeLine()
             ] + lineOfSightDebugLines(limit: 3),

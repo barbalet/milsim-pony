@@ -12,12 +12,12 @@ A cycle is complete only when its feature is usable in the build, has a smoke or
 
 | Cycle | Work | Status | Required Evidence |
 | --- | --- | --- | --- |
-| `117` | Formal Performance Profiling | Profiling app/tooling updated, target-correct attach trace still open | `Tools/profile_cycle117.sh`, `MilsimPonyProfile117.app` profiling build, target-path-correct Metal GPU capture or equivalent profiling artifact, CPU/GPU bottleneck notes, and stored cycle report. |
-| `118` | Vegetation Interaction Closeout | Opened, not complete | Live traversal friction, concealment, occlusion feedback, and regression checks. |
-| `119` | Difficulty Retuning Regression | Opened, not complete | Difficulty presets validated across group AI, all routes, save/resume, and observer pressure. |
-| `120` | Water System Closeout | Opened, not complete | Reflection, caustic/specular, shoreline, and scope-readability validation. |
-| `121` | LOS Debug Overlay Closeout | Opened, not complete | In-world route-author overlay for observer samples, blockers, scan state, and coverage. |
-| `122` | Mission Scripting Expansion | Opened, not complete | Conditional triggers, timed windows, route fail conditions, and alternate objectives in data. |
+| `117` | Formal Performance Profiling | Complete | `Tools/profile_cycle117.sh`, `MilsimPonyProfile117.app` profiling build, target-correct Time Profiler trace, exportable Metal System Trace fallback, CPU/GPU bottleneck notes, and [CYCLE_117_PROFILING_REVIEW.md](CYCLE_117_PROFILING_REVIEW.md). Direct target Metal export remains an Instruments limitation for Cycle `165` retry. |
+| `118` | Vegetation Interaction Closeout | Complete | Live sector-aware vegetation friction, concealment/masking telemetry, traversal rustle state, and [CYCLE_118_SMOKE_TEST.md](CYCLE_118_SMOKE_TEST.md). |
+| `119` | Difficulty Retuning Regression | Complete | Live preset regression telemetry, grouped observer/route/save-resume reporting, `Tools/gamecore_cycle119_regression.c`, and [CYCLE_119_SMOKE_TEST.md](CYCLE_119_SMOKE_TEST.md). |
+| `120` | Water System Closeout | Complete | Runtime `Water Closeout:` validation line for SSR/probe fallback, shoreline/water motion reporting, and [CYCLE_120_SMOKE_TEST.md](CYCLE_120_SMOKE_TEST.md). |
+| `121` | LOS Debug Overlay Closeout | Complete | Route-author `LOS Overlay:` vector telemetry, sample category reporting, focus scan state, mask counts, and [CYCLE_121_SMOKE_TEST.md](CYCLE_121_SMOKE_TEST.md). |
+| `122` | Mission Scripting Expansion | Complete | Conditional mission phase fields, runtime phase evaluation, core forced-failure hook, scene-authored alert/time/alternate objectives, and [CYCLE_122_SMOKE_TEST.md](CYCLE_122_SMOKE_TEST.md). |
 | `123` | All-Route Minimap Accuracy | Opened, not complete | Formal validation for markers, route paths, threat arcs, sectors, collision footprints, and all routes. |
 | `124` | Notarized Packaging Pipeline | Opened, not complete | Package validation, signing/notarization path, CI gate, tester handoff, and archive verification. |
 | `125` | SSAO/HBAO Closeout | Opened, not complete | Real screen-space AO path or measured equivalent with visual/regression proof. |

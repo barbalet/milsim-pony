@@ -342,6 +342,10 @@ struct SceneMapMissionPhase: Identifiable {
     let successCue: String
     let failureCue: String
     let mapCode: String?
+    let failOnObserverAlert: Bool?
+    let failOnSuspicionRatio: Float?
+    let timeLimitSeconds: Float?
+    let alternateObjective: String?
 }
 
 struct SceneMapAlternateRoute: Identifiable {
@@ -3205,7 +3209,11 @@ private final class ScenePackageBuilder {
                 trigger: phase.trigger,
                 successCue: phase.successCue,
                 failureCue: phase.failureCue,
-                mapCode: phase.mapCode
+                mapCode: phase.mapCode,
+                failOnObserverAlert: phase.failOnObserverAlert,
+                failOnSuspicionRatio: phase.failOnSuspicionRatio,
+                timeLimitSeconds: phase.timeLimitSeconds,
+                alternateObjective: phase.alternateObjective
             )
         }
         let mapAlternateRoutes: [SceneMapAlternateRoute] = alternateRoutes.map { route in

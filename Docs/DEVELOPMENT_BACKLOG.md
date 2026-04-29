@@ -4,7 +4,7 @@ This document extends the shipped roadmap beyond Cycle 116 and now folds togethe
 
 ## Current Baseline
 
-The active development line is Cycle 116. Cycles 99-116 closed many earlier REVIEW items as usable slices, but REVIEW2 raises the bar from "reviewable prototype" to "complete playable game." The next eighty cycles are Cycles `117` through `196`.
+The active development line is Cycle 122. Cycles 99-116 closed many earlier REVIEW items as usable slices, Cycle `117` closed the formal profiling pass, and Cycles `118`-`122` now close vegetation interaction, difficulty regression, water closeout reporting, LOS authoring overlay telemetry, and conditional mission scripting. REVIEW2 still raises the bar from "reviewable prototype" to "complete playable game." The next open playable-game cycles are Cycles `123` through `196`.
 
 The corrected rule remains simple: **if an item is not implemented as usable player/developer functionality, it is not done.** Telemetry, metadata, smoke text, architecture notes, and partial prototypes are evidence, not closure.
 
@@ -47,12 +47,12 @@ The corrected rule remains simple: **if an item is not implemented as usable pla
 
 | Review Item | Remaining Gap | Cycle |
 | --- | --- | --- |
-| Formal Metal GPU profiling | Metal frame capture and CPU/GPU bottleneck artifacts are missing. | `117` |
-| Vegetation interaction | Live traversal friction, occlusion feedback, and concealment mechanics need closeout. | `118` |
-| Difficulty tuning knobs | Needs regression across group AI, multiple routes, and save/resume. | `119` |
-| Water system | Reflection, caustic, specular, and shoreline readability polish remain. | `120` |
-| NPC line-of-sight debug overlay | Needs an in-world route-author visualization mode. | `121` |
-| Objective/mission scripting layer | Needs conditional triggers, timed windows, fail conditions, and alternates. | `122` |
+| Formal Metal GPU profiling | Complete for Cycle `117`: target-correct Time Profiler trace, exportable Metal System Trace fallback, bottleneck notes, and direct-target Metal export limitation are documented in `Docs/CYCLE_117_PROFILING_REVIEW.md`. | `117` |
+| Vegetation interaction | Complete for Cycle `118`: live vegetation friction, masking telemetry, traversal rustle state, and smoke coverage exist. | `118` |
+| Difficulty tuning knobs | Complete for Cycle `119`: difficulty regression telemetry and a core regression cover preset pressure and route-failure hook behavior. | `119` |
+| Water system | Complete for Cycle `120`: runtime water closeout line validates SSR/probe fallback, water targets, and environmental motion during play. | `120` |
+| NPC line-of-sight debug overlay | Complete for Cycle `121`: route-author LOS overlay vector, focus scan state, sample categories, and mask counts are exposed live. | `121` |
+| Objective/mission scripting layer | Complete for Cycle `122`: mission phases now support alert/suspicion/time failure conditions and alternate objectives with a core route-failure hook. | `122` |
 | Minimap accuracy pass | Needs formal all-route geometry/threat/sector verification. | `123` |
 | Packaging and distribution | Needs notarization, CI/build automation, versioning, and tester flow. | `124` |
 | SSAO/HBAO | Needs a real screen-space AO path or measured equivalent. | `125` |
@@ -86,16 +86,16 @@ The corrected rule remains simple: **if an item is not implemented as usable pla
 
 ## Next Eighty Cycle Plan
 
-The execution packets are opened in [CYCLE_117_156_EXECUTION.md](CYCLE_117_156_EXECUTION.md) and [CYCLE_157_196_EXECUTION.md](CYCLE_157_196_EXECUTION.md). These packets do not mark the cycles complete; they list the implementation and verification evidence required before any Cycle `117`-`196` item can be closed. Cycle `117` now has executable profiling tooling in [CYCLE_117_SMOKE_TEST.md](CYCLE_117_SMOKE_TEST.md) and [../Tools/profile_cycle117.sh](../Tools/profile_cycle117.sh). An earlier captured trace attempt under `artifacts/profiling/cycle117-20260429-035159/` exposed stale Launch Services target resolution, so the profiler now builds `MilsimPonyProfile117.app` with a temporary profiling bundle identifier and attaches `xctrace` to its PID. Cycle `117` remains open until a target-correct trace and current-build bottleneck review are stored.
+The execution packets are opened in [CYCLE_117_156_EXECUTION.md](CYCLE_117_156_EXECUTION.md) and [CYCLE_157_196_EXECUTION.md](CYCLE_157_196_EXECUTION.md). These packets do not mark the cycles complete; they list the implementation and verification evidence required before any Cycle `117`-`196` item can be closed. Cycle `117` now has executable profiling tooling in [CYCLE_117_SMOKE_TEST.md](CYCLE_117_SMOKE_TEST.md), [../Tools/profile_cycle117.sh](../Tools/profile_cycle117.sh), and a closed bottleneck review in [CYCLE_117_PROFILING_REVIEW.md](CYCLE_117_PROFILING_REVIEW.md). The stored artifacts are `artifacts/profiling/cycle117-time-profiler-current.trace`, `artifacts/profiling/cycle117-time-profiler-current-toc.xml`, `artifacts/profiling/cycle117-time-profile-current.xml`, `artifacts/profiling/cycle117-metal-system-live.trace`, and `artifacts/profiling/cycle117-metal-system-live-toc.xml`. Direct target-launched Metal export still fails with Instruments `Document Missing Template Error`, so Cycle `165` must retry direct target Metal capture after renderer modernization.
 
 | Cycle | Priority | Primary Goal | Exit Gate |
 | --- | --- | --- | --- |
-| `117` | Immediate | Formal Performance Profiling | Metal GPU capture, CPU/GPU baseline, and bottleneck report are stored with cycle docs. |
-| `118` | Immediate | Vegetation Interaction Closeout | Vegetation affects concealment, occlusion, and traversal friction in the live route. |
-| `119` | Immediate | Difficulty Retuning Regression | Difficulty settings are validated against group AI, multiple routes, and save/resume. |
-| `120` | Immediate | Water System Closeout | Reflections, caustic/specular cues, shoreline motion, and lake readability are validated. |
-| `121` | Immediate | LOS Debug Overlay Closeout | A route-author debug overlay visualizes observer coverage, samples, blockers, and scan state. |
-| `122` | Immediate | Mission Scripting Expansion | Conditional triggers, timed windows, observer-alert failure, and alternate objectives are data-driven. |
+| `117` | Immediate | Formal Performance Profiling | Complete: target-correct CPU baseline, exportable Metal fallback, and bottleneck report are stored with cycle docs. |
+| `118` | Immediate | Vegetation Interaction Closeout | Complete: vegetation affects concealment, occlusion feedback, and traversal friction in the live route. |
+| `119` | Immediate | Difficulty Retuning Regression | Complete: difficulty settings have live route/group/save-resume telemetry and core regression coverage. |
+| `120` | Immediate | Water System Closeout | Complete: reflections, shoreline motion, and lake readability are exposed through runtime validation. |
+| `121` | Immediate | LOS Debug Overlay Closeout | Complete: route-author LOS overlay reports observer coverage, samples, blockers, mask count, and scan state. |
+| `122` | Immediate | Mission Scripting Expansion | Complete: conditional triggers, timed windows, observer-alert failure, suspicion thresholds, and alternate objectives are data-driven. |
 | `123` | Immediate | All-Route Minimap Accuracy | Map markers, route paths, threat arcs, sectors, and collision footprints match all playable routes. |
 | `124` | Immediate | Notarized Packaging Pipeline | Package validation, notarization path, archive policy, CI gate, and tester handoff are wired. |
 | `125` | Immediate | SSAO/HBAO Closeout | Contact shadows/occlusion use a real screen-space AO path or documented equivalent. |

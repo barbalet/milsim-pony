@@ -6,13 +6,13 @@
 
 **milsim-pony** is a macOS-native military simulation prototype set in Canberra, Australia — specifically the basin from Woden to Belconnen with Lake Burley Griffin. It is a first-person rehearsal experience built around three pillars: large-scale terrain readability at basin scale, long-range observation through a 4× magnified scope system, and a playable route-based rehearsal loop with observer pressure and checkpoints.
 
-The stack is deliberately lean: Swift + SwiftUI for the app shell, Metal for GPU rendering, and a portable C core (`GameCore.c`) for all physics, collision, NPC AI, and ballistics. Terrain is handled by a custom internal library called **Jungle**, a C/Metal hybrid that layers vegetation from ground cover up through canopy. World content is entirely JSON-driven — no hardcoded geometry — which means design changes don't require recompilation. The project is currently at **Cycle 116** and now has an eighty-cycle completion roadmap through **Cycle 196**. The aim is a fully playable, fun, notarized Mac game with the full contents of this REVIEW2 document, the added playability recommendations, and the outstanding recovery tasks completed.
+The stack is deliberately lean: Swift + SwiftUI for the app shell, Metal for GPU rendering, and a portable C core (`GameCore.c`) for all physics, collision, NPC AI, and ballistics. Terrain is handled by a custom internal library called **Jungle**, a C/Metal hybrid that layers vegetation from ground cover up through canopy. World content is entirely JSON-driven — no hardcoded geometry — which means design changes don't require recompilation. The project is currently at **Cycle 122** and has a completion roadmap through **Cycle 196**. The aim is a fully playable, fun, notarized Mac game with the full contents of this REVIEW2 document, the added playability recommendations, and the outstanding recovery tasks completed.
 
 ---
 
 ## Top 20 Things That Need Doing
 
-1. **Formal Metal GPU profiling** — runtime counters exist but no actual Metal GPU frame capture or CPU/GPU bottleneck breakdown has been run. This is the most important diagnostic before optimising anything else.
+1. **Formal Metal GPU profiling** — Cycle `117` now has stored target-correct Time Profiler evidence, exported CPU samples, an exportable Metal System Trace fallback, and bottleneck notes. Direct target Metal export still fails with Instruments `Document Missing Template Error`, so Cycle `165` must retry direct target Metal capture after renderer modernization.
 
 2. **Cascaded Shadow Maps (CSM)** — the metadata scaffold is in place, but the actual multi-cascade renderer isn't implemented. The current single 8K shadow map wastes texels on nearby geometry and produces range artifacts.
 
@@ -78,30 +78,30 @@ The stack is deliberately lean: Swift + SwiftUI for the app shell, Metal for GPU
 
 ---
 
-*Generated at Cycle 116 — April 2026*
+*Updated through Cycle 122 — April 2026*
 
 ---
 
-## Cycle 116 Implementation Status Review
+## Cycle 122 Implementation Status Review
 
-*Reviewed April 28, 2026 against the current Cycle 116 development line, `REVIEW.md`, and `Docs/DEVELOPMENT_BACKLOG.md`. This section uses the same honest rule as the recovery backlog: telemetry, planning metadata, and partial prototypes do not count as complete when REVIEW2 asks for a full player-facing or developer-facing system.*
+*Reviewed April 28, 2026 against the current Cycle 122 development line, `REVIEW.md`, and `Docs/DEVELOPMENT_BACKLOG.md`. This section uses the same honest rule as the recovery backlog: telemetry, planning metadata, and partial prototypes do not count as complete when REVIEW2 asks for a full player-facing or developer-facing system.*
 
 ### Top 20 Backlog Status
 
 | # | REVIEW2 Item | Current Status | Cycle Allocation |
 | --- | --- | --- | --- |
-| 1 | Formal Metal GPU profiling | Not yet done. Runtime frame/core/LOS/world profiling readouts exist, and CSM/profile metadata exists, but no stored Metal GPU frame capture or CPU/GPU bottleneck artifact is present. | Cycle `117` is allocated. |
+| 1 | Formal Metal GPU profiling | Done for Cycle `117` formal baseline. Stored artifacts now include a target-correct Time Profiler trace, exported CPU sample table, exportable Metal System Trace fallback, and bottleneck review. Direct target Metal export still fails with Instruments `Document Missing Template Error`, so a retry is allocated to Cycle `165`. | Cycle `117` is complete; Cycle `165` retries direct target Metal capture after renderer modernization. |
 | 2 | Cascaded Shadow Maps | Not yet done. The renderer still uses the single sun shadow map path with CSM readiness/profile lines. | Cycle `126` is allocated. |
 | 3 | SSAO / HBAO pass | Not yet done. The build has surface-fidelity/contact-darkening style reporting, but no proper SSAO/HBAO renderer pass. | Cycle `125` is allocated. |
-| 4 | Water system closeout | Partly done. Water material, motion, shoreline ripple, and bounded SSR/IBL reflection evidence exist; caustic/specular/reflection polish remains incomplete. | Cycle `120` is allocated. |
+| 4 | Water system closeout | Done for Cycle `120` runtime closeout. Water material, motion, shoreline ripple, bounded SSR/IBL reflection evidence, and live `Water Closeout:` validation are present; Hi-Z SSR expansion remains later renderer work. | Cycle `120` is complete; Cycle `145` owns Hi-Z SSR. |
 | 5 | Procedural foliage animation via compute shader | Partly done by vertex-shader/scene-authored wind motion, not by the requested compute/noise system. | Cycle `127` is allocated. |
-| 6 | Vegetation interaction mechanics | Partly done. Concealment/traversal/readout evidence exists, but the backlog still calls for live traversal friction, occlusion feedback, and concealment mechanics closeout. | Cycle `118` is allocated. |
-| 7 | Mission scripting layer | Partly done. Checkpoint mission hooks and phase/objective metadata exist, but conditional triggers, timed windows, fail conditions, and alternate objectives are not complete. | Cycle `122` is allocated. |
+| 6 | Vegetation interaction mechanics | Done for Cycle `118` gameplay closeout. Live movement intent is slowed in vegetated sectors and the HUD reports concealment, traversal rustle, friction, masking, and sector state. | Cycle `118` is complete; Cycle `127` owns procedural foliage animation. |
+| 7 | Mission scripting layer | Done for Cycle `122` conditional scripting closeout. Mission data supports alert, suspicion, timed failure, and alternate-objective fields, with runtime evaluation and a core route-failure hook. | Cycle `122` is complete; Cycles `148` and `149` expand full fail/win flow and objective variants. |
 | 8 | Minimap accuracy across all routes | Partly done. Multi-route selection and map readouts exist; formal all-route geometry/threat/sector verification remains open. | Cycle `123` is allocated. |
 | 9 | Packaging, notarization, and CI automation | Partly done. Packaging validation, archive naming, tester handoff docs, and distribution checks exist; notarization and CI automation remain incomplete. | Cycle `124` is allocated. |
 | 10 | GPU-driven indirect rendering for material passes | Partly done. Cycle 105 added a fallback-safe indirect path for shadow casters only; material-pass indirect draws and GPU culling are still deferred. | Cycle `137` is allocated after Cycle `117` profiling. |
-| 11 | Difficulty tuning regression | Partly done. Difficulty presets affect suspicion, decay, fail threshold, and weapon cycle; regression against group AI and multiple routes remains. | Cycle `119` is allocated. |
-| 12 | NPC line-of-sight debug overlay | Partly done. LOS telemetry/readouts exist, but a proper in-world route-author visualization overlay is not complete. | Cycle `121` is allocated. |
+| 11 | Difficulty tuning regression | Done for Cycle `119` regression slice. Live telemetry reports preset, route, grouped observer, and save/resume coverage; `Tools/gamecore_cycle119_regression.c` verifies pressure tuning and forced failure behavior. | Cycle `119` is complete; larger QA remains Cycles `154`, `164`, and `179`. |
+| 12 | NPC line-of-sight debug overlay | Done for Cycle `121` authoring slice. Live overlay now reports focus observer vector, scan state, sample categories, and vegetation mask counts. | Cycle `121` is complete; automated observer harness remains Cycle `164`. |
 | 13 | Full TAA with temporal reprojection | Not yet done. Cycle 103 delivered scoped-safe depth-aware edge AA specifically without temporal history; full reprojection, jitter, and velocity buffers are not implemented. | Cycle `138` is allocated. |
 | 14 | Clustered / deferred lighting | Partly done. Cycle 102 added a bounded Forward+ start with CPU-side drawable light selection and up to four local lights; a tiled/deferred GPU cluster grid is not complete. | Cycle `139` is allocated. |
 | 15 | First-person weapon animation and reload cycles | Partly done. Muzzle flash, recoil, shot timing, and hit/miss feedback exist; weapon model animation, sway, reload cycles, and richer first-person presentation do not. | Cycle `140` is allocated, with polish in Cycle `161`. |

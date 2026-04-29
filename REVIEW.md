@@ -83,9 +83,9 @@ These are the highest-leverage changes to bring the engine in line with modern r
 
 ## Development Status Check
 
-*Reviewed against the current Cycle 116 development line. This section uses a stricter interpretation than the first planning pass: metadata, readouts, preview-only tools, deferrals, and "architecture decisions" do not count as done. Anything not actually usable in the current build is scheduled into the recovery cycles.*
+*Reviewed against the current Cycle 122 development line. This section uses a stricter interpretation than the first planning pass: metadata, readouts, preview-only tools, deferrals, and "architecture decisions" do not count as done. Anything not actually usable in the current build is scheduled into the recovery cycles.*
 
-### Priority Rules From Cycle 116
+### Priority Rules From Cycle 122
 
 - **Completed recovery groundwork, Cycles 99-116:** earlier REVIEW items received usable implementation slices or honest partial-status documentation.
 - **Immediate recovery, Cycles 117-128:** finish the remaining REVIEW tail before broader campaign polish displaces it.
@@ -104,16 +104,16 @@ These are the highest-leverage changes to bring the engine in line with modern r
 | 6 | Automated capture pipeline | Done for canonical review states | Cycle 99: `Tools/capture_review.sh` batches title/live/map/scope/pause screenshots and `Tools/image_diff.swift` produces optional baseline diffs. District-specific acceptance captures still feed later texture/map closeouts. |
 | 7 | Multiple rehearsal routes | Done for current selectable-route scope | Cycle 113: the briefing route selector now cycles the primary Woden-to-Belconnen route plus both alternate rehearsal routes, and Start Demo binds the selected route at a fresh-run boundary. |
 | 8 | LOD system for distant buildings | Done for configured landmark grayboxes | Cycle 100: `SceneDrawable` now carries LOD roles and switch thresholds, and configured landmarks swap from full graybox geometry to 6-vertex impostor cards past the authored distance. |
-| 9 | Difficulty tuning knobs | Done, needs regression | Cycle 119: secondary overdue validation against richer group AI and route breadth. |
+| 9 | Difficulty tuning knobs | Done for Cycle 119 regression slice | Cycle 119: live telemetry and `Tools/gamecore_cycle119_regression.c` validate difficulty pressure, route/group coverage, save/resume state, and the mission failure hook. |
 | 10 | Sniper scope optics refinement | Done for current optic closeout | Cycle 114: scoped view now has visible lens dirt, edge aberration rings, calibrated mil-dot spacing labels, parallax compensation reporting, and scope-mode smoke coverage. |
 | 11 | Time-of-day system | Done for configurable scenario lighting | Cycle 101: `timeOfDay` scene data now drives renderer sun angle, sky/fog color, haze, ambient/diffuse light, shadow strength, and shadow coverage, with HUD/session smoke visibility. |
 | 12 | Collision volume authoring tools | Done for current authoring workflow | Cycle 115: the briefing map now cycles selectable blocker volumes, highlights the selected footprint, reports sector/dimensions/clearance validation, and exposes export/review source IDs for JSON edits. |
 | 13 | Save/resume session state | Done for current resume scope | Cycle 116: saved review cards now carry route identity, checkpoint progress, map/scope state, checkpoint performance metrics, and an explicit `Resume Saved Run` action that rebinds the saved route before guarded checkpoint restore. |
-| 14 | Performance profiling pass | Partial | Cycle 117: produce formal Metal GPU capture, CPU/GPU bottleneck notes, and before/after profile artifacts. |
-| 15 | Vegetation interaction | Partial | Cycle 118: finish traversal friction, occlusion feedback, and concealment mechanics as gameplay systems. |
-| 16 | Water system | Partial | Cycle 120: secondary overdue closeout for animated reflections/caustic/specular polish after SSR/IBL groundwork starts. |
-| 17 | NPC line-of-sight debug overlay | Partial | Cycle 121: secondary overdue closeout for a real debug overlay mode, not just HUD text telemetry. |
-| 18 | Objective/mission scripting layer | Partial | Cycle 122: secondary overdue expansion to conditional triggers, timed windows, route-fail conditions, and alternate objectives. |
+| 14 | Performance profiling pass | Done for Cycle 117 formal baseline | Cycle 117 produced stored profiling artifacts, target-correct Time Profiler evidence, an exportable Metal System Trace fallback, and CPU/GPU bottleneck notes in `Docs/CYCLE_117_PROFILING_REVIEW.md`. Direct target Metal export still fails with Instruments `Document Missing Template Error` and is scheduled for Cycle `165` retry. |
+| 15 | Vegetation interaction | Done for Cycle 118 gameplay closeout | Cycle 118 adds live sector-aware traversal friction, masking telemetry, traversal rustle state, and smoke coverage. Procedural foliage animation remains Cycle `127`. |
+| 16 | Water system | Done for Cycle 120 runtime closeout | Cycle 120 exposes SSR/probe fallback, water targets, shoreline/water motion, and scope-readable validation through the live HUD. Hi-Z SSR remains Cycle `145`. |
+| 17 | NPC line-of-sight debug overlay | Done for Cycle 121 authoring closeout | Cycle 121 adds route-author LOS vector telemetry, focus scan state, sample categories, and mask counts in live overlay lines. Automated observer harness remains Cycle `164`. |
+| 18 | Objective/mission scripting layer | Done for Cycle 122 conditional scripting closeout | Cycle 122 adds alert/suspicion/time failure conditions, alternate objectives, runtime phase evaluation, and a core forced-failure hook. Full fail/win campaign flow remains Cycle `148`. |
 | 19 | Minimap accuracy pass | Partial | Cycle 123: secondary overdue verification against all playable routes, threat arcs, sector boundaries, and 3D geometry. |
 | 20 | Packaging and distribution | Partial | Cycle 124: secondary overdue completion of notarization, CI/build automation, version policy, and tester distribution. |
 

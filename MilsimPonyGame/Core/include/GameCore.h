@@ -283,6 +283,7 @@ GameBallisticPrediction GameCoreGetBallisticPrediction(void);
 GameProfilingSnapshot GameCoreGetProfilingSnapshot(void);
 int GameCoreGetObserverDebugStates(GameObserverDebugState *states, int maxCount);
 void GameCoreRestartRoute(void);
+void GameCoreForceRouteFailure(void);
 void GameCoreClearFailure(void);
 void GameCoreResetDebugState(void);
 

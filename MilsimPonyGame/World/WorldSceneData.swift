@@ -983,6 +983,10 @@ struct MissionPhaseConfiguration: Decodable {
     let successCue: String
     let failureCue: String
     let mapCode: String?
+    let failOnObserverAlert: Bool?
+    let failOnSuspicionRatio: Float?
+    let timeLimitSeconds: Float?
+    let alternateObjective: String?
 }
 
 struct RouteSelectionConfiguration: Decodable {
