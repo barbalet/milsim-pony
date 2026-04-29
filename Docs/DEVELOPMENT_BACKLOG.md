@@ -1,109 +1,176 @@
 # Development Backlog
 
-This document extends the shipped roadmap beyond Cycle 116 and re-prioritizes the external review captured in [REVIEW.md](../REVIEW.md) on April 23, 2026.
+This document extends the shipped roadmap beyond Cycle 116 and now folds together [REVIEW.md](../REVIEW.md), [REVIEW2.md](../REVIEW2.md), and the April 28, 2026 playability directive: the aim is a fully playable, fun, notarized Mac game in the next eighty cycles.
 
 ## Current Baseline
 
-The active development line is Cycle 116. The previous backlog treated several REVIEW items as effectively complete because they had metadata, HUD readouts, preview states, or architecture decisions. That was too generous.
+The active development line is Cycle 116. Cycles 99-116 closed many earlier REVIEW items as usable slices, but REVIEW2 raises the bar from "reviewable prototype" to "complete playable game." The next eighty cycles are Cycles `117` through `196`.
 
-The corrected rule is simple: **if a REVIEW item is not implemented as usable player/developer functionality, it is not done.** If it is only implemented as telemetry, metadata, a deferred decision, or a partial prototype, it must be pulled into the next 30 cycles.
+The corrected rule remains simple: **if an item is not implemented as usable player/developer functionality, it is not done.** Telemetry, metadata, smoke text, architecture notes, and partial prototypes are evidence, not closure.
 
 ## Priority Rules
 
-- **Top priority, Cycles 99-108:** any REVIEW item that is not done yet.
-- **Next priority, Cycles 109-118:** any REVIEW item that is only partly done.
-- **Secondary overdue priority, Cycles 119-128:** anything that had an earlier allocation but is still incomplete, plus hardening and verification for the prior two bands.
-- A task is complete only when it is usable in the build, has visible verification or tooling, and has smoke-test coverage.
-- Architecture decisions, placeholder telemetry, metadata-only records, and preview-only routes/tools do not close a REVIEW item.
+- **Immediate recovery, Cycles 117-128:** finish the already allocated REVIEW/REVIEW2 recovery tail without slipping the foundational work.
+- **Playable game core, Cycles 129-136:** tutorial, simplified HUD, real sniper objectives, recommended campaign, after-action report, route audio validation, performance presets, and automated gameplay harness foundation.
+- **REVIEW2 modernization, Cycles 137-147:** close the graphics/gameplay systems that were explicitly unallocated in the first REVIEW2 pass.
+- **Campaign and fun loop, Cycles 148-180:** turn the systems into one polished recommended route campaign with win/fail pressure, validated routes, balanced difficulty, and tester-ready pacing.
+- **Release hardening, Cycles 181-196:** bug bash, capture/gameplay CI, notarized release candidate, tester feedback, final REVIEW2 audit, and playable-game signoff.
+- A cycle is complete only when the feature is usable in the build, has a smoke or automated verification path, and has honest documentation that names any remaining limitations.
 
-## Honest Review Recovery Status After Cycle 116
+## Honest Status After Cycle 116
 
 ### Done Enough For Regression Only
 
 | Review Item | Evidence | Follow-Up |
 | --- | --- | --- |
-| Ballistics solver | `GameCore` exposes ballistic prediction, drop, flight time, observer hits, and fire feedback. | Keep in regression coverage. |
-| Automated capture pipeline | Cycle 99 adds `Tools/capture_review.sh` for title/live/map/scope/pause screenshots and `Tools/image_diff.swift` for optional baseline diffs. | Keep in release/package validation and expand later if district-specific capture framing needs more automation. |
-| LOD system for distant buildings | Cycle 100 adds renderer-side LOD roles, switch thresholds, and 6-vertex impostor cards for configured landmark grayboxes. | Keep in scope/capture regression and expand with authored low meshes in later renderer work if needed. |
-| Time-of-day system | Cycle 101 adds scenario-authored time controls that drive renderer sun angle, sky/fog color, haze, ambient/diffuse light, shadow strength, and shadow coverage. | Keep in smoke/capture regression. |
-| Clustered deferred / Forward+ lighting | Cycle 102 adds scene-authored diagnostic dynamic lights, CPU-side drawable light selection, and forward shader accumulation for up to four local point lights. | Expand from bounded forward light lists to a fuller clustered light grid when dynamic light counts grow. |
-| Temporal anti-aliasing / scoped-safe AA | Cycle 103 adds depth-aware postprocess edge anti-aliasing with cross-depth rejection for scoped skyline stability. | Keep in scope/capture regression; full temporal reprojection remains optional if shimmer persists. |
-| Physically based atmosphere and sky | Cycle 104 adds scene-authored Rayleigh/Mie/ozone atmosphere controls tied to the active time-of-day sun, feeding clear color, object fog, terrain haze, and HUD evidence. | Keep in smoke/capture regression; full volumetric sky/cloud work remains a later renderer gate. |
-| GPU-driven indirect rendering | Cycle 105 adds a fallback-safe per-frame `MTLIndirectCommandBuffer` path for shadow-casting object draws. | Expand to material-pass indirect draws and GPU culling only after capture/profiling proves the next useful target. |
-| SDF font and UI rendering | Cycle 106 adds a reusable SDF-style outlined scalable text path for mission overlay, scope labels, map sector labels, road labels, and the north marker. | Replace with a generated MSDF atlas later only if custom font atlas generation becomes necessary. |
-| Screen-space reflections with IBL fallback | Cycle 107 adds bounded postprocess SSR samples with sky-probe fallback controls for lake/glass readability. | Expand to material-masked SSR, richer reflection probes, and render-graph-managed resources after material ID or graph support lands. |
-| Render graph / frame graph architecture | Cycle 108 adds a declarative frame graph scaffold for the current shadow, scene, and presentation passes with imported/transient resources and dependency validation. | Expand to resource aliasing and fuller graph scheduling as CSM, SSAO, capture, water, and volumetric passes become real nodes. |
-| Audio system | Cycle 109 promotes procedural cues into a scene-authored category mix with separate ambience, movement, scope, weapon, and observer gains, a persisted master-volume setting, richer footstep/threat ambience variants, and smoke-test readouts. | Replace procedural/generated cue sources with authored assets later if asset production becomes the limiting factor. |
-| Firing feedback loop | Cycle 110 adds visible scoped muzzle flash, recoil kick/recovery animation, and `Shot Feedback:` classification for hits, blockers, ground impacts, and clear misses. | Expand with weapon model animation and richer impact VFX when first-person weapon art is introduced. |
-| Group NPC behavior | Cycle 111 turns authored paired-observer metadata into runtime formation patrol movement, live overhead-map positions, alert halt/resume behavior, and smoke-testable `Patrol Pairs:` moving/sweep readouts. | Expand with richer tactics once route variety and mission scripting create better encounter contexts. |
-| Black Mountain and West Basin texture coverage | Cycle 112 extends source-backed dry-grass, asphalt, concrete, water, and facade material assignments across West Basin/Yarralumla, Black Mountain/Bruce, Belconnen, and the playable scope perch, with acceptance docs. | Future texture work should add new district-specific bitmap sources only when a route or district expands beyond the shared Canberra texture library. |
-| Multiple rehearsal routes | Cycle 113 turns the route selector into a fresh-run route picker for the primary route and both authored alternate routes, with restart-stable active-route binding and map/checkpoint rebinding. | Cycle 123 must still formally verify minimap accuracy across all playable routes. |
-| Sniper scope optics refinement | Cycle 114 adds visible lens dirt, chromatic edge aberration rings, calibrated mil-dot spacing labels, parallax compensation reporting, and scope-mode smoke coverage. | Keep in scope capture regression as route and rendering systems change. |
-| Collision volume authoring tools | Cycle 115 turns the overhead collision preview into a briefing workflow with selectable blockers, highlighted footprints, dimension/sector/clearance validation, and source-ID export guidance for JSON edits. | Keep in map-authoring regression and expand into direct editing only if the JSON authoring flow becomes a bottleneck. |
-| Save/resume session state | Cycle 116 turns persisted review cards into route-bound saved-run resume with explicit title UX, guarded checkpoint restore, and checkpoint performance readouts. | Keep in regression as route binding, difficulty, and mission scripting expand. |
-| Difficulty tuning knobs | Difficulty presets scale observer suspicion, decay, fail threshold, and weapon cycle. | Re-test after richer group AI and multi-route work in Cycle 119. |
+| Ballistics solver | `GameCore` exposes ballistic prediction, drop, flight time, observer hits, and fire feedback. | Expand into explicit sniper kill objectives in Cycle `131` and harness tests in Cycle `162`. |
+| Automated capture pipeline | Cycle 99 adds `Tools/capture_review.sh` and optional image diffs. | Fold into release CI by Cycle `188`. |
+| LOD system for distant buildings | Cycle 100 adds renderer-side LOD roles and impostor cards. | Regress during profiling, CSM, TAA, and release performance work. |
+| Time-of-day system | Cycle 101 drives sun angle, sky/fog color, haze, ambient/diffuse light, and shadow strength. | Regress during volumetric fog, HDR, and campaign polish. |
+| Clustered deferred / Forward+ lighting start | Cycle 102 adds bounded dynamic local lights. | Full tiled/clustered GPU lighting is Cycle `139`. |
+| Scoped-safe AA | Cycle 103 adds depth-aware post edge AA. | Full temporal reprojection TAA is Cycle `138`. |
+| Physically based atmosphere and sky baseline | Cycle 104 adds Rayleigh/Mie/ozone controls. | Volumetric fog/light shafts are Cycle `144`. |
+| GPU-driven indirect rendering prototype | Cycle 105 adds shadow-caster ICBs. | Material-pass ICB and GPU culling are Cycle `137`. |
+| SDF font and UI rendering | Cycle 106 adds scalable outlined text for HUD/scope/map labels. | Simplified HUD and accessibility work happen in Cycles `130`, `152`, and `181`. |
+| SSR with IBL fallback | Cycle 107 adds bounded SSR/probe fallback. | Hi-Z SSR is Cycle `145`. |
+| Render graph / frame graph scaffold | Cycle 108 describes current pass/resource ordering. | Resource aliasing and fuller scheduling are Cycle `166`. |
+| Audio system | Cycle 109 adds authored category mix and master volume. | All-route audio validation is Cycle `134`; audio polish is Cycle `156`. |
+| Firing feedback loop | Cycle 110 adds muzzle flash, recoil, shot classification, and crack-thump timing. | Full weapon animation/reload is Cycle `140`; combat feel polish is Cycle `186`. |
+| Group NPC behavior | Cycle 111 adds patrol-pair formation movement and alert halt/resume. | Advanced tactics are Cycles `141`, `159`, and `160`. |
+| District texture coverage | Cycle 112 covers Black Mountain/West Basin/Belconnen materials for current scope. | Outer-district completeness audit is Cycle `143`; content density pass is Cycle `182`. |
+| Multiple rehearsal routes | Cycle 113 makes the primary plus two alternates selectable and bindable. | All-route minimap, audio, difficulty, and campaign validation happen in Cycles `123`, `134`, `179`, and `180`. |
+| Sniper scope optics | Cycle 114 adds lens dirt, aberration, mil labels, and parallax reporting. | Full sniper objectives and campaign integration are Cycles `131`, `150`, and `173`. |
+| Collision authoring workflow | Cycle 115 adds selectable blocker review and validation/export guidance. | Regress through minimap validation, harness tests, and route polish. |
+| Save/resume session state | Cycle 116 adds guarded route-bound checkpoint resume and performance readouts. | Basic AAR is Cycle `133`; session replay capture is Cycle `142`; integrated AAR/replay is Cycle `174`. |
 
-### Top Priority Completion Note
+### Existing Recovery Tail
 
-All REVIEW items classified as not done at the start of the recovery pass have now received Cycle `99`-`108` implementation coverage. Remaining work moves through the partly-done and overdue closeout bands below.
-
-### Partly Done: Next Priority In Cycles 109-118
-
-| Review Item | Remaining Gap | New Cycle |
+| Review Item | Remaining Gap | Cycle |
 | --- | --- | --- |
-| Performance profiling pass | Runtime counters exist, but formal Metal GPU capture and bottleneck artifacts are missing. | `117` |
-| Vegetation interaction | Wind/response exists, but traversal friction, occlusion feedback, and concealment mechanics need closeout. | `118` |
+| Formal Metal GPU profiling | Metal frame capture and CPU/GPU bottleneck artifacts are missing. | `117` |
+| Vegetation interaction | Live traversal friction, occlusion feedback, and concealment mechanics need closeout. | `118` |
+| Difficulty tuning knobs | Needs regression across group AI, multiple routes, and save/resume. | `119` |
+| Water system | Reflection, caustic, specular, and shoreline readability polish remain. | `120` |
+| NPC line-of-sight debug overlay | Needs an in-world route-author visualization mode. | `121` |
+| Objective/mission scripting layer | Needs conditional triggers, timed windows, fail conditions, and alternates. | `122` |
+| Minimap accuracy pass | Needs formal all-route geometry/threat/sector verification. | `123` |
+| Packaging and distribution | Needs notarization, CI/build automation, versioning, and tester flow. | `124` |
+| SSAO/HBAO | Needs a real screen-space AO path or measured equivalent. | `125` |
+| Cascaded shadow maps | Needs multi-cascade shadows or a documented measured replacement. | `126` |
+| Procedural wind and foliage animation | Needs renderer-level procedural/compute foliage animation or equivalent. | `127` |
+| REVIEW recovery audit | Needs an honest post-recovery smoke pack and status audit. | `128` |
 
-### Overdue Or Partial: Secondary Priority In Cycles 119-128
+### Newly Allocated REVIEW2 And Playability Work
 
-| Review Item | Remaining Gap | New Cycle |
-| --- | --- | --- |
-| Difficulty tuning knobs | Retune and regress against richer group AI and multiple playable routes. | `119` |
-| Water system | Water motion/materials exist, but reflection/caustic/specular closeout remains. | `120` |
-| NPC line-of-sight debug overlay | HUD telemetry exists, but a real route-author overlay/debug mode needs closeout. | `121` |
-| Objective/mission scripting layer | Checkpoint hooks exist, but conditional triggers, timed windows, fail conditions, and alternates remain. | `122` |
-| Minimap accuracy pass | Current route checks exist, but all playable routes need formal geometry/threat/sector verification. | `123` |
-| Packaging and distribution | Packaging scripts exist, but notarization, CI/build automation, and tester flow remain incomplete. | `124` |
-| SSAO or HBAO | Contact darkening exists, but a proper SSAO/HBAO-class pass or equivalent closeout remains. | `125` |
-| Cascaded shadow maps | Readiness metadata exists, but actual multi-cascade rendering is not complete. | `126` |
-| Procedural wind and foliage animation | Scene-authored motion exists, but the requested procedural renderer-level foliage animation is incomplete. | `127` |
-| REVIEW recovery audit | The full REVIEW list needs a final smoke-test pack and honest status audit after the recovery cycles. | `128` |
+| Work | Cycle |
+| --- | --- |
+| Route tutorial | `129` |
+| Simplified HUD mode | `130` |
+| Full sniper hit/kill objectives | `131` |
+| Recommended route campaign skeleton | `132` |
+| Basic after-action report | `133` |
+| Audio mix validation across all routes | `134` |
+| Performance presets | `135` |
+| Automated gameplay test harness foundation | `136` |
+| Material-pass GPU indirect rendering and GPU culling | `137` |
+| Full TAA with temporal reprojection | `138` |
+| Tiled/clustered Forward+ lighting | `139` |
+| First-person weapon animation and reload cycles | `140` |
+| Advanced observer tactics and coordination | `141` |
+| Session replay capture | `142` |
+| Black Mountain and outer-district texture completeness audit | `143` |
+| Volumetric fog and light shafts | `144` |
+| Hi-Z screen-space reflections | `145` |
+| Parallax occlusion mapping and detail normal blending | `146` |
+| HDR display output and physical camera model | `147` |
 
-## Next Thirty Cycle Plan
+## Next Eighty Cycle Plan
+
+The execution packets are opened in [CYCLE_117_156_EXECUTION.md](CYCLE_117_156_EXECUTION.md) and [CYCLE_157_196_EXECUTION.md](CYCLE_157_196_EXECUTION.md). These packets do not mark the cycles complete; they list the implementation and verification evidence required before any Cycle `117`-`196` item can be closed. Cycle `117` now has executable profiling tooling in [CYCLE_117_SMOKE_TEST.md](CYCLE_117_SMOKE_TEST.md) and [../Tools/profile_cycle117.sh](../Tools/profile_cycle117.sh). An earlier captured trace attempt under `artifacts/profiling/cycle117-20260429-035159/` exposed stale Launch Services target resolution, so the profiler now builds `MilsimPonyProfile117.app` with a temporary profiling bundle identifier and attaches `xctrace` to its PID. Cycle `117` remains open until a target-correct trace and current-build bottleneck review are stored.
 
 | Cycle | Priority | Primary Goal | Exit Gate |
 | --- | --- | --- | --- |
-| `99` | Completed Top | Automated Capture Pipeline | Batch title/live/map/scope/pause captures run from one command and optional baseline comparison produces diff artifacts. |
-| `100` | Completed Top | Distant Building LOD Implementation | Renderer switches configured landmark grayboxes from full geometry to impostor cards with scope-stability readouts. |
-| `101` | Completed Top | Dynamic Time-Of-Day System | Scenario data sets time, sun angle, sky/fog color, haze, shadow coverage, and ambient/diffuse light. |
-| `102` | Completed Top | Forward+ / Clustered Lighting Start | Multiple scene-authored dynamic light sources render without breaking the current single-sun path. |
-| `103` | Completed Top | TAA Or Scoped-Safe Anti-Aliasing | Scope shimmer mitigation is active through depth-aware postprocess edge AA with ghosting-safe rejection. |
-| `104` | Completed Top | Physically Based Atmosphere And Sky | Scene-authored Rayleigh/Mie/ozone controls now drive the time-of-day sky, clear color, and distance haze baseline. |
-| `105` | Completed Top | GPU-Driven Indirect Rendering Prototype | Shadow-casting object draws use a per-frame ICB with fallback; material draws and GPU culling remain documented expansion points. |
-| `106` | Completed Top | SDF Font And UI Rendering | HUD, map, and scope text render crisply through SDF or an equivalent scalable text path. |
-| `107` | Completed Top | SSR With IBL Fallback | Lake/glass reflections render through SSR/probe fallback with scoped-readability checks. |
-| `108` | Completed Top | Render Graph / Frame Graph Scaffolding | Shadow, geometry, presentation, and postprocess-adjacent AA/reflection work are represented in a composable frame graph scaffold. |
-| `109` | Completed Next | Audio System Closeout | Footsteps, ambience, scope, observer, weapon, and session audio have scene-authored category gains, master-volume control, and smoke coverage. |
-| `110` | Completed Next | Firing Feedback Closeout | Muzzle flash, recoil animation, hit/miss visual feedback, and crack-thump presentation are player-facing. |
-| `111` | Completed Next | Group NPC Behavior Closeout | Patrol pairs move in formation, coordinate scans, halt/resume, and recover across checkpoint retries. |
-| `112` | Completed Next | Black Mountain And West Basin Texture Closeout | District-specific textures, source notes, atlas captures, and acceptance screenshots are complete. |
-| `113` | Completed Next | Multi-Route Playability | Primary plus both alternate rehearsal routes are selectable from briefing and bind checkpoints/map state at fresh-run boundaries. |
-| `114` | Completed Next | Scope Optics Closeout | Lens dirt, edge aberration, calibrated mil-dot use, parallax compensation, and scope smoke coverage are complete. |
-| `115` | Completed Next | Collision Authoring Workflow | Designers can inspect, select, validate, and export/review collision-volume changes. |
-| `116` | Completed Next | Save/Resume Closeout | Players can resume sessions and review checkpoint performance safely across launches. |
-| `117` | Next | Formal Performance Profiling | Metal GPU capture, CPU/GPU baseline, and bottleneck report are stored with the cycle docs. |
-| `118` | Next | Vegetation Interaction Closeout | Vegetation affects concealment, occlusion, and traversal friction in the live route. |
-| `119` | Secondary | Difficulty Retuning Regression | Difficulty settings are validated against group AI, multiple routes, and save/resume. |
-| `120` | Secondary | Water System Closeout | Reflections, caustic/specular cues, shoreline motion, and lake readability are validated. |
-| `121` | Secondary | LOS Debug Overlay Closeout | A route-author debug overlay visualizes observer coverage, samples, blockers, and scan state. |
-| `122` | Secondary | Mission Scripting Expansion | Conditional triggers, timed windows, observer-alert failure, and alternate objectives are data-driven. |
-| `123` | Secondary | Minimap Accuracy Closeout | Map markers, route paths, threat arcs, sectors, and collision footprints match all playable routes. |
-| `124` | Secondary | Packaging And Distribution Closeout | Notarization, CI/build automation, versioning, tester handoff, and validation are complete. |
-| `125` | Secondary | SSAO/HBAO Closeout | Contact shadows/occlusion use a real screen-space AO path or documented equivalent. |
-| `126` | Secondary | CSM Closeout | Multi-cascade shadows render or a measured alternative replaces the CSM target. |
-| `127` | Secondary | Procedural Foliage Animation Closeout | Vegetation animation is renderer-level/procedural or equivalent and survives performance tests. |
-| `128` | Secondary | REVIEW Recovery Audit | Every REVIEW item is rechecked against implementation, smoke tests, and honest status wording. |
+| `117` | Immediate | Formal Performance Profiling | Metal GPU capture, CPU/GPU baseline, and bottleneck report are stored with cycle docs. |
+| `118` | Immediate | Vegetation Interaction Closeout | Vegetation affects concealment, occlusion, and traversal friction in the live route. |
+| `119` | Immediate | Difficulty Retuning Regression | Difficulty settings are validated against group AI, multiple routes, and save/resume. |
+| `120` | Immediate | Water System Closeout | Reflections, caustic/specular cues, shoreline motion, and lake readability are validated. |
+| `121` | Immediate | LOS Debug Overlay Closeout | A route-author debug overlay visualizes observer coverage, samples, blockers, and scan state. |
+| `122` | Immediate | Mission Scripting Expansion | Conditional triggers, timed windows, observer-alert failure, and alternate objectives are data-driven. |
+| `123` | Immediate | All-Route Minimap Accuracy | Map markers, route paths, threat arcs, sectors, and collision footprints match all playable routes. |
+| `124` | Immediate | Notarized Packaging Pipeline | Package validation, notarization path, archive policy, CI gate, and tester handoff are wired. |
+| `125` | Immediate | SSAO/HBAO Closeout | Contact shadows/occlusion use a real screen-space AO path or documented equivalent. |
+| `126` | Immediate | CSM Closeout | Multi-cascade shadows render or a measured alternative replaces the CSM target. |
+| `127` | Immediate | Procedural Foliage Animation | Vegetation animation is renderer-level/procedural or equivalent and survives performance tests. |
+| `128` | Immediate | REVIEW/REVIEW2 Recovery Audit | Every REVIEW and REVIEW2 item is rechecked against implementation, tests, and honest status wording. |
+| `129` | Playability | Route Tutorial | A first-time player can learn movement, map, scope, concealment, checkpoints, and route choice in-game. |
+| `130` | Playability | Simplified HUD Mode | A low-noise HUD mode hides developer telemetry while preserving mission-critical prompts. |
+| `131` | Playability | Sniper Hit/Kill Objectives | Missions can require scoped identification, hit confirmation, kill/neutralize objectives, and safe failure. |
+| `132` | Campaign | Recommended Route Campaign Skeleton | One recommended route has campaign state, brief/debrief framing, objective order, and replayable start flow. |
+| `133` | Playability | Basic After-Action Report | Completion/failure produces route time, checkpoints, shots, hits, alerts, restarts, and rating summary. |
+| `134` | Validation | Audio Mix All-Route Validation | Footsteps, scope, weapon, ambience, and observer cues are balanced across all playable routes. |
+| `135` | Performance | Performance Presets | Low/medium/high presets control shadows, foliage, reflections, AO, AA, draw distance, and HUD cost. |
+| `136` | QA | Automated Gameplay Harness Foundation | Programmatic route, ballistics, collision, and observer checks run outside screenshot-only smoke tests. |
+| `137` | Renderer | Material-Pass GPU Indirect Rendering | Material/object draw submission gains ICB/GPU-culling coverage where profiling proves value. |
+| `138` | Renderer | Full Temporal Reprojection TAA | Jitter, velocity/history buffers, reprojection, and scope-safe fallback are implemented and compared. |
+| `139` | Renderer | Tiled/Clustered Forward+ Lighting | GPU light lists support many dynamic lights without the four-light-per-drawable cap. |
+| `140` | Combat | First-Person Weapon Animation | Sniper sway, bolt/reload cycle, ready/lower transitions, and reload feedback are visible and playable. |
+| `141` | AI | Advanced Observer Tactics | Observers coordinate beyond formation patrols with flanking, signalling, and cover-aware pressure. |
+| `142` | Review | Session Replay Capture | A compact session timeline records positions, shots, alerts, objectives, and checkpoint events for replay/AAR. |
+| `143` | Content | Outer-District Texture Audit | Black Mountain, Belconnen, Ginninderra, Bruce, and lower-density outer districts have audited material coverage. |
+| `144` | Renderer | Volumetric Fog And Light Shafts | Raymarched or equivalent volumetric fog/light shafts improve dawn/dusk readability without wrecking scope clarity. |
+| `145` | Renderer | Hi-Z Screen-Space Reflections | SSR uses hierarchical traversal and broader material masks for water, glass, wet pavement, and vehicles. |
+| `146` | Renderer | POM And Detail Normal Blending | Brick, concrete, ground, and close terrain gain depth/detail without extra geometry. |
+| `147` | Renderer | HDR Output And Physical Camera | HDR/EDR path, exposure model, DOF/bokeh policy, and scope-safe tone mapping are implemented or explicitly gated. |
+| `148` | Playability | True Mission Fail/Win Loop | Campaign route has clean win, fail, retry, abandon, checkpoint, and scoring state transitions. |
+| `149` | Mission | Mission Objective Variants | Timed windows, stealth routes, kill/no-kill branches, extraction, and alternate objectives are data-authored. |
+| `150` | Combat | Target/Kill Feedback Polish | Hit reactions, neutralization clarity, impact VFX/audio, and objective credit are unambiguous. |
+| `151` | Onboarding | Tutorial Usability Pass | Tutorial prompts are playtested, skippable, restart-safe, and do not block experienced players. |
+| `152` | UX | HUD Accessibility And Options | Simplified HUD gains scale, contrast, opacity, subtitle, color, and telemetry toggles. |
+| `153` | Release | Notarized Release Dry Run | A release candidate is built, signed/notarized where credentials allow, packaged, and install-tested. |
+| `154` | Performance | Performance Preset QA | Presets are validated on route, scope, map, combat, water, and foliage-heavy scenes. |
+| `155` | Map | Map/Collision Consistency Audit | Minimap, collision blockers, checkpoint placement, objective markers, and route geometry agree in all routes. |
+| `156` | Audio | Audio Mix Polish | Route-specific ambience, alert escalation, weapon tails, footsteps, and AAR/replay cues are balanced. |
+| `157` | AAR | After-Action Comparison | AAR compares runs, highlights best checkpoint splits, alerts, accuracy, and objective success/failure reasons. |
+| `158` | Campaign | Recommended Route Content Pass | The recommended route gets final objective beats, scenic anchors, threat pacing, and checkpoint rhythm. |
+| `159` | AI | Observer Flanking Tactics | Observer groups can pressure from alternate angles while staying readable and fair. |
+| `160` | AI | Cover-Bounding And Suppression Signals | Coordinated observer behavior includes bounded movement, callouts/signals, and suppression-style pressure. |
+| `161` | Combat | Weapon Animation Polish | Sway/reload/bolt timing, scope interruption, breath recovery, and animation/audio sync are tuned. |
+| `162` | QA | Ballistics Harness | Automated tests cover drop, time of flight, blocker hits, kill credit, and objective hit rules. |
+| `163` | QA | Collision Harness | Automated tests cover player blockers, checkpoint spawns, route blockers, projectile blockers, and vegetation friction. |
+| `164` | QA | Observer Detection Harness | Automated tests cover LOS samples, concealment, difficulty presets, group alerts, and fail thresholds. |
+| `165` | Performance | Post-Modernization Profiling | Profiling is rerun after CSM, SSAO, TAA, clustered lighting, and indirect rendering land. |
+| `166` | Renderer | Render Graph Resource Scheduling | Frame graph expands to resource aliasing, pass validation, and safer scheduling for modernized passes. |
+| `167` | Materials | Terrain And Material Quality Pass | Terrain, roads, facades, props, and close materials are tuned under POM/detail/HDR lighting. |
+| `168` | Water | Water Final Polish | Water is retuned with CSM, SSR, fog, HDR, shoreline cues, caustics/specular, and scope readability active. |
+| `169` | Foliage | Foliage Gameplay Tuning | Procedural wind, concealment, friction, performance, and observer readability are tuned together. |
+| `170` | Mission | Campaign Mission Breadth | Recommended route supports enough objective variety to feel like a mission, not a tech demo. |
+| `171` | Onboarding | Route Tutorial Playtest Closeout | New-player route completion, failure recovery, map use, scope use, and tutorial skip paths are verified. |
+| `172` | UX | Simplified HUD Playtest Closeout | Players can finish the recommended route in simplified HUD mode without developer telemetry. |
+| `173` | Combat | Sniper Objectives Campaign Integration | Kill objectives, identification, no-fire states, and score/AAR are integrated into campaign flow. |
+| `174` | AAR | Replay And AAR Integration | Session replay data feeds after-action summaries and route comparison without bloating save files. |
+| `175` | Release | Distribution CI Automation | CI validates build, package inputs, gameplay harness, capture smoke, and release manifest. |
+| `176` | Release | External Tester Handoff | Notarized or credential-blocked release package, tester guide, known issues, and feedback template are complete. |
+| `177` | Performance | Preset Auto-Detect | Hardware/profile heuristics suggest safe defaults and expose override controls. |
+| `178` | Campaign | Recommended Route Vertical Polish | One route is polished end to end for pacing, visuals, audio, objectives, failure, win, and AAR. |
+| `179` | Validation | All-Route Campaign Validation | Every route can start, complete/fail, resume, show map state, play audio, and report AAR correctly. |
+| `180` | Validation | Combined Route Regression | Difficulty, minimap, audio, save/resume, AAR, and observer pressure are validated across all routes. |
+| `181` | UX | Accessibility And Input Polish | Controls, sensitivity, subtitles, HUD modes, remapping readiness, and pause/settings flows are release-grade. |
+| `182` | Content | Outer-District Density Pass | Lower-density districts gain enough roads, facades, blockers, signage, and landmarks to support fun play. |
+| `183` | Balance | Fun-Factor Balance Pass | Time pressure, route length, alerts, objective clarity, combat frequency, and scoring are tuned for repeat play. |
+| `184` | Stability | Full Game Bug Bash | Crash, startup, save, restore, renderer, map, audio, and input bugs are triaged and fixed by severity. |
+| `185` | Graphics | Final Graphics Audit | CSM, SSAO, TAA, clustered lights, HDR, fog, SSR, POM, water, and foliage are reviewed together. |
+| `186` | Combat | Combat Feel Polish | Rifle handling, hit feedback, observer pressure, objective results, and audio/visual response feel coherent. |
+| `187` | Gameplay | Fail/Win Stress Test | Repeated fail/retry/win/resume/quit/relaunch flows do not corrupt state or confuse the player. |
+| `188` | QA | Capture And Gameplay CI | Automated capture plus gameplay harnesses run as repeatable release gates. |
+| `189` | Release | Release Candidate Content Lock | Recommended route, tutorial, AAR, HUD, assets, docs, and known issues are locked for RC testing. |
+| `190` | Release | Release Candidate Performance Lock | Presets, frame pacing, memory, GPU capture deltas, and route performance budgets are signed off. |
+| `191` | Release | Release Candidate Notarization Lock | Signing, notarization/stapling, zip/package verification, and clean-machine launch are signed off. |
+| `192` | Test | Tester Feedback Batch | External tester feedback is categorized into blocker, high, medium, polish, and post-release buckets. |
+| `193` | Test | Post-Feedback Fixes | Blocker and high-priority tester issues are fixed and regression-tested. |
+| `194` | Polish | Final Fun-Factor Smoke | A fresh-player pass verifies the recommended route is understandable, tense, fair, and replayable. |
+| `195` | Audit | Final REVIEW2 Closure Audit | REVIEW2, added recommendations, and outstanding tasks are checked against build evidence. |
+| `196` | Release | Fully Playable Fun Game Candidate | A notarized, packaged, documented, tested build is ready as the playable recommended-route game candidate. |
 
 ## Roadmap Discipline
 
-No new feature block should displace Cycles 99-128 unless it directly closes one of these REVIEW items. If a cycle slips, the unfinished item moves to the next cycle before new work is accepted.
+No new feature block should displace Cycles `117`-`196` unless it directly closes one of the REVIEW2/playability items above. If a cycle slips, the unfinished item moves to the next cycle before new work is accepted, and the final audit must explicitly call out the slip.

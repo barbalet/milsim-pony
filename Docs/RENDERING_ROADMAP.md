@@ -10,9 +10,9 @@ The intent is to improve the current Metal renderer without discarding the exist
 - `WorldSceneData` owns what world JSON can describe.
 - `GameCore` remains authoritative for gameplay and simulation.
 
-## REVIEW Recovery Priority
+## REVIEW2 And Playable-Game Priority
 
-The stricter Cycle 98 REVIEW audit supersedes the older loose sequencing below when there is a conflict. Renderer items that were previously treated as deferred now have fixed recovery slots:
+The stricter Cycle 98 REVIEW audit and the Cycle 116 REVIEW2/playable-game plan supersede the older loose sequencing below when there is a conflict. Renderer items that were previously treated as deferred now have fixed slots inside the Cycle `117`-`196` plan:
 
 | Cycle | Renderer Work |
 | --- | --- |
@@ -28,8 +28,18 @@ The stricter Cycle 98 REVIEW audit supersedes the older loose sequencing below w
 | `125` | SSAO/HBAO-class closeout. |
 | `126` | CSM implementation closeout. |
 | `127` | Procedural foliage animation closeout. |
+| `137` | Material-pass GPU indirect rendering and GPU culling closeout. |
+| `138` | Full temporal reprojection TAA with scoped fallback. |
+| `139` | Tiled/clustered Forward+ lighting with GPU light lists. |
+| `144` | Volumetric fog and light shafts. |
+| `145` | Hi-Z screen-space reflections with broader material masks. |
+| `146` | Parallax occlusion mapping and detail normal blending. |
+| `147` | HDR/EDR output and physical camera model. |
+| `165` | Post-modernization profiling after the renderer upgrades land. |
+| `166` | Render graph resource scheduling, aliasing, and expanded pass validation. |
+| `185` | Final graphics audit across CSM, SSAO, TAA, clustered lights, HDR, fog, SSR, POM, water, and foliage. |
 
-No renderer modernization from REVIEW.md should remain in a "future" bucket beyond Cycle `128` without a new explicit review decision.
+No renderer modernization from REVIEW2 should remain in a "future" bucket beyond Cycle `196` without a new explicit review decision.
 
 ## Current Renderer Baseline
 

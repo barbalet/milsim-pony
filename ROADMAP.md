@@ -157,7 +157,9 @@ Exit criteria:
 
 ## Post-Cycle 21 Extension
 
-Cycle `21` closes the original roadmap. The maintained extension for cycles `22` to `81`, including the integrated April 23, 2026 external review backlog, now lives in [Docs/DEVELOPMENT_BACKLOG.md](Docs/DEVELOPMENT_BACKLOG.md).
+Cycle `21` closes the original roadmap. The maintained extension now lives in [Docs/DEVELOPMENT_BACKLOG.md](Docs/DEVELOPMENT_BACKLOG.md).
+
+The current extension is the Cycle `117`-`196` fully playable game plan. It keeps the existing REVIEW recovery tail, absorbs REVIEW2 in full, and adds the required playability recommendations: true mission win/fail loops, sniper hit/kill objectives, route tutorial, simplified HUD, notarized release package, performance presets, all-route minimap and audio validation, basic after-action reporting, and one polished recommended route campaign.
 
 ## Standard Cycle Cadence
 

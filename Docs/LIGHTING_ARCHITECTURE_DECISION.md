@@ -1,6 +1,6 @@
 # Lighting Architecture Decision
 
-Cycle `98` recorded the fixed-daylight renderer decision. Cycle `101` promotes the time-of-day portion of that decision into configurable renderer inputs. Cycle `102` starts the Forward+/clustered lighting path with scene-authored dynamic lights and bounded forward shader accumulation. Cycle `103` adds a scoped-safe postprocess anti-aliasing alternative with depth rejection. Cycle `104` adds a physical atmosphere baseline tied to the active time-of-day sun. Cycle `105` adds a fallback-safe indirect command path for shadow-casting object draws. Cycle `106` adds scalable SDF-style UI text for HUD, scope, and map labels. Cycle `107` adds bounded postprocess SSR with sky-probe fallback for lake/glass readability. Cycle `108` adds render graph/frame graph scaffolding for the current shadow, scene, and presentation passes. Cycle `109` keeps those renderer decisions stable while closing the audio-system REVIEW item with scene-authored mix controls. The remaining renderer items stay scheduled in the Cycle `99`-`128` recovery plan in [DEVELOPMENT_BACKLOG.md](/Users/barbalet/github/milsim-pony/Docs/DEVELOPMENT_BACKLOG.md).
+Cycle `98` recorded the fixed-daylight renderer decision. Cycle `101` promotes the time-of-day portion of that decision into configurable renderer inputs. Cycle `102` starts the Forward+/clustered lighting path with scene-authored dynamic lights and bounded forward shader accumulation. Cycle `103` adds a scoped-safe postprocess anti-aliasing alternative with depth rejection. Cycle `104` adds a physical atmosphere baseline tied to the active time-of-day sun. Cycle `105` adds a fallback-safe indirect command path for shadow-casting object draws. Cycle `106` adds scalable SDF-style UI text for HUD, scope, and map labels. Cycle `107` adds bounded postprocess SSR with sky-probe fallback for lake/glass readability. Cycle `108` adds render graph/frame graph scaffolding for the current shadow, scene, and presentation passes. Cycle `109` keeps those renderer decisions stable while closing the audio-system REVIEW item with scene-authored mix controls. The remaining renderer work is now scheduled inside the Cycle `117`-`196` playable-game plan in [DEVELOPMENT_BACKLOG.md](/Users/barbalet/github/milsim-pony/Docs/DEVELOPMENT_BACKLOG.md).
 
 ## Decision
 
@@ -48,3 +48,16 @@ The following measurements still matter, but they must support the allocated rec
 - Cycle `106`: SDF font/UI rendering complete for HUD, scope, and map labels; keep it in capture readability regression.
 - Cycle `107`: SSR/IBL reflection prototype complete for lake/glass readability; keep it in West Basin and scope capture regression.
 - Cycle `108`: render graph/frame graph scaffolding complete for current pass/resource ordering; expand it only as new renderer passes become real.
+- Cycle `125`: SSAO/HBAO-class closeout.
+- Cycle `126`: CSM closeout.
+- Cycle `127`: procedural foliage animation closeout.
+- Cycle `137`: material-pass GPU indirect rendering and GPU culling.
+- Cycle `138`: full temporal reprojection TAA with scoped fallback.
+- Cycle `139`: tiled/clustered Forward+ lighting.
+- Cycle `144`: volumetric fog and light shafts.
+- Cycle `145`: Hi-Z SSR.
+- Cycle `146`: POM and detail normal blending.
+- Cycle `147`: HDR/EDR output and physical camera model.
+- Cycle `165`: post-modernization profiling.
+- Cycle `166`: render graph resource scheduling and aliasing.
+- Cycle `185`: final graphics audit before release candidate lock.

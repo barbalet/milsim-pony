@@ -85,11 +85,11 @@ These are the highest-leverage changes to bring the engine in line with modern r
 
 *Reviewed against the current Cycle 116 development line. This section uses a stricter interpretation than the first planning pass: metadata, readouts, preview-only tools, deferrals, and "architecture decisions" do not count as done. Anything not actually usable in the current build is scheduled into the recovery cycles.*
 
-### Priority Rules From Cycle 114
+### Priority Rules From Cycle 116
 
-- **Top priority, Cycles 99-108:** anything not done yet.
-- **Next priority, Cycles 109-118:** anything only partly done.
-- **Secondary overdue priority, Cycles 119-128:** anything allocated to an earlier cycle but still incomplete, plus validation/hardening for the prior two bands.
+- **Completed recovery groundwork, Cycles 99-116:** earlier REVIEW items received usable implementation slices or honest partial-status documentation.
+- **Immediate recovery, Cycles 117-128:** finish the remaining REVIEW tail before broader campaign polish displaces it.
+- **Playable-game completion, Cycles 129-196:** complete REVIEW2, the added playability recommendations, and all outstanding fun-game/release work.
 - **Done means playable, inspectable, smoke-tested, and no longer dependent on a future implementation note.**
 
 ### Top 20 Things That Need Doing
@@ -132,37 +132,14 @@ These are the highest-leverage changes to bring the engine in line with modern r
 | G9 | Procedural wind and foliage animation | Partial | Cycle 127: secondary overdue closeout with procedural/compute foliage animation or an equivalent renderer-level implementation. |
 | G10 | Render graph / frame graph architecture | Done for scaffold | Cycle 108: current shadow, scene, and presentation passes are represented as a frame graph with imported/transient resources and dependency validation; resource aliasing and fuller scheduling remain expansion work. |
 
-### Next 30 Cycle Recovery Plan
+### Recovery Plan Superseded By The Eighty-Cycle Playable-Game Plan
 
-| Cycle | Priority | Work |
-| --- | --- | --- |
-| 99 | Completed top priority | Automated capture pipeline with batch screenshots and diff/comparison reports. |
-| 100 | Completed top priority | Real distant-building LOD/impostor renderer switching. |
-| 101 | Completed top priority | Dynamic time-of-day scenario settings and lighting changes. |
-| 102 | Completed top priority | Forward+/clustered lighting implementation start. |
-| 103 | Completed top priority | TAA or scoped-safe anti-aliasing prototype with evidence. |
-| 104 | Completed top priority | Physically based atmosphere/sky baseline. |
-| 105 | Completed top priority | GPU-driven indirect rendering prototype with capture-backed coverage notes. |
-| 106 | Completed top priority | SDF font/UI rendering for HUD, scope, and map. |
-| 107 | Completed top priority | SSR with IBL/probe fallback for lake/glass. |
-| 108 | Completed top priority | Render graph/frame graph scaffolding. |
-| 109 | Completed next priority | Fuller authored audio system and mix controls. |
-| 110 | Completed next priority | Real firing feedback loop: muzzle flash, recoil animation, miss/hit presentation. |
-| 111 | Completed next priority | Group NPC formation movement and patrol coordination. |
-| 112 | Completed next priority | Black Mountain and West Basin source-backed texture closeout. |
-| 113 | Completed next priority | 2-3 genuinely selectable/playable rehearsal routes. |
-| 114 | Completed next priority | Scope optics closeout: lens effects, mil calibration, parallax compensation. |
-| 115 | Completed next priority | Collision authoring workflow beyond preview: selectable blocker review, validation, and export guidance. |
-| 116 | Completed next priority | Save/resume and checkpoint-performance persistence closeout. |
-| 117 | Next priority | Formal Metal GPU/CPU profiling artifacts and bottleneck report. |
-| 118 | Next priority | Vegetation traversal, concealment, and occlusion feedback closeout. |
-| 119 | Secondary overdue | Difficulty tuning regression across group AI and multiple routes. |
-| 120 | Secondary overdue | Water-system reflection/caustic/specular closeout after SSR groundwork. |
-| 121 | Secondary overdue | NPC LOS debug overlay mode closeout. |
-| 122 | Secondary overdue | Objective/mission scripting expansion. |
-| 123 | Secondary overdue | Minimap accuracy verification across all playable routes. |
-| 124 | Secondary overdue | Packaging/distribution completion: notarization, CI, tester flow. |
-| 125 | Secondary overdue | SSAO/HBAO-class renderer closeout. |
-| 126 | Secondary overdue | CSM implementation closeout. |
-| 127 | Secondary overdue | Procedural foliage animation renderer closeout. |
-| 128 | Secondary overdue | End-to-end REVIEW.md recovery audit and smoke-test pack. |
+The old Cycle `99`-`128` recovery table is now the front end of the broader Cycle `117`-`196` playable-game plan in [Docs/DEVELOPMENT_BACKLOG.md](Docs/DEVELOPMENT_BACKLOG.md). The remaining REVIEW items still keep their original slots:
+
+| Cycle Band | Work |
+| --- | --- |
+| `117`-`128` | Formal profiling, vegetation interaction, difficulty regression, water, LOS overlay, mission scripting, all-route minimap validation, notarized packaging path, SSAO/HBAO, CSM, procedural foliage, and final recovery audit. |
+| `129`-`136` | Route tutorial, simplified HUD, sniper kill objectives, recommended campaign skeleton, basic AAR, all-route audio validation, performance presets, and automated gameplay harness foundation. |
+| `137`-`147` | REVIEW2 renderer/gameplay modernizations that were previously unallocated. |
+| `148`-`180` | True win/fail loop, campaign content, advanced AI, replay/AAR, release CI, all-route validation, performance presets, and fun-factor balance. |
+| `181`-`196` | Accessibility, content density, bug bash, final graphics/combat polish, capture/gameplay CI, release candidate locks, tester feedback, final REVIEW2 audit, and fully playable game candidate. |
